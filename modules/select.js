@@ -9,7 +9,13 @@ let isDragging = false;
 let isResizing = false;
 let dragStart = null;
 let dragOriginal = null;
-let resizeHandle = null; // 'p1' | 'p2' for line endpoints, 'br' for text resize
+let resizeHandle = null; // 'p1' | 'p2' for line endpoints, 'tl'|'tr'|'bl'|'br' for text corners
+let resizeAnchor = null; // { x, y } — the fixed corner during text resize
+let origBbox = null;     // original text bounding box at resize start
+let origBaselineOffY = 0; // data.y - bbox.y at resize start
+let origBaselineOffX = 0; // data.x - bbox.x at resize start
+let origDiagLen = 0;      // diagonal length of original bbox
+let origDiagVec = null;   // unit vector along anchor → dragged corner
 
 export function initSelect() {
   // Listen for color/thickness changes on selected element
@@ -177,33 +183,40 @@ function drawTextHandles(data) {
     return;
   }
 
-  const r = getHandleRadius();
+  const pad = 4;
+  const bx = bbox.x - pad;
+  const by = bbox.y - pad;
+  const bw = bbox.width + pad * 2;
+  const bh = bbox.height + pad * 2;
 
   // Dashed selection box
-  const rect = svgEl('rect', {
-    x: bbox.x - 4, y: bbox.y - 4,
-    width: bbox.width + 8, height: bbox.height + 8,
+  const selBox = svgEl('rect', {
+    x: bx, y: by, width: bw, height: bh,
     class: 'selection-box',
   });
-  dom.handleLayer.appendChild(rect);
+  dom.handleLayer.appendChild(selBox);
 
-  // Move handle (top-left)
-  const hm = svgEl('rect', {
-    x: bbox.x - 4 - r, y: bbox.y - 4 - r,
-    width: r * 2, height: r * 2,
-    class: 'handle handle-move',
-    'data-handle': 'move',
-  });
-  dom.handleLayer.appendChild(hm);
+  // 4 corner resize handles, square, 30% of the longest edge
+  const size = Math.min(bw, bh) * 0.3;
+  const hw = size;
+  const hh = size;
 
-  // Resize handle (bottom-right)
-  const hr = svgEl('rect', {
-    x: bbox.x + bbox.width + 4 - r, y: bbox.y + bbox.height + 4 - r,
-    width: r * 2, height: r * 2,
-    class: 'handle handle-resize',
-    'data-handle': 'br',
-  });
-  dom.handleLayer.appendChild(hr);
+  const corners = [
+    { handle: 'tl', x: bx,            y: by,            cursor: 'nwse-resize' },
+    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: 'nesw-resize' },
+    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: 'nesw-resize' },
+    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: 'nwse-resize' },
+  ];
+
+  for (const c of corners) {
+    const h = svgEl('rect', {
+      x: c.x, y: c.y, width: hw, height: hh,
+      class: 'handle handle-resize-corner',
+      'data-handle': c.handle,
+      style: `cursor: ${c.cursor}`,
+    });
+    dom.handleLayer.appendChild(h);
+  }
 }
 
 function getHandleRadius() {
@@ -295,12 +308,58 @@ function startResize(handleEl, startPt, e) {
     return;
   }
 
+  const data = state.elements.find(el => el.id === state.selectedId);
+  if (!data) return;
+
   isResizing = true;
   resizeHandle = handleType;
   dragStart = startPt;
+  dragOriginal = { ...data };
 
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (data) dragOriginal = { ...data };
+  // For text corner handles, compute the anchor (opposite corner) and bbox info
+  if (data.type === 'text' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
+    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+    if (textEl) {
+      try {
+        const bb = textEl.getBBox();
+        const pad = 4;
+        origBbox = {
+          x: bb.x - pad, y: bb.y - pad,
+          width: bb.width + pad * 2, height: bb.height + pad * 2,
+        };
+      } catch {
+        origBbox = { x: data.x, y: data.y - data.fontSize, width: data.fontSize * 4, height: data.fontSize };
+      }
+    }
+
+    // Baseline offset relative to bbox top-left
+    origBaselineOffX = data.x - origBbox.x;
+    origBaselineOffY = data.y - origBbox.y;
+
+    // Anchor = opposite corner of the bounding box
+    const anchorMap = {
+      tl: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+      tr: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+      bl: { x: origBbox.x + origBbox.width, y: origBbox.y },
+      br: { x: origBbox.x,                  y: origBbox.y },
+    };
+    resizeAnchor = anchorMap[handleType];
+
+    // Original diagonal length (anchor to dragged corner)
+    const draggedCornerMap = {
+      tl: { x: origBbox.x,                  y: origBbox.y },
+      tr: { x: origBbox.x + origBbox.width, y: origBbox.y },
+      bl: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+      br: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+    };
+    const dc = draggedCornerMap[handleType];
+    const dx = dc.x - resizeAnchor.x;
+    const dy = dc.y - resizeAnchor.y;
+    origDiagLen = Math.sqrt(dx * dx + dy * dy);
+    origDiagVec = origDiagLen > 0
+      ? { x: dx / origDiagLen, y: dy / origDiagLen }
+      : { x: 1, y: 1 };
+  }
 
   document.addEventListener('mousemove', onResizeMove);
   document.addEventListener('mouseup', onResizeEnd);
@@ -321,14 +380,41 @@ function onResizeMove(e) {
       data.y2 = pt.y;
     }
     updateLineSVG(data);
-  } else if (data.type === 'text' && resizeHandle === 'br') {
-    // Resize text by changing font size proportionally to drag distance
-    // Use ratio-based scaling: distance from text origin determines scale factor
-    const origBboxH = dragOriginal.fontSize; // approximate height
-    const dy = pt.y - dragStart.y;
-    const scaleFactor = 1 + dy / Math.max(origBboxH, 20);
-    const newSize = Math.max(8, Math.round(dragOriginal.fontSize * scaleFactor));
+  } else if (data.type === 'text' && resizeAnchor) {
+    // Project mouse vector onto original diagonal to get signed scale
+    const mx = pt.x - resizeAnchor.x;
+    const my = pt.y - resizeAnchor.y;
+    const projLen = mx * origDiagVec.x + my * origDiagVec.y;
+    const scaleFactor = origDiagLen > 0 ? projLen / origDiagLen : 1;
+
+    // Clamp to minimum size
+    const newSize = Math.max(8, Math.round(dragOriginal.fontSize * Math.abs(scaleFactor)));
+    const s = newSize / dragOriginal.fontSize;
+
     data.fontSize = newSize;
+
+    // Reposition so the anchor corner stays fixed.
+    // New bbox top-left = anchor - (anchor_to_origTopLeft) * s
+    // But which component depends on which corner is anchored.
+    const handle = resizeHandle;
+    if (handle === 'br') {
+      // anchor = original top-left of bbox
+      data.x = resizeAnchor.x + origBaselineOffX * s;
+      data.y = resizeAnchor.y + origBaselineOffY * s;
+    } else if (handle === 'bl') {
+      // anchor = original top-right → new top-left = anchor.x - newWidth
+      data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
+      data.y = resizeAnchor.y + origBaselineOffY * s;
+    } else if (handle === 'tr') {
+      // anchor = original bottom-left → new top-left.y = anchor.y - newHeight
+      data.x = resizeAnchor.x + origBaselineOffX * s;
+      data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
+    } else if (handle === 'tl') {
+      // anchor = original bottom-right
+      data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
+      data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
+    }
+
     updateTextSVG(data);
     document.getElementById('font-size-input').value = data.fontSize;
   }
@@ -355,15 +441,17 @@ function onResizeEnd() {
       doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2 }); updateLineSVG(data); drawHandles(data); },
       undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2 }); updateLineSVG(data); drawHandles(data); },
     });
-  } else if (data.type === 'text' && orig.fontSize !== final.fontSize) {
+  } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y)) {
     pushAction({
       description: 'Resize text',
-      doFn: () => { data.fontSize = final.fontSize; updateTextSVG(data); drawHandles(data); },
-      undoFn: () => { data.fontSize = orig.fontSize; updateTextSVG(data); drawHandles(data); },
+      doFn: () => { data.fontSize = final.fontSize; data.x = final.x; data.y = final.y; updateTextSVG(data); drawHandles(data); },
+      undoFn: () => { data.fontSize = orig.fontSize; data.x = orig.x; data.y = orig.y; updateTextSVG(data); drawHandles(data); },
     });
   }
 
   dragOriginal = null;
+  resizeAnchor = null;
+  origBbox = null;
 }
 
 // ── Delete ──────────────────────────────────────────────────────
@@ -413,7 +501,7 @@ function addTextSVGAtIndex(data, _idx) {
   addTextElement(data);
 }
 
-// We'll set these from app.js to avoid circular imports
+// We'll set these from main.js to avoid circular imports
 let _lineModule = {};
 let _textModule = {};
 

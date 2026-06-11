@@ -267,8 +267,11 @@ body {
   cursor: move;
 }
 
-#editor-svg .handle-resize {
-  cursor: nwse-resize;
+#editor-svg .handle-resize-corner {
+  fill: rgba(255, 255, 255, 0.7);
+  stroke: #0078d4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Hit area for thin lines */

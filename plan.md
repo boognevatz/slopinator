@@ -7,7 +7,7 @@ draws straight lines and places text on top of it, then exports the result as
 JPG or saves the project as a self-contained SVG for later editing.
 
 The entire UI is plain HTML + CSS + vanilla JavaScript. No frameworks, no build
-step. One `index.html`, one `style.css`, one `app.js` (may be split into
+step. One `index.html`, one `style.css`, one `main.js` (may be split into
 modules later).
 
 ---
@@ -217,7 +217,7 @@ When an element is selected:
 image_annotator/
 ├── index.html          # Single HTML page, loads CSS + JS
 ├── style.css           # All styling
-├── app.js              # Application entry, initializes modules
+├── main.js             # Application entry, initializes modules
 ├── modules/
 │   ├── editor.js       # SVG editor setup, viewBox management, image loading
 │   ├── tools.js        # Tool state machine (Select / Line / Text)
@@ -233,7 +233,7 @@ image_annotator/
 └── README.md           # (optional) brief usage instructions
 ```
 
-All modules use ES module `import`/`export`. The HTML loads `app.js` with
+All modules use ES module `import`/`export`. The HTML loads `main.js` with
 `<script type="module">`.
 
 ### 4.2 State Management
