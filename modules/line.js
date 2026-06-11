@@ -206,7 +206,7 @@ export function normalizeLineStyle(style) {
 
 export function normalizeLineMarkerSize(size) {
   const n = Number(size);
-  if (Number.isNaN(n)) return 12;
+  if (Number.isNaN(n)) return 40;
   return Math.max(2, Math.min(200, n));
 }
 
