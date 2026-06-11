@@ -188,17 +188,26 @@ export function startEditing(id) {
   const viewBox = dom.svg.viewBox.baseVal;
   const svgContentRight = svgToScreen(dom.svg, viewBox.width, 0);
   const availableWidth = svgContentRight.x - textRect.left;
+  const centerX = relX + textRect.width / 2;
+  const centerY = relY + textRect.height / 2;
+  const rotation = data.rotation || 0;
 
   textEditOverlay.style.display = 'block';
-  textEditOverlay.style.left = relX + 'px';
-  textEditOverlay.style.top = relY + 'px';
+  textEditOverlay.style.left = centerX + 'px';
+  textEditOverlay.style.top = centerY + 'px';
+  textEditOverlay.style.width = textRect.width + 'px';
+  textEditOverlay.style.height = textRect.height + 'px';
+  textEditOverlay.style.transformOrigin = 'center center';
+  textEditOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
 
   textarea.style.fontSize = scaledFontSize + 'px';
   textarea.style.lineHeight = (textRect.height / scaledFontSize).toFixed(3);
-  textarea.style.height = Math.max(textRect.height, scaledFontSize) + 'px';
+  textarea.style.height = '100%';
   textarea.style.color = data.fill;
   textarea.style.fontFamily = 'sans-serif';
-  textarea.style.width = Math.max(scaledFontSize * 2, availableWidth) + 'px';
+  textarea.style.width = '100%';
+  textarea.style.boxSizing = 'border-box';
+  textarea.style.transformOrigin = 'center center';
   textarea.value = data.content;
 
   // Hide the SVG text while editing
@@ -221,6 +230,7 @@ function finishEditing() {
   // Clear state before DOM updates to prevent re-entrant calls
   editingTextId = null;
   textEditOverlay.style.display = 'none';
+  textEditOverlay.style.transform = 'none';
 
   const data = state.elements.find(el => el.id === id);
   if (data) {
@@ -266,6 +276,7 @@ function cancelEditing() {
   const id = editingTextId;
   editingTextId = null;
   textEditOverlay.style.display = 'none';
+  textEditOverlay.style.transform = 'none';
 
   // Restore the SVG text visibility with original content
   const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
