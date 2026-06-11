@@ -129,6 +129,8 @@ export function updateImageTransform() {
   transforms.push(`translate(${-w / 2}, ${-h / 2})`);
 
   dom.imageEl.setAttribute('transform', transforms.join(' '));
+  dom.annotationLayer.setAttribute('transform', transforms.join(' '));
+  dom.handleLayer.setAttribute('transform', transforms.join(' '));
 }
 
 /**

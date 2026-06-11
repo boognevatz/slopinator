@@ -1,7 +1,7 @@
 // ── Line module: Straight line drawing ─────────────────────────
 
 import { state, dom } from './editor.js';
-import { generateId, svgEl, screenToSVG } from './utils.js';
+import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 
 let isDrawing = false;
@@ -35,7 +35,7 @@ function onMouseDown(e) {
       target.classList.contains('handle')) return;
 
   isDrawing = true;
-  startPt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  startPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
   previewLine = svgEl('line', {
     x1: startPt.x,
@@ -56,7 +56,7 @@ function onMouseDown(e) {
 
 function onMouseMove(e) {
   if (!isDrawing || !previewLine) return;
-  const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   previewLine.setAttribute('x2', pt.x);
   previewLine.setAttribute('y2', pt.y);
 }
@@ -66,7 +66,7 @@ function onMouseUp(e) {
   document.removeEventListener('mousemove', onMouseMove);
   document.removeEventListener('mouseup', onMouseUp);
 
-  const endPt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const endPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
   // Remove preview
   if (previewLine && previewLine.parentNode) {

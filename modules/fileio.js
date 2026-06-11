@@ -255,6 +255,7 @@ export function saveSVG() {
   svg += `transform="${imgTransform}" />\n`;
 
   // Annotations
+  svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
       svg += `<g id="${el.id}" data-type="line">\n`;
@@ -277,6 +278,7 @@ export function saveSVG() {
       svg += `</text>\n`;
     }
   }
+  svg += `</g>\n`;
 
   svg += `</svg>`;
 
@@ -312,6 +314,7 @@ export function exportJPG(widthOption) {
   svgStr += `transform="${imgTransform}" />\n`;
 
   // Annotations
+  svgStr += `<g transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
       svgStr += `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
@@ -330,6 +333,7 @@ export function exportJPG(widthOption) {
       svgStr += `</text>\n`;
     }
   }
+  svgStr += `</g>\n`;
 
   svgStr += `</svg>`;
 

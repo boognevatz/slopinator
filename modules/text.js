@@ -1,7 +1,7 @@
 // ── Text module: Text placement and inline editing ─────────────
 
 import { state, dom } from './editor.js';
-import { generateId, svgEl, screenToSVG, svgToScreen } from './utils.js';
+import { generateId, svgEl, screenToCoords, svgToScreen } from './utils.js';
 import { pushAction } from './history.js';
 import { switchTool } from './tools.js';
 import { selectElement } from './select.js';
@@ -81,7 +81,7 @@ function onMouseDown(e) {
   // Prevent the browser from moving focus away from our textarea
   e.preventDefault();
 
-  const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
   const id = generateId();
   const textData = {

@@ -1,7 +1,7 @@
 // ── Select module: Selection, move, resize, delete ─────────────
 
 import { state, dom } from './editor.js';
-import { svgEl, screenToSVG } from './utils.js';
+import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
 
@@ -56,7 +56,7 @@ function onMouseDown(e) {
   if (isEditing()) return;
 
   const target = e.target;
-  const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
   // Check if clicking a handle (including child elements of a handle group)
   const handleEl = target.closest ? target.closest('.handle') : null;
@@ -307,7 +307,7 @@ function startDrag(id, startPt) {
 
 function onDragMove(e) {
   if (!isDragging) return;
-  const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const dx = pt.x - dragStart.x;
   const dy = pt.y - dragStart.y;
   const data = state.elements.find(el => el.id === state.selectedId);
@@ -441,7 +441,7 @@ function startResize(handleEl, startPt, e) {
 
 function onResizeMove(e) {
   if (!isResizing) return;
-  const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data) return;
 

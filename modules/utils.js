@@ -22,13 +22,13 @@ export function svgEl(tag, attrs = {}) {
 }
 
 /**
- * Convert screen (client) coordinates to SVG user-space coordinates.
+ * Convert screen (client) coordinates to an element's local coordinate space.
  */
-export function screenToSVG(svg, clientX, clientY) {
+export function screenToCoords(svg, el, clientX, clientY) {
   const pt = svg.createSVGPoint();
   pt.x = clientX;
   pt.y = clientY;
-  const ctm = svg.getScreenCTM();
+  const ctm = el.getScreenCTM();
   if (!ctm) return { x: 0, y: 0 };
   const svgPt = pt.matrixTransform(ctm.inverse());
   return { x: svgPt.x, y: svgPt.y };
