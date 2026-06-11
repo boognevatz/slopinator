@@ -3,7 +3,7 @@
 import { initEditor, state } from './modules/editor.js';
 import { initHistory, undo, redo, canUndo, canRedo } from './modules/history.js';
 import { initPalette } from './modules/palette.js';
-import { rotateCW, rotateCCW, flipH, flipV } from './modules/transform.js';
+import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit } from './modules/transform.js';
 import { initLine, addLineElement } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection } from './modules/select.js';
@@ -32,6 +32,10 @@ function init() {
   document.getElementById('btn-rotate-ccw').addEventListener('click', rotateCCW);
   document.getElementById('btn-flip-h').addEventListener('click', flipH);
   document.getElementById('btn-flip-v').addEventListener('click', flipV);
+
+  document.getElementById('btn-zoom-in').addEventListener('click', zoomIn);
+  document.getElementById('btn-zoom-out').addEventListener('click', zoomOut);
+  document.getElementById('btn-zoom-fit').addEventListener('click', zoomFit);
 
   document.getElementById('btn-undo').addEventListener('click', () => {
     undo();
@@ -77,6 +81,18 @@ function init() {
       return;
     }
 
+    // Zoom shortcuts (+, -)
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      zoomIn();
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      zoomOut();
+      return;
+    }
+
     // Tool shortcuts (only without modifiers)
     if (!e.ctrlKey && !e.altKey && !e.metaKey) {
       switch (e.key.toLowerCase()) {
@@ -102,6 +118,18 @@ function init() {
       }
     }
   });
+
+  // ── Mousewheel zooming ──────────────────────────────────────
+  document.getElementById('editor-container').addEventListener('wheel', (e) => {
+    // Only zoom on wheel if ctrl is pressed? The prompt said "Also wire the + and - buttons to mousewheel"
+    // Usually standard map apps use mousewheel directly. Let's do that.
+    e.preventDefault();
+    if (e.deltaY < 0) {
+      zoomIn();
+    } else if (e.deltaY > 0) {
+      zoomOut();
+    }
+  }, { passive: false });
 
   // ── Window resize handling ──────────────────────────────────
   // SVG auto-scales via viewBox, no extra handling needed.

@@ -18,6 +18,7 @@ export const state = {
     rotation: 0,       // 0 | 90 | 180 | 270
     flipH: false,
     flipV: false,
+    zoomScale: 1.0,
   },
   elements: [],         // { id, type, ...props }
   selectedId: null,
@@ -59,6 +60,7 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
   state.image.rotation = 0;
   state.image.flipH = false;
   state.image.flipV = false;
+  state.image.zoomScale = 1.0;
   state.hasImage = true;
 
   // Clear previous
@@ -90,14 +92,24 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
 }
 
 /**
- * Update the SVG viewBox based on image dimensions and rotation.
+ * Update the SVG viewBox based on image dimensions, rotation, and zoom.
  */
 export function updateViewBox() {
-  const { naturalWidth, naturalHeight, rotation } = state.image;
+  if (!state.hasImage) return;
+  const { naturalWidth, naturalHeight, rotation, zoomScale } = state.image;
   const isRotated = rotation === 90 || rotation === 270;
   const vbW = isRotated ? naturalHeight : naturalWidth;
   const vbH = isRotated ? naturalWidth : naturalHeight;
-  dom.svg.setAttribute('viewBox', `0 0 ${vbW} ${vbH}`);
+  
+  // Calculate scaled dimensions
+  const scaledW = vbW / zoomScale;
+  const scaledH = vbH / zoomScale;
+  
+  // Center the viewbox
+  const x = (vbW - scaledW) / 2;
+  const y = (vbH - scaledH) / 2;
+  
+  dom.svg.setAttribute('viewBox', `${x} ${y} ${scaledW} ${scaledH}`);
 }
 
 /**
@@ -146,7 +158,7 @@ export function getViewBoxDims() {
 }
 
 function enableImageButtons(enabled) {
-  const ids = ['btn-save-svg', 'btn-export-jpg', 'btn-rotate-cw', 'btn-rotate-ccw', 'btn-flip-h', 'btn-flip-v'];
+  const ids = ['btn-save-svg', 'btn-export-jpg', 'btn-rotate-cw', 'btn-rotate-ccw', 'btn-flip-h', 'btn-flip-v', 'btn-zoom-in', 'btn-zoom-out', 'btn-zoom-fit'];
   for (const id of ids) {
     document.getElementById(id).disabled = !enabled;
   }
@@ -162,6 +174,7 @@ export function restoreState(parsed) {
   state.image.rotation = parsed.rotation || 0;
   state.image.flipH = parsed.flipH || false;
   state.image.flipV = parsed.flipV || false;
+  state.image.zoomScale = parsed.zoomScale || 1.0;
   state.hasImage = true;
 
   if (parsed.palette) state.palette = parsed.palette;

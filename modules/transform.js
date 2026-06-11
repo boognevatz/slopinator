@@ -82,3 +82,21 @@ export function flipV() {
     },
   });
 }
+
+export function zoomIn() {
+  if (!state.hasImage) return;
+  state.image.zoomScale = Math.min(10.0, Math.round((state.image.zoomScale + 0.1) * 10) / 10);
+  updateViewBox();
+}
+
+export function zoomOut() {
+  if (!state.hasImage) return;
+  state.image.zoomScale = Math.max(0.1, Math.round((state.image.zoomScale - 0.1) * 10) / 10);
+  updateViewBox();
+}
+
+export function zoomFit() {
+  if (!state.hasImage) return;
+  state.image.zoomScale = 1.0;
+  updateViewBox();
+}
