@@ -200,6 +200,49 @@ body {
 
 /* ── Empty State ─────────────────────────────────────── */
 
+#resize-notification {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 120, 212, 0.9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  z-index: 30;
+  font-size: 13px;
+}
+
+#resize-notification button {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+}
+
+#resize-notification button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+#resize-notification .close-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  margin-left: 10px;
+}
+
+#resize-notification .close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+#resize-notification[hidden] {
+  display: none !important;
+}
+
 #empty-state {
   text-align: center;
   color: #888;

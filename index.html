@@ -67,6 +67,14 @@
   </div>
 
   <div id="editor-container">
+    <div id="resize-notification" class="notification-strip" hidden>
+      <span>Image is very large. Resize to:</span>
+      <button data-width="320">320px</button>
+      <button data-width="640">640px</button>
+      <button data-width="1920">1920px</button>
+      <button data-width="original">Keep Original</button>
+      <button id="btn-close-notification" class="close-btn" title="Dismiss">×</button>
+    </div>
     <svg id="editor-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
       <defs></defs>
       <g id="image-layer"></g>

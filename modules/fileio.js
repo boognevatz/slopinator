@@ -15,6 +15,7 @@ export function initFileIO() {
   const btnSaveSvg = document.getElementById('btn-save-svg');
   const btnExportJpg = document.getElementById('btn-export-jpg');
   const exportMenu = document.getElementById('export-menu');
+  const resizeNotification = document.getElementById('resize-notification');
 
   btnOpen.addEventListener('click', () => fileInput.click());
   btnOpenEmpty.addEventListener('click', () => fileInput.click());
@@ -46,6 +47,26 @@ export function initFileIO() {
       exportJPG(width);
     });
   });
+
+  // Resize notification logic
+  document.getElementById('btn-close-notification').addEventListener('click', () => {
+    resizeNotification.hidden = true;
+  });
+
+  resizeNotification.querySelectorAll('button[data-width]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const widthOpt = e.target.dataset.width;
+      resizeNotification.hidden = true;
+      if (widthOpt !== 'original') {
+        physicallyResizeImage(parseInt(widthOpt));
+      }
+    });
+  });
+
+  // Hide notification on any tool usage
+  document.getElementById('editor-svg').addEventListener('mousedown', () => {
+    resizeNotification.hidden = true;
+  }, { capture: true });
 }
 
 // ── Open File ───────────────────────────────────────────────────
@@ -74,6 +95,14 @@ function openImageFile(file) {
       loadImage(dataURI, img.naturalWidth, img.naturalHeight);
       clearHistory();
       switchTool('text');
+      
+      const maxDim = Math.max(img.naturalWidth, img.naturalHeight);
+      const resizeNotification = document.getElementById('resize-notification');
+      if (maxDim > 1000) {
+        resizeNotification.hidden = false;
+      } else {
+        resizeNotification.hidden = true;
+      }
     };
     img.onerror = () => {
       alert('Failed to load image.');
@@ -81,6 +110,40 @@ function openImageFile(file) {
     img.src = dataURI;
   };
   reader.readAsDataURL(file);
+}
+
+// ── Resize Original Image ───────────────────────────────────────
+
+function physicallyResizeImage(targetWidth) {
+  if (!state.hasImage) return;
+
+  const currentW = state.image.naturalWidth;
+  const currentH = state.image.naturalHeight;
+
+  // Don't upscale
+  if (targetWidth >= currentW) return;
+
+  const targetHeight = Math.round((targetWidth / currentW) * currentH);
+
+  const imgEl = new Image();
+  imgEl.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw scaled down
+    ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
+    
+    // Convert back to base64
+    const newDataURI = canvas.toDataURL('image/jpeg', 0.92);
+    
+    // Reload image into editor
+    loadImage(newDataURI, targetWidth, targetHeight);
+    clearHistory();
+    switchTool('text');
+  };
+  imgEl.src = state.image.dataURI;
 }
 
 // ── Open SVG Project ────────────────────────────────────────────
