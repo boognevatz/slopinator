@@ -39,6 +39,10 @@ html, body {
   gap: 3px;
 }
 
+.toolbar-group[hidden] {
+  display: none !important;
+}
+
 .toolbar-group.separator {
   margin-left: 8px;
   padding-left: 8px;

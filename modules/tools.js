@@ -7,6 +7,12 @@ import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
 
 const toolButtons = {};
+const TOOL_SETTINGS = {
+  select: [],
+  line: ['color', 'thickness'],
+  text: ['color', 'font-size'],
+  crop: [],
+};
 
 export function initTools() {
   toolButtons.select = document.getElementById('btn-select');
@@ -20,6 +26,7 @@ export function initTools() {
 
   // Activate default tool
   activateSelect();
+  updateToolSettingsVisibility(state.activeTool);
 }
 
 export function switchTool(tool) {
@@ -40,8 +47,7 @@ export function switchTool(tool) {
     if (btn) btn.classList.toggle('active', t === tool);
   }
 
-  // Show/hide font size group
-  document.getElementById('font-size-group').hidden = tool !== 'text';
+  updateToolSettingsVisibility(tool);
 
   // Activate new
   switch (tool) {
@@ -50,4 +56,12 @@ export function switchTool(tool) {
     case 'text': activateText(); break;
     case 'crop': activateCrop(); break;
   }
+}
+
+function updateToolSettingsVisibility(tool) {
+  const visible = new Set(TOOL_SETTINGS[tool] || []);
+
+  document.getElementById('color-group').hidden = !visible.has('color');
+  document.getElementById('thickness-group').hidden = !visible.has('thickness');
+  document.getElementById('font-size-group').hidden = !visible.has('font-size');
 }

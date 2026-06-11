@@ -123,11 +123,9 @@ export function selectElement(id) {
   if (data.type === 'line') {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
-    document.getElementById('font-size-group').hidden = true;
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
-    document.getElementById('font-size-group').hidden = false;
     document.getElementById('font-size-input').value = data.fontSize;
   }
 
@@ -142,7 +140,6 @@ export function clearSelection() {
   state.selectedId = null;
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
-  document.getElementById('font-size-group').hidden = state.activeTool !== 'text';
   textInteractMode = 'resize';
 }
 
