@@ -11,7 +11,7 @@ const TOOL_SETTINGS = {
   select: [],
   line: ['color', 'thickness'],
   text: ['color', 'font-size'],
-  crop: [],
+  crop: ['crop'],
 };
 
 export function initTools() {
@@ -64,4 +64,5 @@ function updateToolSettingsVisibility(tool) {
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
+  document.getElementById('crop-group').hidden = !visible.has('crop');
 }

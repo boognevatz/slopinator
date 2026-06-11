@@ -78,6 +78,17 @@
         <input type="number" id="font-size-input" min="8" max="999" value="32" class="small-input">
       </div>
 
+      <div class="toolbar-group separator" id="crop-group" hidden>
+        <span class="toolbar-label">Crop:</span>
+        <span class="toolbar-label">W</span>
+        <input type="number" id="crop-width-input" min="1" step="1" class="small-input crop-size-input">
+        <span class="toolbar-label">x</span>
+        <input type="number" id="crop-height-input" min="1" step="1" class="small-input crop-size-input">
+        <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-original"> keep aspect</label>
+        <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-4-3"> 4:3</label>
+        <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-16-9"> 16:9</label>
+      </div>
+
       <div class="toolbar-group separator" style="margin-left: auto;">
         <span class="toolbar-label" id="image-size-label"></span>
       </div>

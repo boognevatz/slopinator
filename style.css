@@ -176,6 +176,23 @@ button.tool-btn.active {
   font-size: 12px;
 }
 
+.crop-size-input {
+  width: 72px;
+}
+
+.crop-ratio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #c8c8c8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.crop-ratio-option input {
+  margin: 0;
+}
+
 /* ── Editor Container ────────────────────────────────── */
 
 #editor-container {

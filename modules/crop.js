@@ -13,9 +13,31 @@ let resizeHandle = null;
 let dragOriginal = null;
 
 let cropBox = null;
+let cropAspectMode = null; // null | 'original' | '4:3' | '16:9'
+
+const MIN_CROP_SIZE = 10;
+
+const cropUI = {
+  widthInput: null,
+  heightInput: null,
+  ratioOriginal: null,
+  ratio43: null,
+  ratio169: null,
+};
 
 export function initCrop() {
-  // Add listeners
+  cropUI.widthInput = document.getElementById('crop-width-input');
+  cropUI.heightInput = document.getElementById('crop-height-input');
+  cropUI.ratioOriginal = document.getElementById('crop-ratio-original');
+  cropUI.ratio43 = document.getElementById('crop-ratio-4-3');
+  cropUI.ratio169 = document.getElementById('crop-ratio-16-9');
+
+  cropUI.widthInput.addEventListener('input', () => onCropSizeInput('width'));
+  cropUI.heightInput.addEventListener('input', () => onCropSizeInput('height'));
+
+  cropUI.ratioOriginal.addEventListener('change', () => onCropRatioToggle('original'));
+  cropUI.ratio43.addEventListener('change', () => onCropRatioToggle('4:3'));
+  cropUI.ratio169.addEventListener('change', () => onCropRatioToggle('16:9'));
 }
 
 export function activateCrop() {
@@ -42,6 +64,13 @@ export function activateCrop() {
     cropBox.width = Math.min(cropBox.width, w - cropBox.x);
     cropBox.height = Math.min(cropBox.height, h - cropBox.y);
   }
+
+  const ratio = getActiveCropRatio();
+  if (ratio) {
+    setCropBoxSize(cropBox.width, cropBox.width / ratio);
+  }
+
+  syncCropControls();
 
   dom.svg.addEventListener('mousedown', onMouseDown);
   drawCropOverlay();
@@ -144,6 +173,8 @@ function drawCropOverlay() {
   labelGroup.appendChild(textBg);
   labelGroup.appendChild(text);
   group.appendChild(labelGroup);
+
+  syncCropControls();
 }
 
 function onMouseDown(e) {
@@ -199,26 +230,11 @@ function onMouseMove(e) {
     cropBox.x = newX;
     cropBox.y = newY;
   } else if (isResizing) {
-    if (resizeHandle.includes('l')) {
-      const newX = Math.max(0, Math.min(dragOriginal.x + dx, dragOriginal.x + dragOriginal.width - 10));
-      cropBox.width = dragOriginal.width + (dragOriginal.x - newX);
-      cropBox.x = newX;
-    }
-    if (resizeHandle.includes('r')) {
-      const newW = Math.max(10, Math.min(dragOriginal.width + dx, w - dragOriginal.x));
-      cropBox.width = newW;
-    }
-    if (resizeHandle.includes('t')) {
-      const newY = Math.max(0, Math.min(dragOriginal.y + dy, dragOriginal.y + dragOriginal.height - 10));
-      cropBox.height = dragOriginal.height + (dragOriginal.y - newY);
-      cropBox.y = newY;
-    }
-    if (resizeHandle.includes('b')) {
-      const newH = Math.max(10, Math.min(dragOriginal.height + dy, h - dragOriginal.y));
-      cropBox.height = newH;
-    }
+    resizeCropBoxFromDrag(pt);
   }
 
+  clampCropBoxToImage();
+  syncCropControls();
   drawCropOverlay();
 }
 
@@ -227,6 +243,220 @@ function onMouseUp(e) {
   document.removeEventListener('mouseup', onMouseUp);
   isDragging = false;
   isResizing = false;
+}
+
+function onCropSizeInput(source) {
+  if (!cropBox || !state.hasImage) return;
+
+  const widthVal = parseFloat(cropUI.widthInput.value);
+  const heightVal = parseFloat(cropUI.heightInput.value);
+  if (Number.isNaN(widthVal) || Number.isNaN(heightVal)) return;
+
+  const ratio = getActiveCropRatio();
+  let nextWidth = Math.max(MIN_CROP_SIZE, widthVal);
+  let nextHeight = Math.max(MIN_CROP_SIZE, heightVal);
+
+  if (ratio) {
+    if (source === 'width') {
+      nextHeight = nextWidth / ratio;
+    } else {
+      nextWidth = nextHeight * ratio;
+    }
+  }
+
+  setCropBoxSize(nextWidth, nextHeight);
+  drawCropOverlay();
+}
+
+function onCropRatioToggle(mode) {
+  const checkbox = getRatioCheckbox(mode);
+  if (!checkbox.checked) {
+    if (cropAspectMode === mode) {
+      cropAspectMode = null;
+    syncCropRatioChecks();
+  }
+    return;
+  }
+
+  cropAspectMode = mode;
+  syncCropRatioChecks(mode);
+
+  if (cropBox) {
+    const ratio = getActiveCropRatio();
+    if (ratio) {
+      const nextWidth = cropBox.width;
+      setCropBoxSize(nextWidth, nextWidth / ratio);
+      drawCropOverlay();
+    }
+  }
+}
+
+function getRatioCheckbox(mode) {
+  if (mode === 'original') return cropUI.ratioOriginal;
+  if (mode === '4:3') return cropUI.ratio43;
+  return cropUI.ratio169;
+}
+
+function syncCropRatioChecks(activeMode = cropAspectMode) {
+  cropUI.ratioOriginal.checked = activeMode === 'original';
+  cropUI.ratio43.checked = activeMode === '4:3';
+  cropUI.ratio169.checked = activeMode === '16:9';
+}
+
+function getActiveCropRatio() {
+  if (!state.hasImage || !cropAspectMode) return null;
+  if (cropAspectMode === 'original') {
+    return state.image.naturalWidth / state.image.naturalHeight;
+  }
+  if (cropAspectMode === '4:3') return 4 / 3;
+  if (cropAspectMode === '16:9') return 16 / 9;
+  return null;
+}
+
+function syncCropControls() {
+  if (!cropUI.widthInput || !cropUI.heightInput) return;
+  if (!cropBox) return;
+
+  cropUI.widthInput.value = Math.round(cropBox.width);
+  cropUI.heightInput.value = Math.round(cropBox.height);
+  syncCropRatioChecks();
+}
+
+function setCropBoxSize(width, height) {
+  if (!state.hasImage || !cropBox) return;
+
+  const imgW = state.image.naturalWidth;
+  const imgH = state.image.naturalHeight;
+  const centerX = cropBox.x + cropBox.width / 2;
+  const centerY = cropBox.y + cropBox.height / 2;
+  const ratio = getActiveCropRatio();
+
+  let newW = Math.max(MIN_CROP_SIZE, Math.min(width, imgW));
+  let newH = Math.max(MIN_CROP_SIZE, Math.min(height, imgH));
+
+  if (ratio) {
+    const scale = Math.min(imgW / newW, imgH / newH, 1);
+    newW *= scale;
+    newH *= scale;
+  }
+
+  cropBox.width = newW;
+  cropBox.height = newH;
+  cropBox.x = centerX - newW / 2;
+  cropBox.y = centerY - newH / 2;
+
+  clampCropBoxToImage();
+}
+
+function clampCropBoxToImage() {
+  if (!cropBox || !state.hasImage) return;
+
+  const imgW = state.image.naturalWidth;
+  const imgH = state.image.naturalHeight;
+
+  cropBox.width = Math.max(MIN_CROP_SIZE, Math.min(cropBox.width, imgW));
+  cropBox.height = Math.max(MIN_CROP_SIZE, Math.min(cropBox.height, imgH));
+
+  cropBox.x = Math.max(0, Math.min(cropBox.x, imgW - cropBox.width));
+  cropBox.y = Math.max(0, Math.min(cropBox.y, imgH - cropBox.height));
+}
+
+function resizeCropBoxFromDrag(pt) {
+  const imgW = state.image.naturalWidth;
+  const imgH = state.image.naturalHeight;
+  const ratio = getActiveCropRatio();
+
+  const box = { ...dragOriginal };
+
+  if (ratio) {
+    applyRatioResize(box, pt, ratio);
+  } else {
+    applyFreeResize(box, pt);
+  }
+
+  if (ratio) {
+    const scale = Math.min(imgW / box.width, imgH / box.height, 1);
+    box.width *= scale;
+    box.height *= scale;
+  }
+
+  box.width = Math.max(MIN_CROP_SIZE, Math.min(box.width, imgW));
+  box.height = Math.max(MIN_CROP_SIZE, Math.min(box.height, imgH));
+
+  box.x = Math.max(0, Math.min(box.x, imgW - box.width));
+  box.y = Math.max(0, Math.min(box.y, imgH - box.height));
+
+  cropBox = box;
+}
+
+function applyFreeResize(box, pt) {
+  if (resizeHandle.includes('l')) {
+    const x2 = dragOriginal.x + dragOriginal.width;
+    box.x = Math.max(0, Math.min(pt.x, x2 - MIN_CROP_SIZE));
+    box.width = x2 - box.x;
+  }
+  if (resizeHandle.includes('r')) {
+    box.width = Math.max(MIN_CROP_SIZE, pt.x - dragOriginal.x);
+  }
+  if (resizeHandle.includes('t')) {
+    const y2 = dragOriginal.y + dragOriginal.height;
+    box.y = Math.max(0, Math.min(pt.y, y2 - MIN_CROP_SIZE));
+    box.height = y2 - box.y;
+  }
+  if (resizeHandle.includes('b')) {
+    box.height = Math.max(MIN_CROP_SIZE, pt.y - dragOriginal.y);
+  }
+}
+
+function applyRatioResize(box, pt, ratio) {
+  const left = dragOriginal.x;
+  const right = dragOriginal.x + dragOriginal.width;
+  const top = dragOriginal.y;
+  const bottom = dragOriginal.y + dragOriginal.height;
+
+  let width;
+  let height;
+
+  if (resizeHandle === 'br') {
+    width = Math.max(MIN_CROP_SIZE, pt.x - left);
+    height = width / ratio;
+    if (height > pt.y - top) {
+      height = Math.max(MIN_CROP_SIZE, pt.y - top);
+      width = height * ratio;
+    }
+    box.x = left;
+    box.y = top;
+  } else if (resizeHandle === 'bl') {
+    width = Math.max(MIN_CROP_SIZE, right - pt.x);
+    height = width / ratio;
+    if (height > pt.y - top) {
+      height = Math.max(MIN_CROP_SIZE, pt.y - top);
+      width = height * ratio;
+    }
+    box.x = right - width;
+    box.y = top;
+  } else if (resizeHandle === 'tr') {
+    width = Math.max(MIN_CROP_SIZE, pt.x - left);
+    height = width / ratio;
+    if (height > bottom - pt.y) {
+      height = Math.max(MIN_CROP_SIZE, bottom - pt.y);
+      width = height * ratio;
+    }
+    box.x = left;
+    box.y = bottom - height;
+  } else if (resizeHandle === 'tl') {
+    width = Math.max(MIN_CROP_SIZE, right - pt.x);
+    height = width / ratio;
+    if (height > bottom - pt.y) {
+      height = Math.max(MIN_CROP_SIZE, bottom - pt.y);
+      width = height * ratio;
+    }
+    box.x = right - width;
+    box.y = bottom - height;
+  }
+
+  box.width = width;
+  box.height = height;
 }
 
 function applyCrop() {
