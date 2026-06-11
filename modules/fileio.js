@@ -67,6 +67,76 @@ export function initFileIO() {
   document.getElementById('editor-svg').addEventListener('mousedown', () => {
     resizeNotification.hidden = true;
   }, { capture: true });
+
+  // ── Resize dropdown ─────────────────────────────────────────
+  const sizeLabel = document.getElementById('image-size-label');
+  const resizeMenu = document.getElementById('resize-menu');
+  const resizeW = document.getElementById('resize-width-input');
+  const resizeH = document.getElementById('resize-height-input');
+  const resizeRatioRadios = document.querySelectorAll('input[name="resize-ratio"]');
+  const btnResizeApply = document.getElementById('btn-resize-apply');
+  let lastResizeInput = 'width';
+
+  function getResizeRatio() {
+    for (const r of resizeRatioRadios) {
+      if (r.checked) return r.value;
+    }
+    return 'free';
+  }
+
+  function getAspectRatioValue() {
+    const mode = getResizeRatio();
+    const ow = state.image.naturalWidth;
+    const oh = state.image.naturalHeight;
+    if (mode === 'aspect') return ow / oh;
+    if (mode === '4:3') return 4 / 3;
+    if (mode === '16:9') return 16 / 9;
+    return null;
+  }
+
+  function applyAspectRatio(changed) {
+    const ratio = getAspectRatioValue();
+    if (ratio === null) return;
+    if (changed === 'width') {
+      const w = parseFloat(resizeW.value);
+      if (!isNaN(w) && w > 0) resizeH.value = Math.round(w / ratio);
+    } else {
+      const h = parseFloat(resizeH.value);
+      if (!isNaN(h) && h > 0) resizeW.value = Math.round(h * ratio);
+    }
+  }
+
+  sizeLabel.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!state.hasImage) return;
+    const dims = getViewBoxDims();
+    resizeW.value = Math.round(dims.width);
+    resizeH.value = Math.round(dims.height);
+    resizeMenu.hidden = !resizeMenu.hidden;
+    if (!resizeMenu.hidden) { resizeW.focus(); resizeW.select(); }
+  });
+
+  resizeW.addEventListener('focus', () => { lastResizeInput = 'width'; });
+  resizeH.addEventListener('focus', () => { lastResizeInput = 'height'; });
+  resizeW.addEventListener('input', () => applyAspectRatio('width'));
+  resizeH.addEventListener('input', () => applyAspectRatio('height'));
+  resizeRatioRadios.forEach(r => r.addEventListener('change', () => {
+    applyAspectRatio(lastResizeInput);
+  }));
+
+  document.addEventListener('click', (e) => {
+    if (!resizeMenu.hidden && !e.target.closest('#resize-dropdown')) {
+      resizeMenu.hidden = true;
+    }
+  });
+
+  btnResizeApply.addEventListener('click', () => {
+    const w = parseInt(resizeW.value);
+    const h = parseInt(resizeH.value);
+    if (isNaN(w) || isNaN(h) || w < 1 || h < 1) return;
+    resizeMenu.hidden = true;
+    resizeImage(w, h);
+  });
 }
 
 // ── Open File ───────────────────────────────────────────────────
@@ -140,6 +210,72 @@ function physicallyResizeImage(targetWidth) {
     
     // Reload image into editor
     loadImage(newDataURI, targetWidth, targetHeight);
+    clearHistory();
+    switchTool('text');
+  };
+  imgEl.src = state.image.dataURI;
+}
+
+function resizeImage(newWidth, newHeight) {
+  if (!state.hasImage) return;
+  newWidth = Math.round(newWidth);
+  newHeight = Math.round(newHeight);
+  if (newWidth < 1 || newHeight < 1) return;
+
+  const dims = getViewBoxDims();
+  const scaleX = newWidth / dims.width;
+  const scaleY = newHeight / dims.height;
+  const uniformScale = Math.min(scaleX, scaleY);
+
+  // Save and scale elements before loadImage destroys them
+  const savedElements = state.elements.map(el => {
+    if (el.type === 'line') {
+      return {
+        ...el,
+        x1: Math.round(el.x1 * scaleX),
+        y1: Math.round(el.y1 * scaleY),
+        x2: Math.round(el.x2 * scaleX),
+        y2: Math.round(el.y2 * scaleY),
+        lineMarkerSize: el.lineMarkerSize ? Math.round(el.lineMarkerSize * uniformScale) : el.lineMarkerSize,
+        startDecorationSize: el.startDecorationSize ? Math.round(el.startDecorationSize * uniformScale) : undefined,
+        endDecorationSize: el.endDecorationSize ? Math.round(el.endDecorationSize * uniformScale) : undefined,
+      };
+    } else if (el.type === 'text') {
+      return {
+        ...el,
+        x: Math.round(el.x * scaleX),
+        y: Math.round(el.y * scaleY),
+        fontSize: Math.round(el.fontSize * uniformScale),
+      };
+    }
+    return el;
+  });
+
+  const rot = state.image.rotation;
+  const isRotated = rot === 90 || rot === 270;
+  const newNatW = isRotated ? newHeight : newWidth;
+  const newNatH = isRotated ? newWidth : newHeight;
+
+  const imgEl = new Image();
+  imgEl.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = newNatW;
+    canvas.height = newNatH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, newNatW, newNatH);
+    const newDataURI = canvas.toDataURL('image/jpeg', 0.92);
+
+    loadImage(newDataURI, newNatW, newNatH);
+
+    for (const el of savedElements) {
+      if (el.type === 'line') {
+        addLineElement(el);
+      } else if (el.type === 'text') {
+        addTextElement(el);
+      }
+      state.elements.push(el);
+    }
+
     clearHistory();
     switchTool('text');
   };

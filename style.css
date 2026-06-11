@@ -106,6 +106,11 @@ button.tool-btn.active {
   box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
 
+.dropdown-menu.dropdown-menu-right {
+  left: auto;
+  right: 0;
+}
+
 .dropdown-menu button {
   display: block;
   width: 100%;

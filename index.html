@@ -57,7 +57,27 @@
       </div>
 
       <div class="toolbar-group separator" style="margin-left: auto;">
-        <span class="toolbar-label" id="image-size-label"></span>
+        <div class="dropdown" id="resize-dropdown">
+          <span class="toolbar-label" id="image-size-label" style="cursor: pointer;"></span>
+          <div class="dropdown-menu dropdown-menu-right" id="resize-menu" hidden>
+            <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 10px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="toolbar-label">W:</span>
+                <input type="number" id="resize-width-input" class="small-input crop-size-input" min="1">
+                <span class="toolbar-label">×</span>
+                <span class="toolbar-label">H:</span>
+                <input type="number" id="resize-height-input" class="small-input crop-size-input" min="1">
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="free"> Free</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="aspect" checked> Keep aspect</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="4:3"> 4:3</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="16:9"> 16:9</label>
+              </div>
+              <button id="btn-resize-apply" style="width:100%;">Resize</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
