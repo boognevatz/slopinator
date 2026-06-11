@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Annotator v0.1</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="toolbar">
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <button id="btn-open" title="Open Image or SVG Project">Open</button>
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.svg" hidden>
+        <button id="btn-save-svg" title="Save SVG (Ctrl+S)" disabled>Save SVG</button>
+        <div class="dropdown" id="export-dropdown">
+          <button id="btn-export-jpg" title="Export as JPG" disabled>Export JPG ▾</button>
+          <div class="dropdown-menu" id="export-menu" hidden>
+            <button data-width="320">320px wide</button>
+            <button data-width="640">640px wide</button>
+            <button data-width="1920">1920px wide</button>
+            <button data-width="original">Original size</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar-group separator">
+        <button id="btn-select" class="tool-btn active" title="Select (V)" data-tool="select">Select</button>
+        <button id="btn-line" class="tool-btn" title="Line (L)" data-tool="line">Line</button>
+        <button id="btn-text" class="tool-btn" title="Text (T)" data-tool="text">Text</button>
+      </div>
+
+      <div class="toolbar-group separator">
+        <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+        <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
+      </div>
+
+      <div class="toolbar-group separator">
+        <button id="btn-rotate-cw" title="Rotate 90° CW" disabled>⟳ CW</button>
+        <button id="btn-rotate-ccw" title="Rotate 90° CCW" disabled>⟲ CCW</button>
+        <button id="btn-flip-h" title="Flip Horizontal" disabled>↔ Flip H</button>
+        <button id="btn-flip-v" title="Flip Vertical" disabled>↕ Flip V</button>
+      </div>
+
+      <div class="toolbar-group separator">
+        <button id="btn-delete" title="Delete selected (Del)" disabled>🗑 Delete</button>
+      </div>
+    </div>
+
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <span class="toolbar-label">Color:</span>
+        <div id="color-palette" class="palette"></div>
+        <input type="color" id="color-picker-hidden" hidden>
+      </div>
+
+      <div class="toolbar-group separator">
+        <span class="toolbar-label">Thickness:</span>
+        <div id="thickness-presets" class="thickness-bar"></div>
+      </div>
+
+      <div class="toolbar-group separator" id="font-size-group" hidden>
+        <span class="toolbar-label">Font size:</span>
+        <input type="number" id="font-size-input" min="8" max="999" value="32" class="small-input">
+      </div>
+    </div>
+  </div>
+
+  <div id="editor-container">
+    <svg id="editor-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <defs></defs>
+      <g id="image-layer"></g>
+      <g id="annotation-layer"></g>
+      <g id="handle-layer"></g>
+    </svg>
+    <div id="empty-state">
+      <p>Open an image or SVG project to start annotating</p>
+      <button id="btn-open-empty">Open File</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
