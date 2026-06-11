@@ -153,32 +153,38 @@ export function startEditing(id) {
   const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
   if (!textEl) return;
 
-  // Position the textarea over the text element
-  const screenPt = svgToScreen(dom.svg, data.x, data.y);
   const textarea = textEditOverlay.querySelector('textarea');
 
-  // Compute approximate scale: how many screen pixels per SVG unit
-  const svgRect = dom.svg.getBoundingClientRect();
-  const viewBox = dom.svg.viewBox.baseVal;
-  const scale = svgRect.width / viewBox.width;
+  // Get the actual rendered bounding box of the SVG text element
+  const textRect = textEl.getBoundingClientRect();
 
-  const scaledFontSize = data.fontSize * scale;
-
-  // Convert viewport coords to container-relative coords
+  // Container-relative coords
   const container = document.getElementById('editor-container');
   const containerRect = container.getBoundingClientRect();
-  const relX = screenPt.x - containerRect.left;
-  const relY = screenPt.y - containerRect.top;
+  const relX = textRect.left - containerRect.left;
+  const relY = textRect.top - containerRect.top;
+
+  // Get the true SVG-to-screen scale via the CTM (handles letterboxing correctly)
+  const ctm = dom.svg.getScreenCTM();
+  const scale = ctm ? ctm.a : 1;
+  const scaledFontSize = data.fontSize * scale;
+
+  // Compute available width: from text left edge to the right edge of the
+  // SVG *content area* (not the container or the SVG element)
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgContentRight = svgToScreen(dom.svg, viewBox.width, 0);
+  const availableWidth = svgContentRight.x - textRect.left;
 
   textEditOverlay.style.display = 'block';
   textEditOverlay.style.left = relX + 'px';
-  textEditOverlay.style.top = (relY - scaledFontSize) + 'px';
+  textEditOverlay.style.top = relY + 'px';
 
   textarea.style.fontSize = scaledFontSize + 'px';
+  textarea.style.lineHeight = (textRect.height / scaledFontSize).toFixed(3);
+  textarea.style.height = Math.max(textRect.height, scaledFontSize) + 'px';
   textarea.style.color = data.fill;
   textarea.style.fontFamily = 'sans-serif';
-  textarea.style.width = Math.max(200, containerRect.width - relX - 20) + 'px';
-  textarea.style.minHeight = (scaledFontSize + 8) + 'px';
+  textarea.style.width = Math.max(scaledFontSize * 2, availableWidth) + 'px';
   textarea.value = data.content;
 
   // Hide the SVG text while editing

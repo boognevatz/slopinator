@@ -286,15 +286,21 @@ body {
   position: absolute;
   display: none;
   z-index: 20;
+  pointer-events: none;
 }
 
 #text-edit-overlay textarea {
-  background: rgba(0,0,0,0.7);
+  pointer-events: auto;
+  background: transparent;
   color: #fff;
-  border: 1px solid #0078d4;
+  border: none;
   font-family: sans-serif;
   resize: none;
   outline: none;
-  padding: 2px 4px;
+  padding: 0;
+  margin: 0;
   overflow: hidden;
+  caret-color: #0078d4;
+  /* Thin highlight so user knows they're editing */
+  box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.5);
 }
