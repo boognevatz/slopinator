@@ -11,6 +11,7 @@ let lineStyleButtons = null;
 let lineMarkerSizeInput = null;
 
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
+const LINE_DECORATIONS = ['none', 'arrow', 'circle'];
 
 export function initLine() {
   ensureLineMarkers();
@@ -119,6 +120,7 @@ function onMouseUp(e) {
     strokeWidth: state.activeThickness,
     lineStyle: state.activeLineStyle,
     lineMarkerSize: state.activeLineMarkerSize,
+    ...legacyStyleToDecorations(state.activeLineStyle, state.activeLineMarkerSize),
   };
 
   addLineElement(lineData);
@@ -154,8 +156,13 @@ function cancelDraw() {
  */
 export function addLineElement(data) {
   const group = svgEl('g', { id: data.id, 'data-type': 'line' });
-  group.dataset.lineStyle = normalizeLineStyle(data.lineStyle);
-  group.dataset.lineMarkerSize = normalizeLineMarkerSize(data.lineMarkerSize);
+  const lineState = getLineState(data);
+  group.dataset.lineStyle = normalizeLineStyle(lineState.lineStyle);
+  group.dataset.lineMarkerSize = normalizeLineMarkerSize(lineState.lineMarkerSize);
+  group.dataset.startDecoration = lineState.startDecoration;
+  group.dataset.endDecoration = lineState.endDecoration;
+  group.dataset.startDecorationSize = lineState.startDecorationSize;
+  group.dataset.endDecorationSize = lineState.endDecorationSize;
 
   // Visible line
   const line = svgEl('line', {
@@ -170,7 +177,7 @@ export function addLineElement(data) {
   applyLineStyle(line, data.lineStyle);
 
   // Decorations for arrows / circle
-  const decorations = buildLineDecorations(data);
+  const decorations = buildLineDecorations(lineState, data.stroke);
 
   // Invisible wider hit area for easier selection
   const hitArea = svgEl('line', {
@@ -201,6 +208,37 @@ export function normalizeLineMarkerSize(size) {
   const n = Number(size);
   if (Number.isNaN(n)) return 12;
   return Math.max(2, Math.min(200, n));
+}
+
+export function normalizeLineDecoration(value) {
+  if (LINE_DECORATIONS.includes(value)) return value;
+  if (value === 'arrow' || value === 'arrows') return 'arrow';
+  if (value === 'circle') return 'circle';
+  return 'none';
+}
+
+export function styleToDecoration(style) {
+  if (style === 'arrows') return 'arrow';
+  if (style === 'circle') return 'circle';
+  return 'none';
+}
+
+export function decorationToStyle(decoration) {
+  if (decoration === 'arrow') return 'arrows';
+  if (decoration === 'circle') return 'circle';
+  return 'normal';
+}
+
+function legacyStyleToDecorations(style, size) {
+  const norm = normalizeLineStyle(style);
+  const markerSize = normalizeLineMarkerSize(size);
+  if (norm === 'arrows') {
+    return { startDecoration: 'arrow', endDecoration: 'arrow', startDecorationSize: markerSize, endDecorationSize: markerSize };
+  }
+  if (norm === 'circle') {
+    return { startDecoration: 'circle', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
+  }
+  return { startDecoration: 'none', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
 }
 
 export function applyLineStyle(el, style) {
@@ -240,17 +278,20 @@ function ensureLineMarkers() {
 
 function buildLineDecorations(data) {
   const group = svgEl('g', { class: 'line-decorations', 'pointer-events': 'none' });
-  const style = normalizeLineStyle(data.lineStyle);
-  const size = normalizeLineMarkerSize(data.lineMarkerSize);
   const lineColor = data.stroke || '#000';
 
-  if (style === 'arrows') {
-    group.appendChild(buildArrow(data.x1, data.y1, data.x2, data.y2, size, lineColor));
-    group.appendChild(buildArrow(data.x2, data.y2, data.x1, data.y1, size, lineColor));
-  } else if (style === 'circle') {
-    group.appendChild(buildCircle(data.x1, data.y1, data.x2, data.y2, size, lineColor));
+  if (data.startDecoration && data.startDecoration !== 'none') {
+    group.appendChild(buildDecoration(data.startDecoration, data.x1, data.y1, data.x2, data.y2, normalizeLineMarkerSize(data.startDecorationSize), lineColor));
+  }
+  if (data.endDecoration && data.endDecoration !== 'none') {
+    group.appendChild(buildDecoration(data.endDecoration, data.x2, data.y2, data.x1, data.y1, normalizeLineMarkerSize(data.endDecorationSize), lineColor));
   }
   return group;
+}
+
+function buildDecoration(type, x1, y1, x2, y2, size, color) {
+  if (type === 'circle') return buildCircle(x1, y1, x2, y2, size, color);
+  return buildArrow(x1, y1, x2, y2, size, color);
 }
 
 function buildArrow(x1, y1, x2, y2, size, color) {
@@ -288,19 +329,24 @@ function buildCircle(x1, y1, x2, y2, size, color) {
 }
 
 export function getLineDecorationsSvg(data) {
-  const style = normalizeLineStyle(data.lineStyle);
-  const size = normalizeLineMarkerSize(data.lineMarkerSize);
   const color = data.stroke || '#000';
-  if (style === 'arrows') {
-    const a1 = getArrowPoints(data.x1, data.y1, data.x2, data.y2, size);
-    const a2 = getArrowPoints(data.x2, data.y2, data.x1, data.y1, size);
-    return `<polygon points="${a1}" fill="${color}" /><polygon points="${a2}" fill="${color}" />`;
+  const out = [];
+  if (data.startDecoration && data.startDecoration !== 'none') {
+    out.push(getDecorationSvg(data.startDecoration, data.x1, data.y1, data.x2, data.y2, normalizeLineMarkerSize(data.startDecorationSize), color));
   }
-  if (style === 'circle') {
-    const c = getCircleAttrs(data.x1, data.y1, data.x2, data.y2, size);
+  if (data.endDecoration && data.endDecoration !== 'none') {
+    out.push(getDecorationSvg(data.endDecoration, data.x2, data.y2, data.x1, data.y1, normalizeLineMarkerSize(data.endDecorationSize), color));
+  }
+  return out.join('');
+}
+
+function getDecorationSvg(type, x1, y1, x2, y2, size, color) {
+  if (type === 'circle') {
+    const c = getCircleAttrs(x1, y1, x2, y2, size);
     return `<circle cx="${c.cx}" cy="${c.cy}" r="${c.r}" fill="${color}" />`;
   }
-  return '';
+  const points = getArrowPoints(x1, y1, x2, y2, size);
+  return `<polygon points="${points}" fill="${color}" />`;
 }
 
 function getArrowPoints(x1, y1, x2, y2, size) {

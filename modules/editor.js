@@ -29,6 +29,7 @@ export const state = {
   activeLineStyle: 'normal',
   activeLineMarkerSize: 12,
   activeLineEditMode: 'move',
+  activeLineEndpoint: 'end',
   activeFontSize: 32,
   palette: [...DEFAULT_PALETTE],
   thicknessPresets: [...DEFAULT_THICKNESS],

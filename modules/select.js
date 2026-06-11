@@ -4,7 +4,7 @@ import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
-import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement } from './line.js';
+import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle } from './line.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -21,6 +21,7 @@ let textInteractMode = 'resize'; // 'resize' | 'rotate'
 let origRotation = 0;     // original rotation angle when starting rotation
 let rotationCenter = null; // { cx, cy }
 let lineEditMode = 'move';  // 'move' | 'change-end'
+let selectedLineEndpoint = 'end'; // 'start' | 'end'
 
 
 export function initSelect() {
@@ -67,10 +68,34 @@ function setLineEditMode(mode) {
     changeBtn.classList.toggle('active', mode === 'change-end');
   }
   const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
-  if (data) {
-    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: data.id, data } }));
+  if (data && data.type === 'line' && lineEditMode === 'change-end') {
+    setSelectedLineEndpoint(getDefaultLineEndpoint(data));
   }
   refreshSelection();
+}
+
+function setSelectedLineEndpoint(endpoint) {
+  selectedLineEndpoint = endpoint === 'start' ? 'start' : 'end';
+  state.activeLineEndpoint = selectedLineEndpoint;
+
+  const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
+  if (data && data.type === 'line') {
+    syncLineToolbarFromSelection(data);
+  }
+}
+
+function getDefaultLineEndpoint(data) {
+  if (normalizeLineDecoration(data.endDecoration) !== 'none') return 'end';
+  if (normalizeLineDecoration(data.startDecoration) !== 'none') return 'start';
+  return 'end';
+}
+
+function syncLineToolbarFromSelection(data) {
+  const endpoint = selectedLineEndpoint === 'start' ? 'start' : 'end';
+  const decoration = endpoint === 'start' ? normalizeLineDecoration(data.startDecoration) : normalizeLineDecoration(data.endDecoration);
+  const size = endpoint === 'start' ? normalizeLineMarkerSize(data.startDecorationSize ?? data.lineMarkerSize) : normalizeLineMarkerSize(data.endDecorationSize ?? data.lineMarkerSize);
+  setActiveLineStyle(decorationToStyle(decoration));
+  setActiveLineMarkerSize(size);
 }
 
 export function activateSelect() {
@@ -104,6 +129,17 @@ function onMouseDown(e) {
       return;
     }
 
+    if (state.selectedId) {
+      const selected = state.elements.find(el => el.id === state.selectedId);
+      if (selected && selected.type === 'line' && lineEditMode === 'change-end') {
+        if (handleEl.dataset.handle === 'p1' || handleEl.dataset.handle === 'p2') {
+          setSelectedLineEndpoint(handleEl.dataset.handle === 'p1' ? 'start' : 'end');
+          refreshSelection();
+          return;
+        }
+      }
+    }
+
     startResize(handleEl, pt, e);
     return;
   }
@@ -125,6 +161,10 @@ function onMouseDown(e) {
     }
 
     selectElement(id);
+    const data = state.elements.find(el => el.id === id);
+    if (data && data.type === 'line' && lineEditMode === 'change-end') {
+      return;
+    }
     startDrag(id, pt);
     return;
   }
@@ -156,8 +196,9 @@ export function selectElement(id) {
   if (data.type === 'line') {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
-    setActiveLineStyle(normalizeLineStyle(data.lineStyle));
-    setActiveLineMarkerSize(normalizeLineMarkerSize(data.lineMarkerSize));
+    selectedLineEndpoint = getDefaultLineEndpoint(data);
+    state.activeLineEndpoint = selectedLineEndpoint;
+    syncLineToolbarFromSelection(data);
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -191,15 +232,17 @@ function drawHandles(data) {
 function drawLineHandles(data) {
   // Endpoint handles
   const r = getHandleRadius();
+  const startActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'start';
+  const endActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'end';
 
   const h1 = svgEl('circle', {
     cx: data.x1, cy: data.y1, r,
-    class: 'handle handle-endpoint',
+    class: 'handle handle-endpoint' + (startActive ? ' active' : ''),
     'data-handle': 'p1',
   });
   const h2 = svgEl('circle', {
     cx: data.x2, cy: data.y2, r,
-    class: 'handle handle-endpoint',
+    class: 'handle handle-endpoint' + (endActive ? ' active' : ''),
     'data-handle': 'p2',
   });
 
