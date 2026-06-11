@@ -10,6 +10,8 @@ import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelec
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 
+import { dom } from './modules/editor.js';
+
 function init() {
   initEditor();
 
@@ -121,13 +123,21 @@ function init() {
 
   // ── Mousewheel zooming ──────────────────────────────────────
   document.getElementById('editor-container').addEventListener('wheel', (e) => {
-    // Only zoom on wheel if ctrl is pressed? The prompt said "Also wire the + and - buttons to mousewheel"
-    // Usually standard map apps use mousewheel directly. Let's do that.
     e.preventDefault();
+    if (!state.hasImage) return;
+
+    // Get mouse position in absolute SVG coordinates for "zoom to cursor"
+    const pt = dom.svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = dom.svg.getScreenCTM();
+    if (!ctm) return;
+    const svgPt = pt.matrixTransform(ctm.inverse());
+
     if (e.deltaY < 0) {
-      zoomIn();
+      zoomIn(svgPt.x, svgPt.y);
     } else if (e.deltaY > 0) {
-      zoomOut();
+      zoomOut(svgPt.x, svgPt.y);
     }
   }, { passive: false });
 

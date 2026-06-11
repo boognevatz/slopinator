@@ -19,6 +19,8 @@ export const state = {
     flipH: false,
     flipV: false,
     zoomScale: 1.0,
+    zoomX: 0,
+    zoomY: 0,
   },
   elements: [],         // { id, type, ...props }
   selectedId: null,
@@ -61,6 +63,8 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
   state.image.flipH = false;
   state.image.flipV = false;
   state.image.zoomScale = 1.0;
+  state.image.zoomX = 0;
+  state.image.zoomY = 0;
   state.hasImage = true;
 
   // Clear previous
@@ -96,7 +100,7 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
  */
 export function updateViewBox() {
   if (!state.hasImage) return;
-  const { naturalWidth, naturalHeight, rotation, zoomScale } = state.image;
+  const { naturalWidth, naturalHeight, rotation, zoomScale, zoomX, zoomY } = state.image;
   const isRotated = rotation === 90 || rotation === 270;
   const vbW = isRotated ? naturalHeight : naturalWidth;
   const vbH = isRotated ? naturalWidth : naturalHeight;
@@ -105,11 +109,7 @@ export function updateViewBox() {
   const scaledW = vbW / zoomScale;
   const scaledH = vbH / zoomScale;
   
-  // Center the viewbox
-  const x = (vbW - scaledW) / 2;
-  const y = (vbH - scaledH) / 2;
-  
-  dom.svg.setAttribute('viewBox', `${x} ${y} ${scaledW} ${scaledH}`);
+  dom.svg.setAttribute('viewBox', `${zoomX} ${zoomY} ${scaledW} ${scaledH}`);
 }
 
 /**
@@ -175,6 +175,8 @@ export function restoreState(parsed) {
   state.image.flipH = parsed.flipH || false;
   state.image.flipV = parsed.flipV || false;
   state.image.zoomScale = parsed.zoomScale || 1.0;
+  state.image.zoomX = parsed.zoomX || 0;
+  state.image.zoomY = parsed.zoomY || 0;
   state.hasImage = true;
 
   if (parsed.palette) state.palette = parsed.palette;
