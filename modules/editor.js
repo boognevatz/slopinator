@@ -19,8 +19,7 @@ export const state = {
     flipH: false,
     flipV: false,
     zoomScale: 1.0,
-    zoomX: 0,
-    zoomY: 0,
+    fitScale: 1.0,
   },
   elements: [],         // { id, type, ...props }
   selectedId: null,
@@ -63,8 +62,7 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
   state.image.flipH = false;
   state.image.flipV = false;
   state.image.zoomScale = 1.0;
-  state.image.zoomX = 0;
-  state.image.zoomY = 0;
+  state.image.fitScale = null;
   state.hasImage = true;
 
   // Clear previous
@@ -96,20 +94,40 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
 }
 
 /**
- * Update the SVG viewBox based on image dimensions, rotation, and zoom.
+ * Update the SVG viewBox and physical dimensions based on image, rotation, and zoom.
  */
 export function updateViewBox() {
   if (!state.hasImage) return;
-  const { naturalWidth, naturalHeight, rotation, zoomScale, zoomX, zoomY } = state.image;
+  const { naturalWidth, naturalHeight, rotation, zoomScale } = state.image;
   const isRotated = rotation === 90 || rotation === 270;
   const vbW = isRotated ? naturalHeight : naturalWidth;
   const vbH = isRotated ? naturalWidth : naturalHeight;
   
-  // Calculate scaled dimensions
-  const scaledW = vbW / zoomScale;
-  const scaledH = vbH / zoomScale;
-  
-  dom.svg.setAttribute('viewBox', `${zoomX} ${zoomY} ${scaledW} ${scaledH}`);
+  // The SVG internal coordinate system always matches the image natural bounding box
+  dom.svg.setAttribute('viewBox', `0 0 ${vbW} ${vbH}`);
+
+  // Calculate fitScale if it's not set (e.g. on first load)
+  const container = document.getElementById('editor-container');
+  if (!state.image.fitScale) {
+    const cW = container.clientWidth - 20; // 20px padding
+    const cH = container.clientHeight - 20;
+    state.image.fitScale = Math.min(1.0, Math.min(cW / vbW, cH / vbH));
+  }
+
+  // Calculate new physical dimensions
+  const newW = vbW * state.image.fitScale * zoomScale;
+  const newH = vbH * state.image.fitScale * zoomScale;
+
+  dom.svg.style.width = newW + 'px';
+  dom.svg.style.height = newH + 'px';
+
+  // Center horizontally/vertically if smaller than container
+  const padX = Math.max(0, (container.clientWidth - newW) / 2);
+  const padY = Math.max(0, (container.clientHeight - newH) / 2);
+  dom.svg.style.marginLeft = padX + 'px';
+  dom.svg.style.marginTop = padY + 'px';
+
+  updateLabels();
 }
 
 /**
@@ -143,6 +161,8 @@ export function updateImageTransform() {
   dom.imageEl.setAttribute('transform', transforms.join(' '));
   dom.annotationLayer.setAttribute('transform', transforms.join(' '));
   dom.handleLayer.setAttribute('transform', transforms.join(' '));
+
+  updateLabels();
 }
 
 /**
@@ -155,6 +175,22 @@ export function getViewBoxDims() {
     width: isRotated ? naturalHeight : naturalWidth,
     height: isRotated ? naturalWidth : naturalHeight,
   };
+}
+
+function updateLabels() {
+  if (!state.hasImage) {
+    document.getElementById('zoom-label').textContent = '';
+    document.getElementById('image-size-label').textContent = '';
+    return;
+  }
+
+  // Update zoom
+  const zoomPercent = Math.round(state.image.zoomScale * 100);
+  document.getElementById('zoom-label').textContent = `${zoomPercent}%`;
+
+  // Update image size
+  const dims = getViewBoxDims();
+  document.getElementById('image-size-label').textContent = `${Math.round(dims.width)} × ${Math.round(dims.height)}`;
 }
 
 function enableImageButtons(enabled) {
@@ -175,8 +211,7 @@ export function restoreState(parsed) {
   state.image.flipH = parsed.flipH || false;
   state.image.flipV = parsed.flipV || false;
   state.image.zoomScale = parsed.zoomScale || 1.0;
-  state.image.zoomX = parsed.zoomX || 0;
-  state.image.zoomY = parsed.zoomY || 0;
+  state.image.fitScale = null;
   state.hasImage = true;
 
   if (parsed.palette) state.palette = parsed.palette;

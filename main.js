@@ -35,9 +35,9 @@ function init() {
   document.getElementById('btn-flip-h').addEventListener('click', flipH);
   document.getElementById('btn-flip-v').addEventListener('click', flipV);
 
-  document.getElementById('btn-zoom-in').addEventListener('click', zoomIn);
-  document.getElementById('btn-zoom-out').addEventListener('click', zoomOut);
-  document.getElementById('btn-zoom-fit').addEventListener('click', zoomFit);
+  document.getElementById('btn-zoom-in').addEventListener('click', () => zoomIn());
+  document.getElementById('btn-zoom-out').addEventListener('click', () => zoomOut());
+  document.getElementById('btn-zoom-fit').addEventListener('click', () => zoomFit());
 
   document.getElementById('btn-undo').addEventListener('click', () => {
     undo();
@@ -126,18 +126,10 @@ function init() {
     e.preventDefault();
     if (!state.hasImage) return;
 
-    // Get mouse position in absolute SVG coordinates for "zoom to cursor"
-    const pt = dom.svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = dom.svg.getScreenCTM();
-    if (!ctm) return;
-    const svgPt = pt.matrixTransform(ctm.inverse());
-
     if (e.deltaY < 0) {
-      zoomIn(svgPt.x, svgPt.y);
+      zoomIn(e.clientX, e.clientY);
     } else if (e.deltaY > 0) {
-      zoomOut(svgPt.x, svgPt.y);
+      zoomOut(e.clientX, e.clientY);
     }
   }, { passive: false });
 

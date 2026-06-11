@@ -7,6 +7,7 @@ export function rotateCW() {
   const oldRotation = state.image.rotation;
   const newRotation = (oldRotation + 90) % 360;
   state.image.rotation = newRotation;
+  state.image.fitScale = null;
   updateViewBox();
   updateImageTransform();
 
@@ -14,11 +15,13 @@ export function rotateCW() {
     description: 'Rotate CW',
     doFn: () => {
       state.image.rotation = newRotation;
+      state.image.fitScale = null;
       updateViewBox();
       updateImageTransform();
     },
     undoFn: () => {
       state.image.rotation = oldRotation;
+      state.image.fitScale = null;
       updateViewBox();
       updateImageTransform();
     },
@@ -29,6 +32,7 @@ export function rotateCCW() {
   const oldRotation = state.image.rotation;
   const newRotation = (oldRotation + 270) % 360;
   state.image.rotation = newRotation;
+  state.image.fitScale = null;
   updateViewBox();
   updateImageTransform();
 
@@ -36,11 +40,13 @@ export function rotateCCW() {
     description: 'Rotate CCW',
     doFn: () => {
       state.image.rotation = newRotation;
+      state.image.fitScale = null;
       updateViewBox();
       updateImageTransform();
     },
     undoFn: () => {
       state.image.rotation = oldRotation;
+      state.image.fitScale = null;
       updateViewBox();
       updateImageTransform();
     },
@@ -104,36 +110,45 @@ export function zoomFit() {
 }
 
 function applyZoom(newScale, focusX, focusY) {
-  const { rotation, naturalWidth, naturalHeight, zoomScale, zoomX, zoomY } = state.image;
-  const isRotated = rotation === 90 || rotation === 270;
-  const vbW = isRotated ? naturalHeight : naturalWidth;
-  const vbH = isRotated ? naturalWidth : naturalHeight;
-
-  const oldW = vbW / zoomScale;
-  const oldH = vbH / zoomScale;
+  const container = document.getElementById('editor-container');
+  const svg = document.getElementById('editor-svg');
   
-  // If no focus provided, use the center of the current view
-  const fx = focusX !== undefined ? focusX : zoomX + oldW / 2;
-  const fy = focusY !== undefined ? focusY : zoomY + oldH / 2;
-
-  // New dimensions
-  const newW = vbW / newScale;
-  const newH = vbH / newScale;
-
-  // Keep the focus point at the exact same location in the new view
-  // fx = newZoomX + (fx_relative_to_old) * (new_w / old_w)?
-  // Actually, fx and fy are absolute SVG coords.
-  // The distance from the new zoomX to fx must be proportional to newW as the old distance was to oldW.
-  // (fx - newZoomX) / newW = (fx - zoomX) / oldW
-  // => fx - newZoomX = ((fx - zoomX) / oldW) * newW
-  // => newZoomX = fx - ((fx - zoomX) / oldW) * newW
-
-  const newZoomX = fx - ((fx - zoomX) / oldW) * newW;
-  const newZoomY = fy - ((fy - zoomY) / oldH) * newH;
-
+  // Current scroll and dimensions
+  const cW = container.clientWidth;
+  const cH = container.clientHeight;
+  const sL = container.scrollLeft;
+  const sT = container.scrollTop;
+  
+  // Calculate the relative focus point in the container viewport
+  // If focusX/Y are not provided, default to center of the viewport
+  let relX = cW / 2;
+  let relY = cH / 2;
+  
+  if (focusX !== undefined && focusY !== undefined) {
+    const cRect = container.getBoundingClientRect();
+    relX = focusX - cRect.left;
+    relY = focusY - cRect.top;
+  }
+  
+  // Find where that relative point maps to inside the scrollable content
+  const contentX = sL + relX;
+  const contentY = sT + relY;
+  
+  // Calculate how much we are scaling the physical size by
+  const scaleRatio = newScale / state.image.zoomScale;
+  
+  // Set new scale
   state.image.zoomScale = newScale;
-  state.image.zoomX = newZoomX;
-  state.image.zoomY = newZoomY;
-
-  updateViewBox();
+  updateViewBox(); // Updates svg width/height
+  
+  // Wait a microtask for DOM to update sizes so scrollLeft works
+  setTimeout(() => {
+    // The point we hovered over should move proportionally
+    const newContentX = contentX * scaleRatio;
+    const newContentY = contentY * scaleRatio;
+    
+    // Set new scroll positions so the relative point stays exactly under the mouse
+    container.scrollLeft = newContentX - relX;
+    container.scrollTop = newContentY - relY;
+  }, 0);
 }
