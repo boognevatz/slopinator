@@ -4,7 +4,7 @@ import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
-import { applyLineStyle, normalizeLineStyle, setActiveLineStyle } from './line.js';
+import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement } from './line.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -20,6 +20,7 @@ let origDiagVec = null;   // unit vector along anchor → dragged corner
 let textInteractMode = 'resize'; // 'resize' | 'rotate'
 let origRotation = 0;     // original rotation angle when starting rotation
 let rotationCenter = null; // { cx, cy }
+let lineEditMode = 'move';  // 'move' | 'change-end'
 
 
 export function initSelect() {
@@ -33,6 +34,9 @@ export function initSelect() {
   document.addEventListener('line-style-changed', (e) => {
     applyLineStyleToSelected(e.detail.style);
   });
+  document.addEventListener('line-marker-size-changed', (e) => {
+    applyLineMarkerSizeToSelected(e.detail.size);
+  });
 
   // Font size input
   const fontSizeInput = document.getElementById('font-size-input');
@@ -42,6 +46,31 @@ export function initSelect() {
     state.activeFontSize = val;
     applyFontSizeToSelected(val);
   });
+
+  const lineModeMove = document.getElementById('btn-line-mode-move');
+  const lineModeChangeEnd = document.getElementById('btn-line-mode-change-end');
+  if (lineModeMove && lineModeChangeEnd) {
+    lineModeMove.addEventListener('click', () => setLineEditMode('move'));
+    lineModeChangeEnd.addEventListener('click', () => setLineEditMode('change-end'));
+  }
+
+  setLineEditMode(state.activeLineEditMode || 'move');
+}
+
+function setLineEditMode(mode) {
+  lineEditMode = mode;
+  state.activeLineEditMode = mode;
+  const moveBtn = document.getElementById('btn-line-mode-move');
+  const changeBtn = document.getElementById('btn-line-mode-change-end');
+  if (moveBtn && changeBtn) {
+    moveBtn.classList.toggle('active', mode === 'move');
+    changeBtn.classList.toggle('active', mode === 'change-end');
+  }
+  const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
+  if (data) {
+    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: data.id, data } }));
+  }
+  refreshSelection();
 }
 
 export function activateSelect() {
@@ -128,6 +157,7 @@ export function selectElement(id) {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
     setActiveLineStyle(normalizeLineStyle(data.lineStyle));
+    setActiveLineMarkerSize(normalizeLineMarkerSize(data.lineMarkerSize));
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -176,15 +206,17 @@ function drawLineHandles(data) {
   dom.handleLayer.appendChild(h1);
   dom.handleLayer.appendChild(h2);
 
-  // Midpoint move handle
-  const mx = (data.x1 + data.x2) / 2;
-  const my = (data.y1 + data.y2) / 2;
-  const hm = svgEl('rect', {
-    x: mx - r, y: my - r, width: r * 2, height: r * 2,
-    class: 'handle handle-move',
-    'data-handle': 'move',
-  });
-  dom.handleLayer.appendChild(hm);
+  if (lineEditMode === 'move') {
+    // Midpoint move handle
+    const mx = (data.x1 + data.x2) / 2;
+    const my = (data.y1 + data.y2) / 2;
+    const hm = svgEl('rect', {
+      x: mx - r, y: my - r, width: r * 2, height: r * 2,
+      class: 'handle handle-move',
+      'data-handle': 'move',
+    });
+    dom.handleLayer.appendChild(hm);
+  }
 }
 
 function drawTextHandles(data) {
@@ -613,23 +645,7 @@ export function setModuleRefs(lineMod, textMod) {
 // ── SVG Update Helpers ──────────────────────────────────────────
 
 function updateLineSVG(data) {
-  const group = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
-  if (!group) return;
-  group.dataset.lineStyle = normalizeLineStyle(data.lineStyle);
-  const lines = group.querySelectorAll('line');
-  lines.forEach(line => {
-    line.setAttribute('x1', data.x1);
-    line.setAttribute('y1', data.y1);
-    line.setAttribute('x2', data.x2);
-    line.setAttribute('y2', data.y2);
-  });
-  // Update visible line style
-  const visibleLine = group.querySelector('.annotation-line');
-  if (visibleLine) {
-    visibleLine.setAttribute('stroke', data.stroke);
-    visibleLine.setAttribute('stroke-width', data.strokeWidth);
-    applyLineStyle(visibleLine, data.lineStyle);
-  }
+  updateLineElement(data);
 }
 
 function updateTextSVG(data) {
@@ -701,6 +717,25 @@ function applyThicknessToSelected(thickness) {
     description: 'Change thickness',
     doFn: () => { data.strokeWidth = thickness; updateLineSVG(data); },
     undoFn: () => { data.strokeWidth = oldThickness; updateLineSVG(data); },
+  });
+}
+
+function applyLineMarkerSizeToSelected(size) {
+  if (!state.selectedId) return;
+  const data = state.elements.find(el => el.id === state.selectedId);
+  if (!data || data.type !== 'line') return;
+
+  const oldSize = normalizeLineMarkerSize(data.lineMarkerSize);
+  const newSize = normalizeLineMarkerSize(size);
+  if (oldSize === newSize) return;
+
+  data.lineMarkerSize = newSize;
+  updateLineSVG(data);
+
+  pushAction({
+    description: 'Change line marker size',
+    doFn: () => { data.lineMarkerSize = newSize; updateLineSVG(data); },
+    undoFn: () => { data.lineMarkerSize = oldSize; updateLineSVG(data); },
   });
 }
 

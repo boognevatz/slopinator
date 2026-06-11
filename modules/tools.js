@@ -26,7 +26,11 @@ export function initTools() {
 
   // Activate default tool
   activateSelect();
-  updateToolSettingsVisibility(state.activeTool);
+  updateToolSettingsVisibility(state.activeTool, null);
+
+  document.addEventListener('selection-changed', (e) => {
+    updateToolSettingsVisibility(state.activeTool, e.detail?.data?.type || null);
+  });
 }
 
 export function switchTool(tool) {
@@ -47,7 +51,7 @@ export function switchTool(tool) {
     if (btn) btn.classList.toggle('active', t === tool);
   }
 
-  updateToolSettingsVisibility(tool);
+  updateToolSettingsVisibility(tool, null);
 
   // Activate new
   switch (tool) {
@@ -58,12 +62,23 @@ export function switchTool(tool) {
   }
 }
 
-function updateToolSettingsVisibility(tool) {
+function updateToolSettingsVisibility(tool, selectedType = null) {
   const visible = new Set(TOOL_SETTINGS[tool] || []);
+
+  if (tool === 'select' && selectedType === 'line') {
+    visible.add('color');
+    visible.add('thickness');
+  }
+  if (tool === 'select' && selectedType === 'text') {
+    visible.add('color');
+    visible.add('font-size');
+  }
 
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
-  document.getElementById('line-style-group').hidden = !visible.has('line-style');
+  const showLineStyle = tool === 'line' || (tool === 'select' && selectedType === 'line' && state.activeLineEditMode === 'change-end');
+  document.getElementById('line-style-group').hidden = !showLineStyle;
+  document.getElementById('line-mode-group').hidden = !(tool === 'select' && selectedType === 'line');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
   document.getElementById('delete-group').hidden = !visible.has('delete');
   document.getElementById('crop-group').hidden = !visible.has('crop');

@@ -8,6 +8,7 @@ let isDrawing = false;
 let previewLine = null;
 let startPt = null;
 let lineStyleButtons = null;
+let lineMarkerSizeInput = null;
 
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
 
@@ -19,12 +20,20 @@ export function initLine() {
     arrows: document.getElementById('btn-line-style-arrows'),
     circle: document.getElementById('btn-line-style-circle'),
   };
+  lineMarkerSizeInput = document.getElementById('line-marker-size-input');
 
   for (const [style, btn] of Object.entries(lineStyleButtons)) {
     btn.addEventListener('click', () => setActiveLineStyle(style));
   }
 
+  lineMarkerSizeInput.addEventListener('change', () => {
+    const val = parseFloat(lineMarkerSizeInput.value);
+    if (Number.isNaN(val) || val < 2) return;
+    setActiveLineMarkerSize(val);
+  });
+
   updateLineStyleButtons();
+  updateLineMarkerSizeInput();
 }
 
 export function activateLine() {
@@ -109,6 +118,7 @@ function onMouseUp(e) {
     stroke: state.activeColor,
     strokeWidth: state.activeThickness,
     lineStyle: state.activeLineStyle,
+    lineMarkerSize: state.activeLineMarkerSize,
   };
 
   addLineElement(lineData);
@@ -145,6 +155,7 @@ function cancelDraw() {
 export function addLineElement(data) {
   const group = svgEl('g', { id: data.id, 'data-type': 'line' });
   group.dataset.lineStyle = normalizeLineStyle(data.lineStyle);
+  group.dataset.lineMarkerSize = normalizeLineMarkerSize(data.lineMarkerSize);
 
   // Visible line
   const line = svgEl('line', {
@@ -158,6 +169,9 @@ export function addLineElement(data) {
   });
   applyLineStyle(line, data.lineStyle);
 
+  // Decorations for arrows / circle
+  const decorations = buildLineDecorations(data);
+
   // Invisible wider hit area for easier selection
   const hitArea = svgEl('line', {
     x1: data.x1,
@@ -169,61 +183,44 @@ export function addLineElement(data) {
 
   group.appendChild(hitArea);
   group.appendChild(line);
+  group.appendChild(decorations);
   dom.annotationLayer.appendChild(group);
+}
+
+export function updateLineElement(data) {
+  const group = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+  if (group) group.remove();
+  addLineElement(data);
 }
 
 export function normalizeLineStyle(style) {
   return LINE_STYLES.includes(style) ? style : 'normal';
 }
 
+export function normalizeLineMarkerSize(size) {
+  const n = Number(size);
+  if (Number.isNaN(n)) return 12;
+  return Math.max(2, Math.min(200, n));
+}
+
 export function applyLineStyle(el, style) {
   const norm = normalizeLineStyle(style);
   el.setAttribute('data-line-style', norm);
   el.setAttribute('stroke-linecap', 'round');
-  if (el.getAttribute('stroke')) {
-    el.setAttribute('color', el.getAttribute('stroke'));
-  }
   el.removeAttribute('marker-start');
   el.removeAttribute('marker-end');
-
-  if (norm === 'arrows') {
-    el.setAttribute('marker-start', 'url(#annotator-line-arrow-start)');
-    el.setAttribute('marker-end', 'url(#annotator-line-arrow-end)');
-  } else if (norm === 'circle') {
-    el.setAttribute('marker-start', 'url(#annotator-line-circle-start)');
-  }
-}
-
-export function getLineStyleSvgAttrs(style) {
-  const norm = normalizeLineStyle(style);
-  if (norm === 'arrows') {
-    return ' stroke-linecap="round" marker-start="url(#annotator-line-arrow-start)" marker-end="url(#annotator-line-arrow-end)"';
-  }
-  if (norm === 'circle') {
-    return ' stroke-linecap="round" marker-start="url(#annotator-line-circle-start)"';
-  }
-  return ' stroke-linecap="round"';
-}
-
-export function getLineMarkerDefsSvg() {
-  return `
-    <defs>
-      <marker id="annotator-line-arrow-start" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M10 0L0 5L10 10Z" fill="currentColor"></path>
-      </marker>
-      <marker id="annotator-line-arrow-end" markerWidth="10" markerHeight="10" refX="3" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-        <path d="M0 0L10 5L0 10Z" fill="currentColor"></path>
-      </marker>
-      <marker id="annotator-line-circle-start" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto" markerUnits="userSpaceOnUse">
-        <circle cx="5" cy="5" r="4" fill="currentColor"></circle>
-      </marker>
-    </defs>`;
 }
 
 export function setActiveLineStyle(style) {
   state.activeLineStyle = normalizeLineStyle(style);
   updateLineStyleButtons();
   document.dispatchEvent(new CustomEvent('line-style-changed', { detail: { style: state.activeLineStyle } }));
+}
+
+export function setActiveLineMarkerSize(size) {
+  state.activeLineMarkerSize = normalizeLineMarkerSize(size);
+  updateLineMarkerSizeInput();
+  document.dispatchEvent(new CustomEvent('line-marker-size-changed', { detail: { size: state.activeLineMarkerSize } }));
 }
 
 function updateLineStyleButtons() {
@@ -233,47 +230,103 @@ function updateLineStyleButtons() {
   }
 }
 
+function updateLineMarkerSizeInput() {
+  if (lineMarkerSizeInput) lineMarkerSizeInput.value = state.activeLineMarkerSize;
+}
+
 function ensureLineMarkers() {
-  if (!dom.svg) return;
-  if (dom.svg.querySelector('#annotator-line-marker-defs')) return;
-  const defsHost = dom.svg.querySelector('defs') || dom.svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg', 'defs'), dom.svg.firstChild);
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  defs.id = 'annotator-line-marker-defs';
+  // Decorations are rendered per line, no shared markers needed.
+}
 
-  const arrowStart = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-  arrowStart.setAttribute('id', 'annotator-line-arrow-start');
-  arrowStart.setAttribute('markerWidth', '10');
-  arrowStart.setAttribute('markerHeight', '10');
-  arrowStart.setAttribute('refX', '7');
-  arrowStart.setAttribute('refY', '5');
-  arrowStart.setAttribute('orient', 'auto');
-  arrowStart.setAttribute('markerUnits', 'userSpaceOnUse');
-  arrowStart.appendChild(svgEl('path', { d: 'M10 0L0 5L10 10Z', fill: 'currentColor' }));
+function buildLineDecorations(data) {
+  const group = svgEl('g', { class: 'line-decorations', 'pointer-events': 'none' });
+  const style = normalizeLineStyle(data.lineStyle);
+  const size = normalizeLineMarkerSize(data.lineMarkerSize);
+  const lineColor = data.stroke || '#000';
 
-  const arrowEnd = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-  arrowEnd.setAttribute('id', 'annotator-line-arrow-end');
-  arrowEnd.setAttribute('markerWidth', '10');
-  arrowEnd.setAttribute('markerHeight', '10');
-  arrowEnd.setAttribute('refX', '3');
-  arrowEnd.setAttribute('refY', '5');
-  arrowEnd.setAttribute('orient', 'auto');
-  arrowEnd.setAttribute('markerUnits', 'userSpaceOnUse');
-  arrowEnd.appendChild(svgEl('path', { d: 'M0 0L10 5L0 10Z', fill: 'currentColor' }));
+  if (style === 'arrows') {
+    group.appendChild(buildArrow(data.x1, data.y1, data.x2, data.y2, size, lineColor));
+    group.appendChild(buildArrow(data.x2, data.y2, data.x1, data.y1, size, lineColor));
+  } else if (style === 'circle') {
+    group.appendChild(buildCircle(data.x1, data.y1, data.x2, data.y2, size, lineColor));
+  }
+  return group;
+}
 
-  const circleStart = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-  circleStart.setAttribute('id', 'annotator-line-circle-start');
-  circleStart.setAttribute('markerWidth', '10');
-  circleStart.setAttribute('markerHeight', '10');
-  circleStart.setAttribute('refX', '5');
-  circleStart.setAttribute('refY', '5');
-  circleStart.setAttribute('orient', 'auto');
-  circleStart.setAttribute('markerUnits', 'userSpaceOnUse');
-  circleStart.appendChild(svgEl('circle', { cx: 5, cy: 5, r: 4, fill: 'currentColor' }));
+function buildArrow(x1, y1, x2, y2, size, color) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const tip = { x: x1, y: y1 };
+  const base = { x: x1 + ux * size, y: y1 + uy * size };
+  const halfW = size * 0.45;
+  const left = { x: base.x + px * halfW, y: base.y + py * halfW };
+  const right = { x: base.x - px * halfW, y: base.y - py * halfW };
+  return svgEl('polygon', {
+    points: `${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`,
+    fill: color,
+  });
+}
 
-  defs.appendChild(arrowStart);
-  defs.appendChild(arrowEnd);
-  defs.appendChild(circleStart);
-  defsHost.appendChild(defs);
+function buildCircle(x1, y1, x2, y2, size, color) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const radius = Math.max(2, size * 0.5);
+  return svgEl('circle', {
+    cx: x1 + ux * radius,
+    cy: y1 + uy * radius,
+    r: radius,
+    fill: color,
+  });
+}
+
+export function getLineDecorationsSvg(data) {
+  const style = normalizeLineStyle(data.lineStyle);
+  const size = normalizeLineMarkerSize(data.lineMarkerSize);
+  const color = data.stroke || '#000';
+  if (style === 'arrows') {
+    const a1 = getArrowPoints(data.x1, data.y1, data.x2, data.y2, size);
+    const a2 = getArrowPoints(data.x2, data.y2, data.x1, data.y1, size);
+    return `<polygon points="${a1}" fill="${color}" /><polygon points="${a2}" fill="${color}" />`;
+  }
+  if (style === 'circle') {
+    const c = getCircleAttrs(data.x1, data.y1, data.x2, data.y2, size);
+    return `<circle cx="${c.cx}" cy="${c.cy}" r="${c.r}" fill="${color}" />`;
+  }
+  return '';
+}
+
+function getArrowPoints(x1, y1, x2, y2, size) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const tip = { x: x1, y: y1 };
+  const base = { x: x1 + ux * size, y: y1 + uy * size };
+  const halfW = size * 0.45;
+  const left = { x: base.x + px * halfW, y: base.y + py * halfW };
+  const right = { x: base.x - px * halfW, y: base.y - py * halfW };
+  return `${tip.x},${tip.y} ${left.x},${left.y} ${right.x},${right.y}`;
+}
+
+function getCircleAttrs(x1, y1, x2, y2, size) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const r = Math.max(2, size * 0.5);
+  return { cx: x1 + ux * r, cy: y1 + uy * r, r };
 }
 
 function removeLineElement(id) {
