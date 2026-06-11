@@ -115,9 +115,8 @@ function drawCropOverlay() {
   const selBox = svgEl('rect', {
     x, y, width, height,
     class: 'selection-box',
-    'pointer-events': 'all', // to catch drag
     'data-handle': 'move',
-    style: 'cursor: move;'
+    style: 'cursor: move; pointer-events: all; fill: rgba(255,255,255,0.01);'
   });
   group.appendChild(selBox);
 
@@ -208,6 +207,16 @@ function onMouseDown(e) {
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
     return;
+  }
+
+  const cropOverlay = target.closest ? target.closest('#crop-overlay-group') : null;
+  if (cropOverlay) {
+    e.preventDefault();
+    isDragging = true;
+    dragStart = pt;
+    dragOriginal = { ...cropBox };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }
 }
 
