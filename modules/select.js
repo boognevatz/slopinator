@@ -58,19 +58,20 @@ function onMouseDown(e) {
   const target = e.target;
   const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
 
-  // Check if clicking a handle
-  if (target.classList.contains('handle')) {
+  // Check if clicking a handle (including child elements of a handle group)
+  const handleEl = target.closest ? target.closest('.handle') : null;
+  if (handleEl) {
     e.preventDefault();
     e.stopPropagation();
     
     // Toggle interact mode for text center icon
-    if (target.dataset.handle === 'mode-toggle' || target.closest('[data-handle="mode-toggle"]')) {
+    if (handleEl.dataset.handle === 'mode-toggle') {
       textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
       refreshSelection();
       return;
     }
 
-    startResize(target, pt, e);
+    startResize(handleEl, pt, e);
     return;
   }
 
@@ -245,8 +246,11 @@ function drawTextHandles(data) {
 
   // Draw the center mode-toggle icon
   const iconSize = 24; // Base size for icon viewBox
-  const scale = Math.min(bw, bh) * 0.4 / iconSize; // Scale icon to fit well
-  const iconScale = Math.max(0.5, Math.min(scale, 1.5)); // clamp scale
+  
+  // Scale the icon so it stays visually proportional to the box size (unclamped)
+  // Making it roughly the same size as the corner handles (or slightly larger)
+  const desiredIconSize = Math.min(bw, bh) * 0.4;
+  const iconScale = desiredIconSize / iconSize;
   const actualSize = iconSize * iconScale;
 
   const iconG = svgEl('g', {
@@ -391,16 +395,15 @@ function startResize(handleEl, startPt, e) {
       }
     }
 
+    origRotation = data.rotation || 0;
+    rotationCenter = {
+      x: origBbox.x + origBbox.width / 2,
+      y: origBbox.y + origBbox.height / 2
+    };
+
     if (textInteractMode === 'rotate') {
-      origRotation = data.rotation || 0;
-      rotationCenter = {
-        x: origBbox.x + origBbox.width / 2,
-        y: origBbox.y + origBbox.height / 2
-      };
-      
       // Calculate original angle from center to mouse
       dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
-      
     } else {
       // Baseline offset relative to bbox top-left
       origBaselineOffX = data.x - origBbox.x;
@@ -466,9 +469,18 @@ function onResizeMove(e) {
       data.rotation = newRot;
       updateTextSVG(data);
     } else if (resizeAnchor) {
-      // Project mouse vector onto original diagonal to get signed scale
-      const mx = pt.x - resizeAnchor.x;
-      const my = pt.y - resizeAnchor.y;
+      // Un-rotate mouse point so it matches the unrotated bounding box space
+      const angleRad = -(data.rotation || 0) * Math.PI / 180;
+      const cosA = Math.cos(angleRad);
+      const sinA = Math.sin(angleRad);
+      const dxMouse = pt.x - rotationCenter.x;
+      const dyMouse = pt.y - rotationCenter.y;
+      const unrotatedPtX = rotationCenter.x + dxMouse * cosA - dyMouse * sinA;
+      const unrotatedPtY = rotationCenter.y + dxMouse * sinA + dyMouse * cosA;
+
+      // Project unrotated mouse vector onto original diagonal to get signed scale
+      const mx = unrotatedPtX - resizeAnchor.x;
+      const my = unrotatedPtY - resizeAnchor.y;
       const projLen = mx * origDiagVec.x + my * origDiagVec.y;
       const scaleFactor = origDiagLen > 0 ? projLen / origDiagLen : 1;
 
