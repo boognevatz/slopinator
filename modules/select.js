@@ -68,10 +68,13 @@ function setLineEditMode(mode) {
     changeBtn.classList.toggle('active', mode === 'change-end');
   }
   const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
-  if (data && data.type === 'line' && lineEditMode === 'change-end') {
-    setSelectedLineEndpoint(getDefaultLineEndpoint(data));
+  if (mode === 'change-end') {
+    selectedLineEndpoint = null;
   }
   refreshSelection();
+  if (data) {
+    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: data.id, data } }));
+  }
 }
 
 function setSelectedLineEndpoint(endpoint) {
@@ -194,13 +197,9 @@ export function selectElement(id) {
 
   // Update active color/thickness from selected element
   if (data.type === 'line') {
+    setLineEditMode('move');
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
-    if (lineEditMode === 'change-end') {
-      selectedLineEndpoint = getDefaultLineEndpoint(data);
-      state.activeLineEndpoint = selectedLineEndpoint;
-      syncLineToolbarFromSelection(data);
-    }
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -236,15 +235,17 @@ function drawLineHandles(data) {
   const r = getHandleRadius();
   const startActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'start';
   const endActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'end';
+  const startUnselected = lineEditMode === 'change-end' && !startActive;
+  const endUnselected = lineEditMode === 'change-end' && !endActive;
 
   const h1 = svgEl('circle', {
     cx: data.x1, cy: data.y1, r,
-    class: 'handle handle-endpoint' + (startActive ? ' active' : ''),
+    class: 'handle handle-endpoint' + (startActive ? ' active' : '') + (startUnselected ? ' unselected' : ''),
     'data-handle': 'p1',
   });
   const h2 = svgEl('circle', {
     cx: data.x2, cy: data.y2, r,
-    class: 'handle handle-endpoint' + (endActive ? ' active' : ''),
+    class: 'handle handle-endpoint' + (endActive ? ' active' : '') + (endUnselected ? ' unselected' : ''),
     'data-handle': 'p2',
   });
 
@@ -773,6 +774,7 @@ function applyLineMarkerSizeToSelected(size) {
   const newSize = normalizeLineMarkerSize(size);
 
   if (lineEditMode === 'change-end') {
+    if (!selectedLineEndpoint) return;
     const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
     const oldSize = data[sizeKey];
     const normOld = normalizeLineMarkerSize(oldSize ?? data.lineMarkerSize);
@@ -818,6 +820,7 @@ function applyLineStyleToSelected(style) {
   const newDecor = styleToDecoration(newStyle);
 
   if (lineEditMode === 'change-end') {
+    if (!selectedLineEndpoint) return;
     const decorKey = selectedLineEndpoint === 'start' ? 'startDecoration' : 'endDecoration';
     const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
     const oldDecor = normalizeLineDecoration(data[decorKey]);
@@ -830,14 +833,14 @@ function applyLineStyleToSelected(style) {
     const oldEndSize = data.endDecorationSize;
 
     data[decorKey] = newDecor;
-    data[sizeKey] = normalizeLineMarkerSize(data.lineMarkerSize);
+    data[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
     updateLineSVG(data);
 
     pushAction({
       description: 'Change line end decoration',
       doFn: () => {
         data[decorKey] = newDecor;
-        data[sizeKey] = normalizeLineMarkerSize(data.lineMarkerSize);
+        data[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
         updateLineSVG(data);
       },
       undoFn: () => {

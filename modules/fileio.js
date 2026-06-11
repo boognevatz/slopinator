@@ -1,7 +1,7 @@
 // ── File I/O module: Open, Save SVG, Export JPG ────────────────
 
 import { state, dom, loadImage, restoreState, getViewBoxDims } from './editor.js';
-import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLineMarkerSize } from './line.js';
+import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLineMarkerSize, normalizeLineDecoration } from './line.js';
 import { addTextElement } from './text.js';
 import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
@@ -236,6 +236,10 @@ function openSVGProject(svgText) {
     const markerStart = line.getAttribute('marker-start') || '';
     const markerEnd = line.getAttribute('marker-end') || '';
     const inferredStyle = lineStyleAttr || (markerStart.includes('circle') ? 'circle' : (markerStart.includes('arrow') || markerEnd.includes('arrow') ? 'arrows' : 'normal'));
+    const rawStartDecor = g.getAttribute('data-start-decoration') || '';
+    const rawEndDecor = g.getAttribute('data-end-decoration') || '';
+    const rawStartSize = g.getAttribute('data-start-decoration-size') || '';
+    const rawEndSize = g.getAttribute('data-end-decoration-size') || '';
     elements.push({
       id: g.id,
       type: 'line',
@@ -246,7 +250,11 @@ function openSVGProject(svgText) {
       stroke: line.getAttribute('stroke'),
       strokeWidth: parseFloat(line.getAttribute('stroke-width')),
       lineStyle: normalizeLineStyle(inferredStyle),
-      lineMarkerSize: normalizeLineMarkerSize(g.getAttribute('data-line-marker-size') || line.getAttribute('data-line-marker-size') || 12),
+      lineMarkerSize: normalizeLineMarkerSize(g.getAttribute('data-line-marker-size') || line.getAttribute('data-line-marker-size') || 30),
+      startDecoration: rawStartDecor ? normalizeLineDecoration(rawStartDecor) : undefined,
+      endDecoration: rawEndDecor ? normalizeLineDecoration(rawEndDecor) : undefined,
+      startDecorationSize: rawStartSize ? normalizeLineMarkerSize(rawStartSize) : undefined,
+      endDecorationSize: rawEndSize ? normalizeLineMarkerSize(rawEndSize) : undefined,
     });
   });
 
@@ -327,7 +335,11 @@ export function saveSVG() {
   svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+      const startDecor = normalizeLineDecoration(el.startDecoration);
+      const endDecor = normalizeLineDecoration(el.endDecoration);
+      const startSize = normalizeLineMarkerSize(el.startDecorationSize ?? el.lineMarkerSize);
+      const endSize = normalizeLineMarkerSize(el.endDecorationSize ?? el.lineMarkerSize);
+      svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" data-start-decoration="${startDecor}" data-end-decoration="${endDecor}" data-start-decoration-size="${startSize}" data-end-decoration-size="${endSize}">\n`;
       svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
       svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
       svg += `  ${getLineDecorationsSvg(el)}\n`;
@@ -387,7 +399,11 @@ export function exportJPG(widthOption) {
   svgStr += `<g transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+      const jStartDecor = normalizeLineDecoration(el.startDecoration);
+      const jEndDecor = normalizeLineDecoration(el.endDecoration);
+      const jStartSize = normalizeLineMarkerSize(el.startDecorationSize ?? el.lineMarkerSize);
+      const jEndSize = normalizeLineMarkerSize(el.endDecorationSize ?? el.lineMarkerSize);
+      svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" data-start-decoration="${jStartDecor}" data-end-decoration="${jEndDecor}" data-start-decoration-size="${jStartSize}" data-end-decoration-size="${jEndSize}">\n`;
       svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
       svgStr += `  ${getLineDecorationsSvg(el)}\n`;
       svgStr += `</g>\n`;

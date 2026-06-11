@@ -27,7 +27,7 @@ export const state = {
   activeColor: '#ff0000',
   activeThickness: 2,
   activeLineStyle: 'normal',
-  activeLineMarkerSize: 40,
+  activeLineMarkerSize: 30,
   activeLineEditMode: 'move',
   activeLineEndpoint: 'end',
   activeFontSize: 32,

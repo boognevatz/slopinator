@@ -329,7 +329,16 @@ body {
 }
 
 #editor-svg .handle-endpoint {
+  fill: #fff;
   cursor: crosshair;
+}
+
+#editor-svg .handle-endpoint.unselected {
+  fill: transparent;
+}
+
+#editor-svg .handle-endpoint.active {
+  fill: #fff;
 }
 
 #editor-svg .handle-move {
