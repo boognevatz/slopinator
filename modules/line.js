@@ -177,7 +177,7 @@ export function addLineElement(data) {
   applyLineStyle(line, data.lineStyle);
 
   // Decorations for arrows / circle
-  const decorations = buildLineDecorations(lineState, data.stroke);
+  const decorations = buildLineDecorations({ ...lineState, x1: data.x1, y1: data.y1, x2: data.x2, y2: data.y2 });
 
   // Invisible wider hit area for easier selection
   const hitArea = svgEl('line', {
@@ -239,6 +239,16 @@ function legacyStyleToDecorations(style, size) {
     return { startDecoration: 'circle', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
   }
   return { startDecoration: 'none', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
+}
+
+function getLineState(data) {
+  const lineStyle = normalizeLineStyle(data.lineStyle);
+  const markerSize = normalizeLineMarkerSize(data.lineMarkerSize);
+  const startDecoration = data.startDecoration !== undefined ? normalizeLineDecoration(data.startDecoration) : styleToDecoration(lineStyle);
+  const endDecoration = data.endDecoration !== undefined ? normalizeLineDecoration(data.endDecoration) : styleToDecoration(lineStyle);
+  const startDecorationSize = data.startDecorationSize !== undefined ? normalizeLineMarkerSize(data.startDecorationSize) : markerSize;
+  const endDecorationSize = data.endDecorationSize !== undefined ? normalizeLineMarkerSize(data.endDecorationSize) : markerSize;
+  return { lineStyle, lineMarkerSize: markerSize, startDecoration, endDecoration, startDecorationSize, endDecorationSize, stroke: data.stroke };
 }
 
 export function applyLineStyle(el, style) {

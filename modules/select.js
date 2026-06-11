@@ -196,9 +196,11 @@ export function selectElement(id) {
   if (data.type === 'line') {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
-    selectedLineEndpoint = getDefaultLineEndpoint(data);
-    state.activeLineEndpoint = selectedLineEndpoint;
-    syncLineToolbarFromSelection(data);
+    if (lineEditMode === 'change-end') {
+      selectedLineEndpoint = getDefaultLineEndpoint(data);
+      state.activeLineEndpoint = selectedLineEndpoint;
+      syncLineToolbarFromSelection(data);
+    }
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -768,8 +770,33 @@ function applyLineMarkerSizeToSelected(size) {
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data || data.type !== 'line') return;
 
-  const oldSize = normalizeLineMarkerSize(data.lineMarkerSize);
   const newSize = normalizeLineMarkerSize(size);
+
+  if (lineEditMode === 'change-end') {
+    const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
+    const oldSize = data[sizeKey];
+    const normOld = normalizeLineMarkerSize(oldSize ?? data.lineMarkerSize);
+    if (normOld === newSize) return;
+
+    const oldStartSize = data.startDecorationSize;
+    const oldEndSize = data.endDecorationSize;
+
+    data[sizeKey] = newSize;
+    updateLineSVG(data);
+
+    pushAction({
+      description: 'Change line end marker size',
+      doFn: () => { data[sizeKey] = newSize; updateLineSVG(data); },
+      undoFn: () => {
+        data.startDecorationSize = oldStartSize;
+        data.endDecorationSize = oldEndSize;
+        updateLineSVG(data);
+      },
+    });
+    return;
+  }
+
+  const oldSize = normalizeLineMarkerSize(data.lineMarkerSize);
   if (oldSize === newSize) return;
 
   data.lineMarkerSize = newSize;
@@ -788,6 +815,42 @@ function applyLineStyleToSelected(style) {
   if (!data || data.type !== 'line') return;
 
   const newStyle = normalizeLineStyle(style);
+  const newDecor = styleToDecoration(newStyle);
+
+  if (lineEditMode === 'change-end') {
+    const decorKey = selectedLineEndpoint === 'start' ? 'startDecoration' : 'endDecoration';
+    const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
+    const oldDecor = normalizeLineDecoration(data[decorKey]);
+    const oldSize = data[sizeKey];
+    if (oldDecor === newDecor) return;
+
+    const oldStartDecor = data.startDecoration;
+    const oldEndDecor = data.endDecoration;
+    const oldStartSize = data.startDecorationSize;
+    const oldEndSize = data.endDecorationSize;
+
+    data[decorKey] = newDecor;
+    data[sizeKey] = normalizeLineMarkerSize(data.lineMarkerSize);
+    updateLineSVG(data);
+
+    pushAction({
+      description: 'Change line end decoration',
+      doFn: () => {
+        data[decorKey] = newDecor;
+        data[sizeKey] = normalizeLineMarkerSize(data.lineMarkerSize);
+        updateLineSVG(data);
+      },
+      undoFn: () => {
+        data.startDecoration = oldStartDecor;
+        data.endDecoration = oldEndDecor;
+        data.startDecorationSize = oldStartSize;
+        data.endDecorationSize = oldEndSize;
+        updateLineSVG(data);
+      },
+    });
+    return;
+  }
+
   const oldStyle = normalizeLineStyle(data.lineStyle);
   if (oldStyle === newStyle) return;
 
@@ -833,7 +896,9 @@ export function refreshSelection() {
     clearSelection();
     return;
   }
-  if (data.type === 'line') {
+  if (data.type === 'line' && lineEditMode === 'change-end') {
+    syncLineToolbarFromSelection(data);
+  } else if (data.type === 'line') {
     setActiveLineStyle(normalizeLineStyle(data.lineStyle));
   }
   drawHandles(data);
