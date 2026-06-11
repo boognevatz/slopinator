@@ -6,6 +6,7 @@ import { addTextElement } from './text.js';
 import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob } from './utils.js';
+import { switchTool } from './tools.js';
 
 export function initFileIO() {
   const fileInput = document.getElementById('file-input');
@@ -72,6 +73,7 @@ function openImageFile(file) {
     img.onload = () => {
       loadImage(dataURI, img.naturalWidth, img.naturalHeight);
       clearHistory();
+      switchTool('text');
     };
     img.onerror = () => {
       alert('Failed to load image.');
@@ -100,6 +102,7 @@ function openSVGProject(svgText) {
       const dataURI = canvas.toDataURL('image/png');
       loadImage(dataURI, canvas.width, canvas.height);
       clearHistory();
+      switchTool('text');
       URL.revokeObjectURL(url);
     };
     img.onerror = () => {
@@ -180,6 +183,13 @@ function openSVGProject(svgText) {
 
   // Parse texts
   svgRoot.querySelectorAll('text[data-type="text"]').forEach(t => {
+    let rotation = 0;
+    const transform = t.getAttribute('transform');
+    if (transform) {
+      const match = transform.match(/rotate\(([-\d.]+)/);
+      if (match) rotation = parseFloat(match[1]);
+    }
+
     elements.push({
       id: t.id,
       type: 'text',
@@ -188,6 +198,7 @@ function openSVGProject(svgText) {
       content: t.textContent,
       fontSize: parseFloat(t.getAttribute('font-size')),
       fill: t.getAttribute('fill'),
+      rotation: rotation,
     });
   });
 
@@ -216,6 +227,7 @@ function openSVGProject(svgText) {
 
   clearHistory();
   refreshPalette();
+  switchTool('text');
 }
 
 // ── Save SVG ────────────────────────────────────────────────────
@@ -251,7 +263,16 @@ export function saveSVG() {
       svg += `</g>\n`;
     } else if (el.type === 'text') {
       svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
-      svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif">`;
+      svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
+      if (el.rotation) {
+        // Need to calculate cx, cy - we can approximate it or get it from DOM
+        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+        if (textEl) {
+          const transform = textEl.getAttribute('transform');
+          if (transform) svg += ` transform="${transform}"`;
+        }
+      }
+      svg += `>`;
       svg += escapeXml(el.content);
       svg += `</text>\n`;
     }
@@ -296,7 +317,15 @@ export function exportJPG(widthOption) {
       svgStr += `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
       svgStr += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" />\n`;
     } else if (el.type === 'text') {
-      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif">`;
+      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
+      if (el.rotation) {
+        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+        if (textEl) {
+          const transform = textEl.getAttribute('transform');
+          if (transform) svgStr += ` transform="${transform}"`;
+        }
+      }
+      svgStr += `>`;
       svgStr += escapeXml(el.content);
       svgStr += `</text>\n`;
     }

@@ -16,6 +16,10 @@ let origBaselineOffY = 0; // data.y - bbox.y at resize start
 let origBaselineOffX = 0; // data.x - bbox.x at resize start
 let origDiagLen = 0;      // diagonal length of original bbox
 let origDiagVec = null;   // unit vector along anchor → dragged corner
+let textInteractMode = 'resize'; // 'resize' | 'rotate'
+let origRotation = 0;     // original rotation angle when starting rotation
+let rotationCenter = null; // { cx, cy }
+
 
 export function initSelect() {
   // Listen for color/thickness changes on selected element
@@ -58,6 +62,14 @@ function onMouseDown(e) {
   if (target.classList.contains('handle')) {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Toggle interact mode for text center icon
+    if (target.dataset.handle === 'mode-toggle' || target.closest('[data-handle="mode-toggle"]')) {
+      textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
+      refreshSelection();
+      return;
+    }
+
     startResize(target, pt, e);
     return;
   }
@@ -130,6 +142,7 @@ export function clearSelection() {
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
   document.getElementById('font-size-group').hidden = state.activeTool !== 'text';
+  textInteractMode = 'resize';
 }
 
 function drawHandles(data) {
@@ -189,23 +202,35 @@ function drawTextHandles(data) {
   const bw = bbox.width + pad * 2;
   const bh = bbox.height + pad * 2;
 
+  // Center of the text
+  const cx = bbox.x + bbox.width / 2;
+  const cy = bbox.y + bbox.height / 2;
+
+  // Create a group for the handles to apply the same rotation as the text
+  const handleGroup = svgEl('g', {
+    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
+  });
+  dom.handleLayer.appendChild(handleGroup);
+
   // Dashed selection box
   const selBox = svgEl('rect', {
     x: bx, y: by, width: bw, height: bh,
     class: 'selection-box',
   });
-  dom.handleLayer.appendChild(selBox);
+  handleGroup.appendChild(selBox);
 
   // 4 corner resize handles, square, 30% of the longest edge
   const size = Math.min(bw, bh) * 0.3;
   const hw = size;
   const hh = size;
 
+  const isRotate = textInteractMode === 'rotate';
+
   const corners = [
-    { handle: 'tl', x: bx,            y: by,            cursor: 'nwse-resize' },
-    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: 'nesw-resize' },
-    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: 'nesw-resize' },
-    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: 'nwse-resize' },
+    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
@@ -215,8 +240,42 @@ function drawTextHandles(data) {
       'data-handle': c.handle,
       style: `cursor: ${c.cursor}`,
     });
-    dom.handleLayer.appendChild(h);
+    handleGroup.appendChild(h);
   }
+
+  // Draw the center mode-toggle icon
+  const iconSize = 24; // Base size for icon viewBox
+  const scale = Math.min(bw, bh) * 0.4 / iconSize; // Scale icon to fit well
+  const iconScale = Math.max(0.5, Math.min(scale, 1.5)); // clamp scale
+  const actualSize = iconSize * iconScale;
+
+  const iconG = svgEl('g', {
+    class: 'handle',
+    'data-handle': 'mode-toggle',
+    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+    style: 'cursor: pointer; opacity: 0.6;'
+  });
+
+  // Background circle for visibility
+  iconG.appendChild(svgEl('circle', {
+    cx: 12, cy: 12, r: 12,
+    fill: '#000',
+  }));
+
+  // SVG paths for icons (Material Design)
+  const crossArrowPath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
+  const recyclePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+
+  const pathEl = svgEl('path', {
+    d: isRotate ? recyclePath : crossArrowPath,
+    fill: '#fff'
+  });
+  iconG.appendChild(pathEl);
+
+  iconG.addEventListener('mouseenter', () => iconG.style.opacity = '1');
+  iconG.addEventListener('mouseleave', () => iconG.style.opacity = '0.6');
+
+  handleGroup.appendChild(iconG);
 }
 
 function getHandleRadius() {
@@ -332,33 +391,45 @@ function startResize(handleEl, startPt, e) {
       }
     }
 
-    // Baseline offset relative to bbox top-left
-    origBaselineOffX = data.x - origBbox.x;
-    origBaselineOffY = data.y - origBbox.y;
+    if (textInteractMode === 'rotate') {
+      origRotation = data.rotation || 0;
+      rotationCenter = {
+        x: origBbox.x + origBbox.width / 2,
+        y: origBbox.y + origBbox.height / 2
+      };
+      
+      // Calculate original angle from center to mouse
+      dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
+      
+    } else {
+      // Baseline offset relative to bbox top-left
+      origBaselineOffX = data.x - origBbox.x;
+      origBaselineOffY = data.y - origBbox.y;
 
-    // Anchor = opposite corner of the bounding box
-    const anchorMap = {
-      tl: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
-      tr: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
-      bl: { x: origBbox.x + origBbox.width, y: origBbox.y },
-      br: { x: origBbox.x,                  y: origBbox.y },
-    };
-    resizeAnchor = anchorMap[handleType];
+      // Anchor = opposite corner of the bounding box
+      const anchorMap = {
+        tl: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+        tr: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+        bl: { x: origBbox.x + origBbox.width, y: origBbox.y },
+        br: { x: origBbox.x,                  y: origBbox.y },
+      };
+      resizeAnchor = anchorMap[handleType];
 
-    // Original diagonal length (anchor to dragged corner)
-    const draggedCornerMap = {
-      tl: { x: origBbox.x,                  y: origBbox.y },
-      tr: { x: origBbox.x + origBbox.width, y: origBbox.y },
-      bl: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
-      br: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
-    };
-    const dc = draggedCornerMap[handleType];
-    const dx = dc.x - resizeAnchor.x;
-    const dy = dc.y - resizeAnchor.y;
-    origDiagLen = Math.sqrt(dx * dx + dy * dy);
-    origDiagVec = origDiagLen > 0
-      ? { x: dx / origDiagLen, y: dy / origDiagLen }
-      : { x: 1, y: 1 };
+      // Original diagonal length (anchor to dragged corner)
+      const draggedCornerMap = {
+        tl: { x: origBbox.x,                  y: origBbox.y },
+        tr: { x: origBbox.x + origBbox.width, y: origBbox.y },
+        bl: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+        br: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+      };
+      const dc = draggedCornerMap[handleType];
+      const dx = dc.x - resizeAnchor.x;
+      const dy = dc.y - resizeAnchor.y;
+      origDiagLen = Math.sqrt(dx * dx + dy * dy);
+      origDiagVec = origDiagLen > 0
+        ? { x: dx / origDiagLen, y: dy / origDiagLen }
+        : { x: 1, y: 1 };
+    }
   }
 
   document.addEventListener('mousemove', onResizeMove);
@@ -380,43 +451,58 @@ function onResizeMove(e) {
       data.y2 = pt.y;
     }
     updateLineSVG(data);
-  } else if (data.type === 'text' && resizeAnchor) {
-    // Project mouse vector onto original diagonal to get signed scale
-    const mx = pt.x - resizeAnchor.x;
-    const my = pt.y - resizeAnchor.y;
-    const projLen = mx * origDiagVec.x + my * origDiagVec.y;
-    const scaleFactor = origDiagLen > 0 ? projLen / origDiagLen : 1;
+  } else if (data.type === 'text') {
+    if (textInteractMode === 'rotate') {
+      const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
+      const angleDiff = currentAngle - dragStart.angle;
+      let newRot = origRotation + angleDiff;
+      
+      // Snap to 5 degrees
+      newRot = Math.round(newRot / 5) * 5;
+      
+      // Keep it 0-360
+      newRot = ((newRot % 360) + 360) % 360;
+      
+      data.rotation = newRot;
+      updateTextSVG(data);
+    } else if (resizeAnchor) {
+      // Project mouse vector onto original diagonal to get signed scale
+      const mx = pt.x - resizeAnchor.x;
+      const my = pt.y - resizeAnchor.y;
+      const projLen = mx * origDiagVec.x + my * origDiagVec.y;
+      const scaleFactor = origDiagLen > 0 ? projLen / origDiagLen : 1;
 
-    // Clamp to minimum size
-    const newSize = Math.max(8, Math.round(dragOriginal.fontSize * Math.abs(scaleFactor)));
-    const s = newSize / dragOriginal.fontSize;
+      // Clamp to minimum size
+      const newSize = Math.max(8, Math.round(dragOriginal.fontSize * Math.abs(scaleFactor)));
+      const s = newSize / dragOriginal.fontSize;
 
-    data.fontSize = newSize;
+      data.fontSize = newSize;
 
-    // Reposition so the anchor corner stays fixed.
-    // New bbox top-left = anchor - (anchor_to_origTopLeft) * s
-    // But which component depends on which corner is anchored.
-    const handle = resizeHandle;
-    if (handle === 'br') {
-      // anchor = original top-left of bbox
-      data.x = resizeAnchor.x + origBaselineOffX * s;
-      data.y = resizeAnchor.y + origBaselineOffY * s;
-    } else if (handle === 'bl') {
-      // anchor = original top-right → new top-left = anchor.x - newWidth
-      data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
-      data.y = resizeAnchor.y + origBaselineOffY * s;
-    } else if (handle === 'tr') {
-      // anchor = original bottom-left → new top-left.y = anchor.y - newHeight
-      data.x = resizeAnchor.x + origBaselineOffX * s;
-      data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
-    } else if (handle === 'tl') {
-      // anchor = original bottom-right
-      data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
-      data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
+      // Reposition so the anchor corner stays fixed.
+      // New bbox top-left = anchor - (anchor_to_origTopLeft) * s
+      // But which component depends on which corner is anchored.
+      const handle = resizeHandle;
+      if (handle === 'br') {
+        // anchor = original top-left of bbox
+        data.x = resizeAnchor.x + origBaselineOffX * s;
+        data.y = resizeAnchor.y + origBaselineOffY * s;
+      } else if (handle === 'bl') {
+        // anchor = original top-right → new top-left = anchor.x - newWidth
+        data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
+        data.y = resizeAnchor.y + origBaselineOffY * s;
+      } else if (handle === 'tr') {
+        // anchor = original bottom-left → new top-left.y = anchor.y - newHeight
+        data.x = resizeAnchor.x + origBaselineOffX * s;
+        data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
+      } else if (handle === 'tl') {
+        // anchor = original bottom-right
+        data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
+        data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
+      }
+
+      updateTextSVG(data);
+      document.getElementById('font-size-input').value = data.fontSize;
     }
-
-    updateTextSVG(data);
-    document.getElementById('font-size-input').value = data.fontSize;
   }
 
   drawHandles(data);
@@ -441,11 +527,11 @@ function onResizeEnd() {
       doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2 }); updateLineSVG(data); drawHandles(data); },
       undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2 }); updateLineSVG(data); drawHandles(data); },
     });
-  } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y)) {
+  } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y || orig.rotation !== final.rotation)) {
     pushAction({
-      description: 'Resize text',
-      doFn: () => { data.fontSize = final.fontSize; data.x = final.x; data.y = final.y; updateTextSVG(data); drawHandles(data); },
-      undoFn: () => { data.fontSize = orig.fontSize; data.x = orig.x; data.y = orig.y; updateTextSVG(data); drawHandles(data); },
+      description: textInteractMode === 'rotate' ? 'Rotate text' : 'Resize text',
+      doFn: () => { data.fontSize = final.fontSize; data.x = final.x; data.y = final.y; data.rotation = final.rotation; updateTextSVG(data); drawHandles(data); },
+      undoFn: () => { data.fontSize = orig.fontSize; data.x = orig.x; data.y = orig.y; data.rotation = orig.rotation; updateTextSVG(data); drawHandles(data); },
     });
   }
 
@@ -538,6 +624,19 @@ function updateTextSVG(data) {
   textEl.setAttribute('font-size', data.fontSize);
   textEl.setAttribute('fill', data.fill);
   textEl.textContent = data.content;
+  
+  if (data.rotation) {
+    try {
+      const bbox = textEl.getBBox();
+      const cx = bbox.x + bbox.width / 2;
+      const cy = bbox.y + bbox.height / 2;
+      textEl.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+    } catch {
+      // ignore
+    }
+  } else {
+    textEl.removeAttribute('transform');
+  }
 }
 
 // ── Apply property changes to selected ──────────────────────────

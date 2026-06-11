@@ -3,6 +3,8 @@
 import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToSVG, svgToScreen } from './utils.js';
 import { pushAction } from './history.js';
+import { switchTool } from './tools.js';
+import { selectElement } from './select.js';
 
 let textEditOverlay = null;
 let editingTextId = null;
@@ -129,6 +131,18 @@ export function addTextElement(data) {
   });
   textEl.textContent = data.content;
   dom.annotationLayer.appendChild(textEl);
+
+  if (data.rotation) {
+    // Need to wait for it to render to get bbox
+    setTimeout(() => {
+      try {
+        const bbox = textEl.getBBox();
+        const cx = bbox.x + bbox.width / 2;
+        const cy = bbox.y + bbox.height / 2;
+        textEl.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+      } catch {}
+    }, 0);
+  }
 }
 
 function removeTextElement(id) {
@@ -236,6 +250,10 @@ function finishEditing() {
       });
     }
   }
+
+  // Switch to select tool and automatically select the newly edited text
+  switchTool('select');
+  selectElement(id);
 }
 
 /**
