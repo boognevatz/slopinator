@@ -7,6 +7,7 @@ import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit } from './m
 import { initLine, addLineElement } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection } from './modules/select.js';
+import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 
@@ -17,6 +18,7 @@ function init() {
 
   // Give select module references to line/text for undo recreation
   setModuleRefs({ addLineElement }, { addTextElement });
+  setCropModuleRefs({ addLineElement }, { addTextElement });
 
   // History: update undo/redo button states on change
   initHistory(updateUndoRedoButtons);
@@ -25,6 +27,7 @@ function init() {
   initLine();
   initText();
   initSelect();
+  initCrop();
   initTools();
   initFileIO();
 
@@ -106,6 +109,9 @@ function init() {
           break;
         case 't':
           switchTool('text');
+          break;
+        case 'c':
+          switchTool('crop');
           break;
         case 'delete':
         case 'backspace':
