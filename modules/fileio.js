@@ -1,7 +1,7 @@
 // ── File I/O module: Open, Save SVG, Export JPG ────────────────
 
 import { state, dom, loadImage, restoreState, getViewBoxDims } from './editor.js';
-import { addLineElement } from './line.js';
+import { addLineElement, getLineStyleSvgAttrs, getLineMarkerDefsSvg, normalizeLineStyle } from './line.js';
 import { addTextElement } from './text.js';
 import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
@@ -232,6 +232,10 @@ function openSVGProject(svgText) {
   svgRoot.querySelectorAll('g[data-type="line"]').forEach(g => {
     const line = g.querySelector('line.annotation-line');
     if (!line) return;
+    const lineStyleAttr = line.getAttribute('data-line-style') || g.getAttribute('data-line-style') || '';
+    const markerStart = line.getAttribute('marker-start') || '';
+    const markerEnd = line.getAttribute('marker-end') || '';
+    const inferredStyle = lineStyleAttr || (markerStart.includes('circle') ? 'circle' : (markerStart.includes('arrow') || markerEnd.includes('arrow') ? 'arrows' : 'normal'));
     elements.push({
       id: g.id,
       type: 'line',
@@ -241,6 +245,7 @@ function openSVGProject(svgText) {
       y2: parseFloat(line.getAttribute('y2')),
       stroke: line.getAttribute('stroke'),
       strokeWidth: parseFloat(line.getAttribute('stroke-width')),
+      lineStyle: normalizeLineStyle(inferredStyle),
     });
   });
 
@@ -309,6 +314,7 @@ export function saveSVG() {
   // Palette comment
   svg += `<!-- annotator-palette: ${state.palette.join(',')} -->\n`;
   svg += `<!-- annotator-thickness: ${state.thicknessPresets.join(',')} -->\n`;
+  svg += getLineMarkerDefsSvg() + '\n';
 
   // Image
   const img = state.image;
@@ -321,9 +327,9 @@ export function saveSVG() {
   svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      svg += `<g id="${el.id}" data-type="line">\n`;
-      svg += `  <line class="annotation-line" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
-      svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" />\n`;
+      svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}">\n`;
+      svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
+      svg += `stroke="${el.stroke}" color="${el.stroke}" stroke-width="${el.strokeWidth}"${getLineStyleSvgAttrs(el.lineStyle)} />\n`;
       svg += `</g>\n`;
     } else if (el.type === 'text') {
       svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
@@ -369,6 +375,8 @@ export function exportJPG(widthOption) {
   svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
   svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
 
+  svgStr += getLineMarkerDefsSvg() + '\n';
+
   // Image
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
@@ -380,8 +388,8 @@ export function exportJPG(widthOption) {
   svgStr += `<g transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      svgStr += `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
-      svgStr += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" stroke-linecap="round" />\n`;
+      svgStr += `<line data-line-style="${normalizeLineStyle(el.lineStyle)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
+      svgStr += `stroke="${el.stroke}" color="${el.stroke}" stroke-width="${el.strokeWidth}"${getLineStyleSvgAttrs(el.lineStyle)} />\n`;
     } else if (el.type === 'text') {
       svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
       if (el.rotation) {

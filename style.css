@@ -164,6 +164,12 @@ button.tool-btn.active {
   color: #fff;
 }
 
+.line-style-btn.active {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: #fff;
+}
+
 /* ── Small input ─────────────────────────────────────── */
 
 .small-input {

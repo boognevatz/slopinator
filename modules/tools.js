@@ -9,7 +9,7 @@ import { activateCrop, deactivateCrop } from './crop.js';
 const toolButtons = {};
 const TOOL_SETTINGS = {
   select: ['delete'],
-  line: ['color', 'thickness'],
+  line: ['color', 'thickness', 'line-style'],
   text: ['color', 'font-size'],
   crop: ['crop'],
 };
@@ -63,6 +63,7 @@ function updateToolSettingsVisibility(tool) {
 
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
+  document.getElementById('line-style-group').hidden = !visible.has('line-style');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
   document.getElementById('delete-group').hidden = !visible.has('delete');
   document.getElementById('crop-group').hidden = !visible.has('crop');

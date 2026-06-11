@@ -26,6 +26,7 @@ export const state = {
   activeTool: 'select', // 'select' | 'line' | 'text'
   activeColor: '#ff0000',
   activeThickness: 2,
+  activeLineStyle: 'normal',
   activeFontSize: 32,
   palette: [...DEFAULT_PALETTE],
   thicknessPresets: [...DEFAULT_THICKNESS],

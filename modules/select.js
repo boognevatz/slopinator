@@ -4,6 +4,7 @@ import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
+import { applyLineStyle, normalizeLineStyle, setActiveLineStyle } from './line.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -28,6 +29,9 @@ export function initSelect() {
   });
   document.addEventListener('palette-thickness-changed', (e) => {
     applyThicknessToSelected(e.detail.thickness);
+  });
+  document.addEventListener('line-style-changed', (e) => {
+    applyLineStyleToSelected(e.detail.style);
   });
 
   // Font size input
@@ -123,6 +127,7 @@ export function selectElement(id) {
   if (data.type === 'line') {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
+    setActiveLineStyle(normalizeLineStyle(data.lineStyle));
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -610,6 +615,7 @@ export function setModuleRefs(lineMod, textMod) {
 function updateLineSVG(data) {
   const group = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
   if (!group) return;
+  group.dataset.lineStyle = normalizeLineStyle(data.lineStyle);
   const lines = group.querySelectorAll('line');
   lines.forEach(line => {
     line.setAttribute('x1', data.x1);
@@ -622,6 +628,7 @@ function updateLineSVG(data) {
   if (visibleLine) {
     visibleLine.setAttribute('stroke', data.stroke);
     visibleLine.setAttribute('stroke-width', data.strokeWidth);
+    applyLineStyle(visibleLine, data.lineStyle);
   }
 }
 
@@ -697,6 +704,25 @@ function applyThicknessToSelected(thickness) {
   });
 }
 
+function applyLineStyleToSelected(style) {
+  if (!state.selectedId) return;
+  const data = state.elements.find(el => el.id === state.selectedId);
+  if (!data || data.type !== 'line') return;
+
+  const newStyle = normalizeLineStyle(style);
+  const oldStyle = normalizeLineStyle(data.lineStyle);
+  if (oldStyle === newStyle) return;
+
+  data.lineStyle = newStyle;
+  updateLineSVG(data);
+
+  pushAction({
+    description: 'Change line style',
+    doFn: () => { data.lineStyle = newStyle; updateLineSVG(data); },
+    undoFn: () => { data.lineStyle = oldStyle; updateLineSVG(data); },
+  });
+}
+
 function applyFontSizeToSelected(fontSize) {
   if (!state.selectedId) return;
   const data = state.elements.find(el => el.id === state.selectedId);
@@ -728,6 +754,9 @@ export function refreshSelection() {
   if (!data) {
     clearSelection();
     return;
+  }
+  if (data.type === 'line') {
+    setActiveLineStyle(normalizeLineStyle(data.lineStyle));
   }
   drawHandles(data);
 }
