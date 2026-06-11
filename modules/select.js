@@ -62,11 +62,12 @@ function onMouseDown(e) {
     e.preventDefault();
     const id = annotGroup.id;
 
-    // Double-click on text → edit
+    // Double-click on text → edit (defer to next frame so mousedown
+    // processing completes and doesn't steal focus from the textarea)
     if (e.detail === 2) {
       const data = state.elements.find(el => el.id === id);
       if (data && data.type === 'text') {
-        startEditing(id);
+        setTimeout(() => startEditing(id), 0);
         return;
       }
     }

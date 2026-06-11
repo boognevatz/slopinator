@@ -6,6 +6,7 @@ import { pushAction } from './history.js';
 
 let textEditOverlay = null;
 let editingTextId = null;
+let blurTimeout = null; // debounce blur to avoid race conditions
 
 export function initText() {
   // Create the text editing overlay (textarea positioned over SVG)
@@ -16,11 +17,28 @@ export function initText() {
   textEditOverlay.appendChild(textarea);
   document.getElementById('editor-container').appendChild(textEditOverlay);
 
-  textarea.addEventListener('blur', finishEditing);
-  textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+  // Prevent clicks on the overlay from propagating to the SVG
+  textEditOverlay.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+  });
+
+  // Debounced blur: gives focus() calls time to land before we commit
+  textarea.addEventListener('blur', () => {
+    clearTimeout(blurTimeout);
+    blurTimeout = setTimeout(() => {
       finishEditing();
-      e.stopPropagation();
+    }, 150);
+  });
+
+  // If textarea regains focus (e.g. clicking inside it), cancel the blur timeout
+  textarea.addEventListener('focus', () => {
+    clearTimeout(blurTimeout);
+  });
+
+  textarea.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // don't let tool shortcuts fire while typing
+    if (e.key === 'Escape') {
+      cancelEditing();
     }
     // Enter without shift commits
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -45,12 +63,21 @@ function onMouseDown(e) {
   if (e.button !== 0) return;
   if (!state.hasImage) return;
 
+  // If currently editing, finish that first and don't place new text
+  if (editingTextId) {
+    finishEditing();
+    return;
+  }
+
   // Don't place text on existing annotations
   const target = e.target;
   if (target.classList.contains('annotation-text') ||
       target.classList.contains('annotation-line') ||
       target.classList.contains('line-hit-area') ||
       target.classList.contains('handle')) return;
+
+  // Prevent the browser from moving focus away from our textarea
+  e.preventDefault();
 
   const pt = screenToSVG(dom.svg, e.clientX, e.clientY);
 
@@ -80,8 +107,10 @@ function onMouseDown(e) {
     },
   });
 
-  // Immediately start editing
-  startEditing(id);
+  // Defer focus to next frame so mousedown processing is fully complete
+  setTimeout(() => {
+    startEditing(id);
+  }, 0);
 }
 
 /**
@@ -111,6 +140,11 @@ function removeTextElement(id) {
  * Start inline editing of a text element.
  */
 export function startEditing(id) {
+  // If already editing something else, finish it first
+  if (editingTextId && editingTextId !== id) {
+    finishEditing();
+  }
+
   const data = state.elements.find(el => el.id === id);
   if (!data || data.type !== 'text') return;
 
@@ -150,16 +184,23 @@ export function startEditing(id) {
   // Hide the SVG text while editing
   textEl.setAttribute('visibility', 'hidden');
 
+  // Cancel any pending blur timeout before focusing
+  clearTimeout(blurTimeout);
   textarea.focus();
   textarea.select();
 }
 
 function finishEditing() {
+  clearTimeout(blurTimeout);
   if (!editingTextId) return;
 
   const textarea = textEditOverlay.querySelector('textarea');
   const newContent = textarea.value.trim() || 'Text';
   const id = editingTextId;
+
+  // Clear state before DOM updates to prevent re-entrant calls
+  editingTextId = null;
+  textEditOverlay.style.display = 'none';
 
   const data = state.elements.find(el => el.id === id);
   if (data) {
@@ -189,9 +230,24 @@ function finishEditing() {
       });
     }
   }
+}
 
-  textEditOverlay.style.display = 'none';
+/**
+ * Cancel editing without saving changes.
+ */
+function cancelEditing() {
+  clearTimeout(blurTimeout);
+  if (!editingTextId) return;
+
+  const id = editingTextId;
   editingTextId = null;
+  textEditOverlay.style.display = 'none';
+
+  // Restore the SVG text visibility with original content
+  const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
+  if (textEl) {
+    textEl.removeAttribute('visibility');
+  }
 }
 
 export function isEditing() {
