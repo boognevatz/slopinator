@@ -172,10 +172,18 @@ export function startEditing(id) {
   // Get the actual rendered bounding box of the SVG text element
   const textRect = textEl.getBoundingClientRect();
 
-  // Container-relative coords
   const container = document.getElementById('editor-container');
   const containerRect = container.getBoundingClientRect();
-  const relX = textRect.left - containerRect.left;
+
+  // Use the SVG coordinate anchor (data.x) for horizontal position via the
+  // annotation layer CTM — more reliable than getBoundingClientRect().left
+  // which can include font-metric padding quirks.
+  const pt = dom.svg.createSVGPoint();
+  pt.x = data.x;
+  pt.y = data.y;
+  const layerCtm = dom.annotationLayer.getScreenCTM();
+  const anchorScreen = layerCtm ? pt.matrixTransform(layerCtm) : { x: textRect.left, y: textRect.top };
+  const relX = anchorScreen.x - containerRect.left;
   const relY = textRect.top - containerRect.top;
 
   // Get the true SVG-to-screen scale via the CTM (handles letterboxing correctly)
@@ -183,11 +191,6 @@ export function startEditing(id) {
   const scale = ctm ? ctm.a : 1;
   const scaledFontSize = data.fontSize * scale;
 
-  // Compute available width: from text left edge to the right edge of the
-  // SVG *content area* (not the container or the SVG element)
-  const viewBox = dom.svg.viewBox.baseVal;
-  const svgContentRight = svgToScreen(dom.svg, viewBox.width, 0);
-  const availableWidth = svgContentRight.x - textRect.left;
   const centerX = relX + textRect.width / 2;
   const centerY = relY + textRect.height / 2;
   const rotation = data.rotation || 0;

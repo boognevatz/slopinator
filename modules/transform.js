@@ -101,6 +101,14 @@ export function zoomOut(focusX, focusY) {
   applyZoom(newScale, focusX, focusY);
 }
 
+export function zoomOneToOne() {
+  if (!state.hasImage || !state.image.fitScale) return;
+  state.image.zoomScale = 1 / state.image.fitScale;
+  state.image.zoomX = 0;
+  state.image.zoomY = 0;
+  updateViewBox();
+}
+
 export function zoomFit() {
   if (!state.hasImage) return;
   state.image.zoomScale = 1.0;

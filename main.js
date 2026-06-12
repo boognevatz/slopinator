@@ -3,7 +3,7 @@
 import { initEditor, state } from './modules/editor.js';
 import { initHistory, undo, redo, canUndo, canRedo } from './modules/history.js';
 import { initPalette } from './modules/palette.js';
-import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit } from './modules/transform.js';
+import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToOne } from './modules/transform.js';
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection } from './modules/select.js';
@@ -43,6 +43,7 @@ function init() {
   document.getElementById('btn-zoom-in').addEventListener('click', () => zoomIn());
   document.getElementById('btn-zoom-out').addEventListener('click', () => zoomOut());
   document.getElementById('btn-zoom-fit').addEventListener('click', () => zoomFit());
+  document.getElementById('btn-zoom-11').addEventListener('click', () => zoomOneToOne());
 
   document.getElementById('btn-undo').addEventListener('click', () => {
     undo();
