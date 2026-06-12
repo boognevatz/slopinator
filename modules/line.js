@@ -1,4 +1,4 @@
-// ── Line module: Straight line drawing ─────────────────────────
+// ── Line module: Straight line drawing & polyline builder ─────────────────────────
 
 import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
@@ -9,6 +9,15 @@ let previewLine = null;
 let startPt = null;
 let lineStyleButtons = null;
 let lineMarkerSizeInput = null;
+
+// Polyline extend mode state
+let pendingPolyline = null;
+let activeExtendIdx = 0;
+
+// Vertex drag state
+let isDraggingVertex = false;
+let dragVertexIdx = -1;
+let dragVertexOrigPoints = null;
 
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
 const LINE_DECORATIONS = ['none', 'arrow', 'circle'];
@@ -45,6 +54,12 @@ export function activateLine() {
 export function deactivateLine() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('mousedown', onMouseDown);
+  if (isDraggingVertex) {
+    document.removeEventListener('mousemove', onVertexDragMove);
+    document.removeEventListener('mouseup', onVertexDragEnd);
+    isDraggingVertex = false;
+  }
+  finalizePolyline();
   cancelDraw();
 }
 
@@ -52,8 +67,28 @@ function onMouseDown(e) {
   if (e.button !== 0) return;
   if (!state.hasImage) return;
 
-  // Don't start drawing on existing annotations
   const target = e.target;
+
+  // If we have a pending polyline waiting for extend/finalize
+  if (pendingPolyline) {
+    const clickPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+    const threshold = getExtendHitRadius();
+    const nearIdx = findNearestVertex(clickPt, pendingPolyline.points, threshold);
+    if (nearIdx !== -1) {
+      e.preventDefault();
+      startVertexDrag(nearIdx, e);
+      return;
+    }
+    // Clicking on other annotation → don't interfere
+    if (target.classList.contains('annotation-line') ||
+        target.classList.contains('annotation-text') ||
+        target.classList.contains('line-hit-area')) return;
+    // Clicked empty space → one-click extend from active endpoint
+    addExtensionPoint(e);
+    return;
+  }
+
+  // Don't start drawing on existing annotations
   if (target.classList.contains('annotation-line') ||
       target.classList.contains('annotation-text') ||
       target.classList.contains('line-hit-area') ||
@@ -109,13 +144,16 @@ function onMouseUp(e) {
 
   // Create the line element
   const id = generateId();
+  const pts = [
+    { x: startPt.x, y: startPt.y },
+    { x: endPt.x, y: endPt.y },
+  ];
   const lineData = {
     id,
     type: 'line',
-    x1: startPt.x,
-    y1: startPt.y,
-    x2: endPt.x,
-    y2: endPt.y,
+    points: pts,
+    x1: pts[0].x, y1: pts[0].y,
+    x2: pts[1].x, y2: pts[1].y,
     stroke: state.activeColor,
     strokeWidth: state.activeThickness,
     lineStyle: state.activeLineStyle,
@@ -126,17 +164,11 @@ function onMouseUp(e) {
   addLineElement(lineData);
   state.elements.push(lineData);
 
-  pushAction({
-    description: 'Draw line',
-    doFn: () => {
-      addLineElement(lineData);
-      state.elements.push(lineData);
-    },
-    undoFn: () => {
-      removeLineElement(id);
-      state.elements = state.elements.filter(el => el.id !== id);
-    },
-  });
+  // Enter extend mode instead of pushing to history immediately
+  // Each click on empty space adds a new segment from the active endpoint
+  pendingPolyline = lineData;
+  activeExtendIdx = 1; // last point is active by default
+  showExtendHandles(lineData, 1);
 
   isDrawing = false;
 }
@@ -151,10 +183,218 @@ function cancelDraw() {
   document.removeEventListener('mouseup', onMouseUp);
 }
 
+// ── Polyline extend mode ────────────────────────────────────────
+
+function showExtendHandles(data, activeIdx) {
+  dom.handleLayer.innerHTML = '';
+  const visR = getExtendHandleRadius();
+  const hitR = getExtendHitRadius();
+  const pts = data.points;
+
+  for (let i = 0; i < pts.length; i++) {
+    const x = pts[i].x, y = pts[i].y;
+    const isFirst = i === 0;
+    const isLast = i === pts.length - 1;
+    const isActive = (isFirst && activeIdx === 0) || (isLast && activeIdx === pts.length - 1);
+    const handleLabel = isFirst ? 'p1' : isLast ? 'p2' : 'v' + i;
+
+    // Hit area (larger, transparent, captures mouse events for hand cursor)
+    const hit = svgEl('circle', {
+      cx: x, cy: y, r: hitR,
+      class: 'handle-extend',
+      fill: 'transparent',
+      stroke: 'none',
+      'data-handle': handleLabel,
+    });
+    dom.handleLayer.appendChild(hit);
+
+    // Visual circle (smaller, visible, does not capture mouse events)
+    const vis = svgEl('circle', {
+      cx: x, cy: y, r: visR,
+      class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'),
+      'pointer-events': 'none',
+    });
+    dom.handleLayer.appendChild(vis);
+  }
+}
+
+function getExtendHandleRadius() {
+  const viewBox = dom.svg.viewBox.baseVal;
+  if (!viewBox || viewBox.width === 0) return 10;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox.width / svgRect.width;
+  return Math.max(6, 10 * scale);
+}
+
+function getExtendHitRadius() {
+  return getExtendHandleRadius() + 4;
+}
+
+function addExtensionPoint(e) {
+  if (!pendingPolyline) return;
+
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const pts = pendingPolyline.points;
+  const anchorPt = pts[activeExtendIdx];
+
+  // Don't place if too close to avoid zero-length segments
+  const dx = pt.x - anchorPt.x;
+  const dy = pt.y - anchorPt.y;
+  if (Math.sqrt(dx * dx + dy * dy) < 5) return;
+
+  if (activeExtendIdx === 0) {
+    // Extending from first point — prepend
+    pts.unshift({ x: pt.x, y: pt.y });
+    pendingPolyline.x1 = pt.x;
+    pendingPolyline.y1 = pt.y;
+  } else {
+    // Extending from last point — append
+    pts.push({ x: pt.x, y: pt.y });
+    pendingPolyline.x2 = pt.x;
+    pendingPolyline.y2 = pt.y;
+  }
+
+  // Re-render the element (becomes <polyline> if >= 3 points)
+  updateLineElement(pendingPolyline);
+
+  // The new point becomes the active endpoint
+  activeExtendIdx = activeExtendIdx === 0 ? 0 : pts.length - 1;
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+}
+
+// ── Vertex dragging ─────────────────────────────────────────────
+
+function findNearestVertex(pt, points, threshold) {
+  let nearest = -1;
+  let minDist = threshold;
+  for (let i = 0; i < points.length; i++) {
+    const dx = pt.x - points[i].x;
+    const dy = pt.y - points[i].y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = i;
+    }
+  }
+  return nearest;
+}
+
+function syncLineEndpoints(data) {
+  data.x1 = data.points[0].x;
+  data.y1 = data.points[0].y;
+  data.x2 = data.points[data.points.length - 1].x;
+  data.y2 = data.points[data.points.length - 1].y;
+}
+
+function startVertexDrag(idx, e) {
+  isDraggingVertex = true;
+  dragVertexIdx = idx;
+  dragVertexOrigPoints = pendingPolyline.points.map(p => ({...p}));
+
+  if (idx === 0 || idx === pendingPolyline.points.length - 1) {
+    activeExtendIdx = idx;
+  }
+
+  dom.svg.style.cursor = 'move';
+  dom.handleLayer.innerHTML = '';
+
+  document.addEventListener('mousemove', onVertexDragMove);
+  document.addEventListener('mouseup', onVertexDragEnd);
+}
+
+function onVertexDragMove(e) {
+  if (!isDraggingVertex || !pendingPolyline) return;
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const pts = pendingPolyline.points;
+
+  pts[dragVertexIdx] = { x: pt.x, y: pt.y };
+  syncLineEndpoints(pendingPolyline);
+
+  updateLineElement(pendingPolyline);
+}
+
+function onVertexDragEnd() {
+  document.removeEventListener('mousemove', onVertexDragMove);
+  document.removeEventListener('mouseup', onVertexDragEnd);
+
+  if (!isDraggingVertex || !pendingPolyline) return;
+  isDraggingVertex = false;
+
+  const origPt = dragVertexOrigPoints[dragVertexIdx];
+  const currPt = pendingPolyline.points[dragVertexIdx];
+  if (origPt.x !== currPt.x || origPt.y !== currPt.y) {
+    const data = pendingPolyline;
+    const origSnap = dragVertexOrigPoints;
+    const finalSnap = data.points.map(p => ({...p}));
+
+    pushAction({
+      description: 'Move vertex',
+      doFn: () => {
+        for (let i = 0; i < data.points.length; i++) {
+          data.points[i].x = finalSnap[i].x;
+          data.points[i].y = finalSnap[i].y;
+        }
+        syncLineEndpoints(data);
+        updateLineElement(data);
+      },
+      undoFn: () => {
+        for (let i = 0; i < data.points.length; i++) {
+          data.points[i].x = origSnap[i].x;
+          data.points[i].y = origSnap[i].y;
+        }
+        syncLineEndpoints(data);
+        updateLineElement(data);
+      },
+    });
+  }
+
+  dom.svg.style.cursor = 'crosshair';
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+}
+
+export function finalizePolyline() {
+  if (!pendingPolyline) return;
+
+  dom.handleLayer.innerHTML = '';
+
+  const data = pendingPolyline;
+  const id = data.id;
+
+  pushAction({
+    description: data.points.length > 2 ? 'Draw polyline' : 'Draw line',
+    doFn: () => {
+      addLineElement(data);
+      state.elements.push(data);
+    },
+    undoFn: () => {
+      removeLineElement(id);
+      state.elements = state.elements.filter(el => el.id !== id);
+    },
+  });
+
+  pendingPolyline = null;
+}
+
+export function handlePolylineEscape() {
+  if (pendingPolyline) {
+    finalizePolyline();
+    return true;
+  }
+  return false;
+}
+
+export function isLineExtending() {
+  return !!pendingPolyline;
+}
+
 /**
  * Create SVG elements for a line annotation.
  */
 export function addLineElement(data) {
+  // Ensure points array (backward compat with old data format)
+  const pts = data.points || [{x: data.x1, y: data.y1}, {x: data.x2, y: data.y2}];
+  if (!data.points) data.points = pts;
+
   const group = svgEl('g', { id: data.id, 'data-type': 'line' });
   const lineState = getLineState(data);
   group.dataset.lineStyle = normalizeLineStyle(lineState.lineStyle);
@@ -164,33 +404,54 @@ export function addLineElement(data) {
   group.dataset.startDecorationSize = lineState.startDecorationSize;
   group.dataset.endDecorationSize = lineState.endDecorationSize;
 
-  // Visible line
-  const line = svgEl('line', {
-    x1: data.x1,
-    y1: data.y1,
-    x2: data.x2,
-    y2: data.y2,
-    stroke: data.stroke,
-    'stroke-width': data.strokeWidth,
-    class: 'annotation-line',
-  });
-  applyLineStyle(line, data.lineStyle);
+  const decorData = { ...lineState, x1: pts[0].x, y1: pts[0].y, x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y };
 
-  // Decorations for arrows / circle
-  const decorations = buildLineDecorations({ ...lineState, x1: data.x1, y1: data.y1, x2: data.x2, y2: data.y2 });
+  if (pts.length >= 3) {
+    // Render as polyline
+    const ptsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
+    const polyline = svgEl('polyline', {
+      points: ptsStr,
+      fill: 'none',
+      stroke: data.stroke,
+      'stroke-width': data.strokeWidth,
+      class: 'annotation-line',
+    });
+    applyLineStyle(polyline, data.lineStyle);
 
-  // Invisible wider hit area for easier selection
-  const hitArea = svgEl('line', {
-    x1: data.x1,
-    y1: data.y1,
-    x2: data.x2,
-    y2: data.y2,
-    class: 'line-hit-area',
-  });
+    const hitArea = svgEl('polyline', {
+      points: ptsStr,
+      fill: 'none',
+      class: 'line-hit-area',
+    });
 
-  group.appendChild(hitArea);
-  group.appendChild(line);
-  group.appendChild(decorations);
+    const decorations = buildLineDecorations(decorData);
+
+    group.appendChild(hitArea);
+    group.appendChild(polyline);
+    group.appendChild(decorations);
+  } else {
+    // Render as line (2 points)
+    const line = svgEl('line', {
+      x1: pts[0].x, y1: pts[0].y,
+      x2: pts[1].x, y2: pts[1].y,
+      stroke: data.stroke,
+      'stroke-width': data.strokeWidth,
+      class: 'annotation-line',
+    });
+    applyLineStyle(line, data.lineStyle);
+
+    const decorations = buildLineDecorations(decorData);
+    const hitArea = svgEl('line', {
+      x1: pts[0].x, y1: pts[0].y,
+      x2: pts[1].x, y2: pts[1].y,
+      class: 'line-hit-area',
+    });
+
+    group.appendChild(hitArea);
+    group.appendChild(line);
+    group.appendChild(decorations);
+  }
+
   dom.annotationLayer.appendChild(group);
 }
 

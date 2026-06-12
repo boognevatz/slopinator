@@ -297,7 +297,6 @@ body {
 /* ── SVG annotation styles ───────────────────────────── */
 
 #editor-svg .annotation-line {
-  cursor: pointer;
   pointer-events: stroke;
 }
 
@@ -335,11 +334,10 @@ body {
 
 #editor-svg .handle-endpoint {
   fill: #fff;
-  cursor: crosshair;
 }
 
 #editor-svg .handle-endpoint.unselected {
-  fill: transparent;
+  fill: rgba(255,255,255,0.001);
 }
 
 #editor-svg .handle-endpoint.active {
@@ -348,6 +346,10 @@ body {
 
 #editor-svg .handle-move {
   cursor: move;
+}
+
+#editor-svg .handle-extend {
+  cursor: pointer;
 }
 
 #editor-svg .handle-resize-corner {
@@ -363,7 +365,6 @@ body {
   stroke-width: 12;
   fill: none;
   pointer-events: stroke;
-  cursor: pointer;
   vector-effect: non-scaling-stroke;
 }
 

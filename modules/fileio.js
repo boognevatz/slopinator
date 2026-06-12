@@ -380,6 +380,10 @@ function openSVGProject(svgText) {
     elements.push({
       id: g.id,
       type: 'line',
+      points: [
+        { x: parseFloat(line.getAttribute('x1')), y: parseFloat(line.getAttribute('y1')) },
+        { x: parseFloat(line.getAttribute('x2')), y: parseFloat(line.getAttribute('y2')) },
+      ],
       x1: parseFloat(line.getAttribute('x1')),
       y1: parseFloat(line.getAttribute('y1')),
       x2: parseFloat(line.getAttribute('x2')),
@@ -392,6 +396,27 @@ function openSVGProject(svgText) {
       endDecoration: rawEndDecor ? normalizeLineDecoration(rawEndDecor) : undefined,
       startDecorationSize: rawStartSize ? normalizeLineMarkerSize(rawStartSize) : undefined,
       endDecorationSize: rawEndSize ? normalizeLineMarkerSize(rawEndSize) : undefined,
+    });
+  });
+
+  // Parse polyline lines (3+ points)
+  svgRoot.querySelectorAll('polyline[data-type="line"]').forEach(p => {
+    const ptsAttr = p.getAttribute('points') || '';
+    const pts = ptsAttr.trim().split(/\s+/).filter(Boolean).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      return { x, y };
+    });
+    if (pts.length < 2) return;
+    elements.push({
+      id: p.id || generateId(),
+      type: 'line',
+      points: pts,
+      x1: pts[0].x, y1: pts[0].y,
+      x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y,
+      stroke: p.getAttribute('stroke') || '#ff0000',
+      strokeWidth: parseFloat(p.getAttribute('stroke-width')) || 2,
+      lineStyle: normalizeLineStyle(p.getAttribute('data-line-style') || 'normal'),
+      lineMarkerSize: normalizeLineMarkerSize(p.getAttribute('data-line-marker-size') || 30),
     });
   });
 
@@ -492,15 +517,16 @@ export function saveSVG() {
   svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      const startDecor = normalizeLineDecoration(el.startDecoration);
-      const endDecor = normalizeLineDecoration(el.endDecoration);
-      const startSize = normalizeLineMarkerSize(el.startDecorationSize ?? el.lineMarkerSize);
-      const endSize = normalizeLineMarkerSize(el.endDecorationSize ?? el.lineMarkerSize);
-      svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" data-start-decoration="${startDecor}" data-end-decoration="${endDecor}" data-start-decoration-size="${startSize}" data-end-decoration-size="${endSize}">\n`;
-      svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" `;
-      svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-      svg += `  ${getLineDecorationsSvg(el)}\n`;
-      svg += `</g>\n`;
+      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+      if (pts.length >= 3) {
+        svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else {
+        svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+        svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
+        svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+        svg += `  ${getLineDecorationsSvg(el)}\n`;
+        svg += `</g>\n`;
+      }
     } else if (el.type === 'text') {
       svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
       svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
@@ -558,14 +584,14 @@ export function exportJPG(widthOption) {
   svgStr += `<g transform="${imgTransform}">\n`;
   for (const el of state.elements) {
     if (el.type === 'line') {
-      const jStartDecor = normalizeLineDecoration(el.startDecoration);
-      const jEndDecor = normalizeLineDecoration(el.endDecoration);
-      const jStartSize = normalizeLineMarkerSize(el.startDecorationSize ?? el.lineMarkerSize);
-      const jEndSize = normalizeLineMarkerSize(el.endDecorationSize ?? el.lineMarkerSize);
-      svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" data-start-decoration="${jStartDecor}" data-end-decoration="${jEndDecor}" data-start-decoration-size="${jStartSize}" data-end-decoration-size="${jEndSize}">\n`;
-      svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-      svgStr += `  ${getLineDecorationsSvg(el)}\n`;
-      svgStr += `</g>\n`;
+      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+      if (pts.length >= 3) {
+        svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else {
+        svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+        svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+        svgStr += `</g>\n`;
+      }
     } else if (el.type === 'text') {
       svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
       if (el.rotation) {

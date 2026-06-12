@@ -4,7 +4,7 @@ import { initEditor, state } from './modules/editor.js';
 import { initHistory, undo, redo, canUndo, canRedo } from './modules/history.js';
 import { initPalette } from './modules/palette.js';
 import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit } from './modules/transform.js';
-import { initLine, addLineElement } from './modules/line.js';
+import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection } from './modules/select.js';
 import { initCrop, setCropModuleRefs } from './modules/crop.js';
@@ -126,7 +126,9 @@ function init() {
           }
           break;
         case 'escape':
-          clearSelection();
+          if (!handlePolylineEscape()) {
+            clearSelection();
+          }
           break;
       }
     }

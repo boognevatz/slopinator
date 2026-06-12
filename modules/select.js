@@ -416,10 +416,18 @@ function onDragMove(e) {
   if (!data) return;
 
   if (data.type === 'line') {
-    data.x1 = dragOriginal.x1 + dx;
-    data.y1 = dragOriginal.y1 + dy;
-    data.x2 = dragOriginal.x2 + dx;
-    data.y2 = dragOriginal.y2 + dy;
+    if (data.points) {
+      data.points = dragOriginal.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+      data.x1 = data.points[0].x;
+      data.y1 = data.points[0].y;
+      data.x2 = data.points[data.points.length - 1].x;
+      data.y2 = data.points[data.points.length - 1].y;
+    } else {
+      data.x1 = dragOriginal.x1 + dx;
+      data.y1 = dragOriginal.y1 + dy;
+      data.x2 = dragOriginal.x2 + dx;
+      data.y2 = dragOriginal.y2 + dy;
+    }
     updateLineSVG(data);
   } else if (data.type === 'text') {
     data.x = dragOriginal.x + dx;
@@ -453,8 +461,8 @@ function onDragEnd() {
   if (data.type === 'line' && (orig.x1 !== final.x1 || orig.y1 !== final.y1)) {
     pushAction({
       description: 'Move line',
-      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2 }); updateLineSVG(data); drawHandles(data); },
-      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2 }); updateLineSVG(data); drawHandles(data); },
+      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
+      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
     });
   } else if (data.type === 'text' && (orig.x !== final.x || orig.y !== final.y)) {
     pushAction({
@@ -563,9 +571,11 @@ function onResizeMove(e) {
     if (resizeHandle === 'p1') {
       data.x1 = pt.x;
       data.y1 = pt.y;
+      if (data.points) { data.points[0] = { x: pt.x, y: pt.y }; }
     } else if (resizeHandle === 'p2') {
       data.x2 = pt.x;
       data.y2 = pt.y;
+      if (data.points) { data.points[data.points.length - 1] = { x: pt.x, y: pt.y }; }
     }
     updateLineSVG(data);
   } else if (data.type === 'text') {
@@ -650,8 +660,8 @@ function onResizeEnd() {
   if (data.type === 'line') {
     pushAction({
       description: 'Resize line',
-      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2 }); updateLineSVG(data); drawHandles(data); },
-      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2 }); updateLineSVG(data); drawHandles(data); },
+      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
+      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
     });
   } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y || orig.rotation !== final.rotation)) {
     pushAction({
