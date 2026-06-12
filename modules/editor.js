@@ -34,6 +34,8 @@ export const state = {
   activeFontSize: 32,
   palette: [...DEFAULT_PALETTE],
   thicknessPresets: [...DEFAULT_THICKNESS],
+  viewerWidth: 0,
+  viewerHeight: 0,
   hasImage: false,
 };
 
@@ -123,6 +125,9 @@ export function updateViewBox() {
   const newW = vbW * state.image.fitScale * zoomScale;
   const newH = vbH * state.image.fitScale * zoomScale;
 
+  state.viewerWidth = Math.round(newW);
+  state.viewerHeight = Math.round(newH);
+
   dom.svg.style.width = newW + 'px';
   dom.svg.style.height = newH + 'px';
 
@@ -189,9 +194,10 @@ function updateLabels() {
     return;
   }
 
-  // Update zoom
-  const zoomPercent = Math.round(state.image.zoomScale * 100);
-  document.getElementById('zoom-label').textContent = `${zoomPercent}%`;
+  // Update zoom (effective = zoomScale × fitScale — the real visible scale)
+  const zoomPercent = Math.round(state.image.zoomScale * state.image.fitScale * 100);
+  document.getElementById('zoom-label').textContent =
+    `${zoomPercent}% — ${state.viewerWidth}×${state.viewerHeight}`;
 
   // Update image size
   const dims = getViewBoxDims();
