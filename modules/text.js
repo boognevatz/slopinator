@@ -48,6 +48,25 @@ export function initText() {
       finishEditing();
     }
   });
+
+  textarea.addEventListener('input', () => {
+    if (!editingTextId) return;
+    const curW = parseFloat(textEditOverlay.style.width);
+
+    // Measure content width using the textarea itself with no-wrap
+    const prevWS = textarea.style.whiteSpace;
+    const prevO = textarea.style.overflow;
+    textarea.style.overflow = 'hidden';
+    textarea.style.whiteSpace = 'nowrap';
+    const textW = textarea.scrollWidth;
+    textarea.style.whiteSpace = prevWS;
+    textarea.style.overflow = prevO;
+
+    textEditOverlay.style.width = Math.max(curW, textW + 5) + 'px';
+    // Height is constant for single-line text — keep initial size
+    textarea.scrollLeft = 0;
+    textarea.scrollTop = 0;
+  });
 }
 
 export function activateText() {
@@ -191,17 +210,27 @@ export function startEditing(id) {
   const scale = ctm ? ctm.a : 1;
   const scaledFontSize = data.fontSize * scale;
 
-  const centerX = relX + textRect.width / 2;
   const centerY = relY + textRect.height / 2;
   const rotation = data.rotation || 0;
 
   textEditOverlay.style.display = 'block';
-  textEditOverlay.style.left = centerX + 'px';
-  textEditOverlay.style.top = centerY + 'px';
   textEditOverlay.style.width = textRect.width + 'px';
   textEditOverlay.style.height = textRect.height + 'px';
-  textEditOverlay.style.transformOrigin = 'center center';
-  textEditOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+
+  if (rotation) {
+    // Rotated text: center anchor — rotate around center to match SVG
+    const centerX = relX + textRect.width / 2;
+    textEditOverlay.style.left = centerX + 'px';
+    textEditOverlay.style.top = centerY + 'px';
+    textEditOverlay.style.transformOrigin = 'center center';
+    textEditOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+  } else {
+    // Non-rotated: left anchor — expands only to the right while typing
+    textEditOverlay.style.left = relX + 'px';
+    textEditOverlay.style.top = centerY + 'px';
+    textEditOverlay.style.transformOrigin = 'left center';
+    textEditOverlay.style.transform = 'translate(0, -50%)';
+  }
 
   textarea.style.fontSize = scaledFontSize + 'px';
   textarea.style.lineHeight = (textRect.height / scaledFontSize).toFixed(3);
