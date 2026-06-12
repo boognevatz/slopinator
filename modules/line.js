@@ -13,6 +13,8 @@ let lineMarkerSizeInput = null;
 // Polyline extend mode state
 let pendingPolyline = null;
 let activeExtendIdx = 0;
+let isEditingExisting = false;
+let extendOrigPoints = null;
 
 // Vertex drag state
 let isDraggingVertex = false;
@@ -48,9 +50,24 @@ export function initLine() {
   updateLineMarkerSizeInput();
 }
 
-export function activateLine() {
+export function activateLine(selectedData) {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('mousedown', onMouseDown);
+  if (selectedData) {
+    loadExistingPolyline(selectedData);
+  }
+}
+
+function loadExistingPolyline(data) {
+  if (!data.points) {
+    data.points = [{x: data.x1, y: data.y1}, {x: data.x2, y: data.y2}];
+  }
+  pendingPolyline = data;
+  isEditingExisting = true;
+  extendOrigPoints = data.points.map(p => ({...p}));
+  activeExtendIdx = data.points.length - 1;
+  updateLineElement(data);
+  showExtendHandles(data, activeExtendIdx);
 }
 
 export function deactivateLine() {
@@ -364,7 +381,7 @@ function onVertexDragEnd() {
 
   const origPt = dragVertexOrigPoints[dragVertexIdx];
   const currPt = pendingPolyline.points[dragVertexIdx];
-  if (origPt.x !== currPt.x || origPt.y !== currPt.y) {
+  if (!isEditingExisting && (origPt.x !== currPt.x || origPt.y !== currPt.y)) {
     const data = pendingPolyline;
     const origSnap = dragVertexOrigPoints;
     const finalSnap = data.points.map(p => ({...p}));
@@ -403,17 +420,40 @@ export function finalizePolyline() {
   const data = pendingPolyline;
   const id = data.id;
 
-  pushAction({
-    description: data.points.length > 2 ? 'Draw polyline' : 'Draw line',
-    doFn: () => {
-      addLineElement(data);
-      state.elements.push(data);
-    },
-    undoFn: () => {
-      removeLineElement(id);
-      state.elements = state.elements.filter(el => el.id !== id);
-    },
-  });
+  if (isEditingExisting) {
+    const origSnap = extendOrigPoints;
+    const finalSnap = data.points.map(p => ({...p}));
+    isEditingExisting = false;
+    extendOrigPoints = null;
+
+    pushAction({
+      description: data.points.length > origSnap.length ? 'Extend polyline' : 'Move vertices',
+      doFn: () => {
+        data.points.length = 0;
+        for (const p of finalSnap) data.points.push({...p});
+        syncLineEndpoints(data);
+        updateLineElement(data);
+      },
+      undoFn: () => {
+        data.points.length = 0;
+        for (const p of origSnap) data.points.push({...p});
+        syncLineEndpoints(data);
+        updateLineElement(data);
+      },
+    });
+  } else {
+    pushAction({
+      description: data.points.length > 2 ? 'Draw polyline' : 'Draw line',
+      doFn: () => {
+        addLineElement(data);
+        state.elements.push(data);
+      },
+      undoFn: () => {
+        removeLineElement(id);
+        state.elements = state.elements.filter(el => el.id !== id);
+      },
+    });
+  }
 
   pendingPolyline = null;
 }
@@ -428,6 +468,10 @@ export function handlePolylineEscape() {
 
 export function isLineExtending() {
   return !!pendingPolyline;
+}
+
+export function getPendingPolylineId() {
+  return pendingPolyline ? pendingPolyline.id : null;
 }
 
 /**

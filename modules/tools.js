@@ -1,8 +1,8 @@
 // ── Tools module: Tool state machine (Select / Line / Text) ────
 
 import { state } from './editor.js';
-import { activateSelect, deactivateSelect } from './select.js';
-import { activateLine, deactivateLine } from './line.js';
+import { activateSelect, deactivateSelect, selectElement } from './select.js';
+import { activateLine, deactivateLine, getPendingPolylineId } from './line.js';
 import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
 import { activateFreehand, deactivateFreehand } from './freehand.js';
@@ -39,6 +39,19 @@ export function initTools() {
 export function switchTool(tool) {
   if (tool === state.activeTool) return;
 
+  // Capture pending polyline before line deactivation finalizes it
+  let pendingLineId = null;
+  if (state.activeTool === 'line' && tool === 'select') {
+    pendingLineId = getPendingPolylineId();
+  }
+
+  // Capture selected line data before deactivating (deactivateSelect clears selection)
+  let selectedLineData = null;
+  if (state.selectedId && tool === 'line') {
+    const sel = state.elements.find(el => el.id === state.selectedId);
+    if (sel && sel.type === 'line') selectedLineData = sel;
+  }
+
   // Deactivate current
   switch (state.activeTool) {
     case 'select': deactivateSelect(); break;
@@ -60,10 +73,16 @@ export function switchTool(tool) {
   // Activate new
   switch (tool) {
     case 'select': activateSelect(); break;
-    case 'line': activateLine(); break;
+    case 'line': activateLine(selectedLineData); break;
     case 'text': activateText(); break;
     case 'crop': activateCrop(); break;
     case 'freehand': activateFreehand(); break;
+  }
+
+  // If switching from line to select, select the just-finalized polyline
+  if (pendingLineId) {
+    const sel = state.elements.find(el => el.id === pendingLineId);
+    if (sel) selectElement(sel.id);
   }
 }
 
