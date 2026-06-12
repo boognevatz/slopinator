@@ -18,6 +18,8 @@ let activeExtendIdx = 0;
 let isDraggingVertex = false;
 let dragVertexIdx = -1;
 let dragVertexOrigPoints = null;
+let dragVisualHandle = null;
+let coordTooltip = null;
 
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
 const LINE_DECORATIONS = ['none', 'arrow', 'circle'];
@@ -59,6 +61,7 @@ export function deactivateLine() {
     document.removeEventListener('mouseup', onVertexDragEnd);
     isDraggingVertex = false;
   }
+  cleanupDragUI();
   finalizePolyline();
   cancelDraw();
 }
@@ -286,6 +289,23 @@ function syncLineEndpoints(data) {
   data.y2 = data.points[data.points.length - 1].y;
 }
 
+function cleanupDragUI() {
+  if (coordTooltip) {
+    coordTooltip.remove();
+    coordTooltip = null;
+  }
+  dragVisualHandle = null;
+}
+
+function updateCoordTooltip(clientX, clientY, pt) {
+  if (!coordTooltip) return;
+  const x = Math.round(pt.x);
+  const y = Math.round(pt.y);
+  coordTooltip.textContent = `${x}, ${y}`;
+  coordTooltip.style.left = (clientX + 14) + 'px';
+  coordTooltip.style.top = (clientY - 26) + 'px';
+}
+
 function startVertexDrag(idx, e) {
   isDraggingVertex = true;
   dragVertexIdx = idx;
@@ -297,6 +317,22 @@ function startVertexDrag(idx, e) {
 
   dom.svg.style.cursor = 'move';
   dom.handleLayer.innerHTML = '';
+
+  // Show the dragged vertex as an active (white filled) circle
+  const pt = pendingPolyline.points[idx];
+  const r = getExtendHandleRadius();
+  dragVisualHandle = svgEl('circle', {
+    cx: pt.x, cy: pt.y, r,
+    class: 'handle handle-endpoint active',
+    'pointer-events': 'none',
+  });
+  dom.handleLayer.appendChild(dragVisualHandle);
+
+  // Coordinate tooltip
+  coordTooltip = document.createElement('div');
+  coordTooltip.style.cssText = 'position:fixed;background:rgba(0,0,0,0.75);color:#fff;padding:2px 7px;border-radius:3px;font-size:12px;pointer-events:none;z-index:100;font-family:monospace;';
+  document.body.appendChild(coordTooltip);
+  updateCoordTooltip(e.clientX, e.clientY, pt);
 
   document.addEventListener('mousemove', onVertexDragMove);
   document.addEventListener('mouseup', onVertexDragEnd);
@@ -311,6 +347,12 @@ function onVertexDragMove(e) {
   syncLineEndpoints(pendingPolyline);
 
   updateLineElement(pendingPolyline);
+
+  if (dragVisualHandle) {
+    dragVisualHandle.setAttribute('cx', pt.x);
+    dragVisualHandle.setAttribute('cy', pt.y);
+  }
+  updateCoordTooltip(e.clientX, e.clientY, pt);
 }
 
 function onVertexDragEnd() {
@@ -349,6 +391,7 @@ function onVertexDragEnd() {
   }
 
   dom.svg.style.cursor = 'crosshair';
+  cleanupDragUI();
   showExtendHandles(pendingPolyline, activeExtendIdx);
 }
 
