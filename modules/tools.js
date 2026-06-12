@@ -105,7 +105,7 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
 
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
-  const showLineStyle = tool === 'line' || (tool === 'select' && selectedType === 'line' && state.activeLineEditMode === 'change-end');
+  const showLineStyle = tool === 'line' || (tool === 'select' && selectedType === 'line');
   document.getElementById('line-style-group').hidden = !showLineStyle;
   document.getElementById('line-mode-group').hidden = !(tool === 'select' && selectedType === 'line');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');

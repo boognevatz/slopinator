@@ -15,6 +15,7 @@ let pendingPolyline = null;
 let activeExtendIdx = 0;
 let isEditingExisting = false;
 let extendOrigPoints = null;
+let extendOrigStyle = null;
 
 // Vertex drag state
 let isDraggingVertex = false;
@@ -48,6 +49,38 @@ export function initLine() {
 
   updateLineStyleButtons();
   updateLineMarkerSizeInput();
+
+  document.addEventListener('line-style-changed', () => {
+    if (pendingPolyline) {
+      applyStyleToPendingPolyline();
+    }
+  });
+  document.addEventListener('line-marker-size-changed', () => {
+    if (pendingPolyline) {
+      applySizeToPendingPolyline();
+    }
+  });
+}
+
+function applyStyleToPendingPolyline() {
+  const isStart = activeExtendIdx === 0;
+  const decors = legacyStyleToDecorations(state.activeLineStyle, state.activeLineMarkerSize);
+  const decorKey = isStart ? 'startDecoration' : 'endDecoration';
+  const sizeKey = isStart ? 'startDecorationSize' : 'endDecorationSize';
+  pendingPolyline[decorKey] = decors[decorKey];
+  pendingPolyline[sizeKey] = decors[sizeKey];
+  pendingPolyline.lineStyle = state.activeLineStyle;
+  pendingPolyline.lineMarkerSize = state.activeLineMarkerSize;
+  updateLineElement(pendingPolyline);
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+}
+
+function applySizeToPendingPolyline() {
+  pendingPolyline.lineMarkerSize = state.activeLineMarkerSize;
+  pendingPolyline.startDecorationSize = state.activeLineMarkerSize;
+  pendingPolyline.endDecorationSize = state.activeLineMarkerSize;
+  updateLineElement(pendingPolyline);
+  showExtendHandles(pendingPolyline, activeExtendIdx);
 }
 
 export function activateLine(selectedData) {
@@ -65,6 +98,14 @@ function loadExistingPolyline(data) {
   pendingPolyline = data;
   isEditingExisting = true;
   extendOrigPoints = data.points.map(p => ({...p}));
+  extendOrigStyle = {
+    lineStyle: data.lineStyle,
+    lineMarkerSize: data.lineMarkerSize,
+    startDecoration: data.startDecoration,
+    endDecoration: data.endDecoration,
+    startDecorationSize: data.startDecorationSize,
+    endDecorationSize: data.endDecorationSize,
+  };
   activeExtendIdx = data.points.length - 1;
   updateLineElement(data);
   showExtendHandles(data, activeExtendIdx);
@@ -423,8 +464,18 @@ export function finalizePolyline() {
   if (isEditingExisting) {
     const origSnap = extendOrigPoints;
     const finalSnap = data.points.map(p => ({...p}));
+    const origStyle = extendOrigStyle;
+    const finalStyle = {
+      lineStyle: data.lineStyle,
+      lineMarkerSize: data.lineMarkerSize,
+      startDecoration: data.startDecoration,
+      endDecoration: data.endDecoration,
+      startDecorationSize: data.startDecorationSize,
+      endDecorationSize: data.endDecorationSize,
+    };
     isEditingExisting = false;
     extendOrigPoints = null;
+    extendOrigStyle = null;
 
     pushAction({
       description: data.points.length > origSnap.length ? 'Extend polyline' : 'Move vertices',
@@ -432,12 +483,14 @@ export function finalizePolyline() {
         data.points.length = 0;
         for (const p of finalSnap) data.points.push({...p});
         syncLineEndpoints(data);
+        Object.assign(data, finalStyle);
         updateLineElement(data);
       },
       undoFn: () => {
         data.points.length = 0;
         for (const p of origSnap) data.points.push({...p});
         syncLineEndpoints(data);
+        Object.assign(data, origStyle);
         updateLineElement(data);
       },
     });
@@ -491,7 +544,17 @@ export function addLineElement(data) {
   group.dataset.startDecorationSize = lineState.startDecorationSize;
   group.dataset.endDecorationSize = lineState.endDecorationSize;
 
-  const decorData = { ...lineState, x1: pts[0].x, y1: pts[0].y, x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y };
+  const decorData = {
+    ...lineState,
+    x1: pts[0].x, y1: pts[0].y,
+    x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y,
+  };
+  if (pts.length >= 3) {
+    decorData.startDirX = pts[1].x;
+    decorData.startDirY = pts[1].y;
+    decorData.endDirX = pts[pts.length - 2].x;
+    decorData.endDirY = pts[pts.length - 2].y;
+  }
 
   if (pts.length >= 3) {
     // Render as polyline
@@ -577,14 +640,14 @@ export function decorationToStyle(decoration) {
   return 'normal';
 }
 
-function legacyStyleToDecorations(style, size) {
+export function legacyStyleToDecorations(style, size) {
   const norm = normalizeLineStyle(style);
   const markerSize = normalizeLineMarkerSize(size);
   if (norm === 'arrows') {
     return { startDecoration: 'arrow', endDecoration: 'arrow', startDecorationSize: markerSize, endDecorationSize: markerSize };
   }
   if (norm === 'circle') {
-    return { startDecoration: 'circle', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
+    return { startDecoration: 'circle', endDecoration: 'circle', startDecorationSize: markerSize, endDecorationSize: markerSize };
   }
   return { startDecoration: 'none', endDecoration: 'none', startDecorationSize: markerSize, endDecorationSize: markerSize };
 }
@@ -637,12 +700,20 @@ function ensureLineMarkers() {
 function buildLineDecorations(data) {
   const group = svgEl('g', { class: 'line-decorations', 'pointer-events': 'none' });
   const lineColor = data.stroke || '#000';
+  const sdx = data.startDirX, sdy = data.startDirY;
+  const edx = data.endDirX, edy = data.endDirY;
 
   if (data.startDecoration && data.startDecoration !== 'none') {
-    group.appendChild(buildDecoration(data.startDecoration, data.x1, data.y1, data.x2, data.y2, normalizeLineMarkerSize(data.startDecorationSize), lineColor));
+    const tx = data.x1, ty = data.y1;
+    const dx = (sdx != null) ? sdx : data.x2;
+    const dy = (sdy != null) ? sdy : data.y2;
+    group.appendChild(buildDecoration(data.startDecoration, tx, ty, dx, dy, normalizeLineMarkerSize(data.startDecorationSize), lineColor));
   }
   if (data.endDecoration && data.endDecoration !== 'none') {
-    group.appendChild(buildDecoration(data.endDecoration, data.x2, data.y2, data.x1, data.y1, normalizeLineMarkerSize(data.endDecorationSize), lineColor));
+    const tx = data.x2, ty = data.y2;
+    const dx = (edx != null) ? edx : data.x1;
+    const dy = (edy != null) ? edy : data.y1;
+    group.appendChild(buildDecoration(data.endDecoration, tx, ty, dx, dy, normalizeLineMarkerSize(data.endDecorationSize), lineColor));
   }
   return group;
 }
@@ -672,15 +743,10 @@ function buildArrow(x1, y1, x2, y2, size, color) {
 }
 
 function buildCircle(x1, y1, x2, y2, size, color) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
   const radius = Math.max(2, size * 0.5);
   return svgEl('circle', {
-    cx: x1 + ux * radius,
-    cy: y1 + uy * radius,
+    cx: x1,
+    cy: y1,
     r: radius,
     fill: color,
   });
@@ -724,13 +790,8 @@ function getArrowPoints(x1, y1, x2, y2, size) {
 }
 
 function getCircleAttrs(x1, y1, x2, y2, size) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
   const r = Math.max(2, size * 0.5);
-  return { cx: x1 + ux * r, cy: y1 + uy * r, r };
+  return { cx: x1, cy: y1, r };
 }
 
 function removeLineElement(id) {

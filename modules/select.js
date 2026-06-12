@@ -4,7 +4,7 @@ import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
-import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle } from './line.js';
+import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle, legacyStyleToDecorations } from './line.js';
 import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
 
 let isDragging = false;
@@ -201,6 +201,8 @@ export function selectElement(id) {
     setLineEditMode('move');
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
+    setActiveLineStyle(data.lineStyle);
+    setActiveLineMarkerSize(data.lineMarkerSize);
   } else if (data.type === 'text') {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
@@ -861,15 +863,29 @@ function applyLineMarkerSizeToSelected(size) {
   }
 
   const oldSize = normalizeLineMarkerSize(data.lineMarkerSize);
+  const oldStartSize = data.startDecorationSize;
+  const oldEndSize = data.endDecorationSize;
   if (oldSize === newSize) return;
 
   data.lineMarkerSize = newSize;
+  data.startDecorationSize = newSize;
+  data.endDecorationSize = newSize;
   updateLineSVG(data);
 
   pushAction({
     description: 'Change line marker size',
-    doFn: () => { data.lineMarkerSize = newSize; updateLineSVG(data); },
-    undoFn: () => { data.lineMarkerSize = oldSize; updateLineSVG(data); },
+    doFn: () => {
+      data.lineMarkerSize = newSize;
+      data.startDecorationSize = newSize;
+      data.endDecorationSize = newSize;
+      updateLineSVG(data);
+    },
+    undoFn: () => {
+      data.lineMarkerSize = oldSize;
+      data.startDecorationSize = oldStartSize;
+      data.endDecorationSize = oldEndSize;
+      updateLineSVG(data);
+    },
   });
 }
 
@@ -916,16 +932,66 @@ function applyLineStyleToSelected(style) {
     return;
   }
 
-  const oldStyle = normalizeLineStyle(data.lineStyle);
-  if (oldStyle === newStyle) return;
+  const oldStyle = data.lineStyle;
+  const oldStartDecor = data.startDecoration;
+  const oldEndDecor = data.endDecoration;
+  const oldStartDecorSize = data.startDecorationSize;
+  const oldEndDecorSize = data.endDecorationSize;
 
-  data.lineStyle = newStyle;
+  const targetDecor = styleToDecoration(newStyle);
+  const startHas = data.startDecoration && data.startDecoration !== 'none';
+
+  if (targetDecor === 'none') {
+    data.lineStyle = 'normal';
+    data.startDecoration = 'none';
+    data.endDecoration = 'none';
+  } else if (!startHas && !endHas) {
+    const decors = legacyStyleToDecorations(newStyle, state.activeLineMarkerSize);
+    data.lineStyle = newStyle;
+    data.startDecoration = decors.startDecoration;
+    data.endDecoration = decors.endDecoration;
+    data.startDecorationSize = decors.startDecorationSize;
+    data.endDecorationSize = decors.endDecorationSize;
+  } else {
+    data.lineStyle = newStyle;
+    if (startHas) {
+      data.startDecoration = targetDecor;
+      data.startDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
+    }
+    if (endHas) {
+      data.endDecoration = targetDecor;
+      data.endDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
+    }
+  }
   updateLineSVG(data);
 
   pushAction({
     description: 'Change line style',
-    doFn: () => { data.lineStyle = newStyle; updateLineSVG(data); },
-    undoFn: () => { data.lineStyle = oldStyle; updateLineSVG(data); },
+    doFn: () => {
+      data.lineStyle = newStyle;
+      if (targetDecor === 'none') {
+        data.startDecoration = 'none';
+        data.endDecoration = 'none';
+      } else if (!startHas && !endHas) {
+        const d = legacyStyleToDecorations(newStyle, state.activeLineMarkerSize);
+        data.startDecoration = d.startDecoration;
+        data.endDecoration = d.endDecoration;
+        data.startDecorationSize = d.startDecorationSize;
+        data.endDecorationSize = d.endDecorationSize;
+      } else {
+        if (startHas) { data.startDecoration = targetDecor; data.startDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize); }
+        if (endHas) { data.endDecoration = targetDecor; data.endDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize); }
+      }
+      updateLineSVG(data);
+    },
+    undoFn: () => {
+      data.lineStyle = oldStyle;
+      data.startDecoration = oldStartDecor;
+      data.endDecoration = oldEndDecor;
+      data.startDecorationSize = oldStartDecorSize;
+      data.endDecorationSize = oldEndDecorSize;
+      updateLineSVG(data);
+    },
   });
 }
 
