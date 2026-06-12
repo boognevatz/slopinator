@@ -10,14 +10,15 @@ import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelec
 import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
+import { initFreehand, addFreehandElement } from './modules/freehand.js';
 
 import { dom } from './modules/editor.js';
 
 function init() {
   initEditor();
 
-  // Give select module references to line/text for undo recreation
-  setModuleRefs({ addLineElement }, { addTextElement });
+  // Give select module references to line/text/freehand for undo recreation
+  setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement });
   setCropModuleRefs({ addLineElement }, { addTextElement });
 
   // History: update undo/redo button states on change
@@ -29,6 +30,7 @@ function init() {
   initSelect();
   initCrop();
   initTools();
+  initFreehand();
   initFileIO();
 
   // ── Toolbar button wiring ───────────────────────────────────
@@ -112,6 +114,9 @@ function init() {
           break;
         case 'c':
           switchTool('crop');
+          break;
+        case 'f':
+          switchTool('freehand');
           break;
         case 'delete':
         case 'backspace':

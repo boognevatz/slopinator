@@ -30,6 +30,7 @@ export const state = {
   activeLineMarkerSize: 30,
   activeLineEditMode: 'move',
   activeLineEndpoint: 'end',
+  activeFreehandEpsilon: 0,
   activeFontSize: 32,
   palette: [...DEFAULT_PALETTE],
   thicknessPresets: [...DEFAULT_THICKNESS],

@@ -3,9 +3,10 @@
 import { state, dom, loadImage, restoreState, getViewBoxDims } from './editor.js';
 import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLineMarkerSize, normalizeLineDecoration } from './line.js';
 import { addTextElement } from './text.js';
+import { addFreehandElement } from './freehand.js';
 import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
-import { downloadString, downloadBlob } from './utils.js';
+import { downloadString, downloadBlob, generateId } from './utils.js';
 import { switchTool } from './tools.js';
 
 export function initFileIO() {
@@ -415,6 +416,24 @@ function openSVGProject(svgText) {
     });
   });
 
+  // Parse freehand polylines
+  svgRoot.querySelectorAll('polyline[data-type="freehand"]').forEach(p => {
+    const ptsAttr = p.getAttribute('points') || '';
+    const points = ptsAttr.trim().split(/\s+/).filter(Boolean).map(pair => {
+      const [x, y] = pair.split(',').map(Number);
+      return { x, y };
+    });
+    elements.push({
+      id: p.id || generateId(),
+      type: 'freehand',
+      points,
+      rawPoints: null,
+      epsilon: parseFloat(p.getAttribute('data-epsilon')) || 3,
+      stroke: p.getAttribute('stroke') || '#ff0000',
+      strokeWidth: parseFloat(p.getAttribute('stroke-width')) || 2,
+    });
+  });
+
   // Restore state
   const parsedElements = restoreState({
     dataURI,
@@ -434,6 +453,8 @@ function openSVGProject(svgText) {
       addLineElement(el);
     } else if (el.type === 'text') {
       addTextElement(el);
+    } else if (el.type === 'freehand') {
+      addFreehandElement(el);
     }
     state.elements.push(el);
   }
@@ -494,6 +515,8 @@ export function saveSVG() {
       svg += `>`;
       svg += escapeXml(el.content);
       svg += `</text>\n`;
+    } else if (el.type === 'freehand') {
+      svg += `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
     }
   }
   svg += `</g>\n`;
@@ -555,6 +578,8 @@ export function exportJPG(widthOption) {
       svgStr += `>`;
       svgStr += escapeXml(el.content);
       svgStr += `</text>\n`;
+    } else if (el.type === 'freehand') {
+      svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
     }
   }
   svgStr += `</g>\n`;

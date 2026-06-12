@@ -5,6 +5,7 @@ import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
 import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle } from './line.js';
+import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -179,7 +180,7 @@ function onMouseDown(e) {
 function findAnnotationParent(target) {
   let el = target;
   while (el && el !== dom.svg) {
-    if (el.dataset && el.dataset.type === 'line') return el;
+    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand')) return el;
     if (el.dataset && el.dataset.type === 'text') return el;
     el = el.parentElement;
   }
@@ -204,6 +205,10 @@ export function selectElement(id) {
     state.activeColor = data.fill;
     state.activeFontSize = data.fontSize;
     document.getElementById('font-size-input').value = data.fontSize;
+  } else if (data.type === 'freehand') {
+    state.activeColor = data.stroke;
+    state.activeThickness = data.strokeWidth;
+    syncFreehandEpsilonSlider(data.epsilon);
   }
 
   drawHandles(data);
@@ -227,6 +232,8 @@ function drawHandles(data) {
     drawLineHandles(data);
   } else if (data.type === 'text') {
     drawTextHandles(data);
+  } else if (data.type === 'freehand') {
+    drawFreehandHandles(data);
   }
 }
 
@@ -362,6 +369,21 @@ function drawTextHandles(data) {
   handleGroup.appendChild(iconG);
 }
 
+function drawFreehandHandles(data) {
+  const r = getHandleRadius();
+  // Centroid
+  let cx = 0, cy = 0;
+  for (const p of data.points) { cx += p.x; cy += p.y; }
+  cx /= data.points.length;
+  cy /= data.points.length;
+  const hm = svgEl('rect', {
+    x: cx - r, y: cy - r, width: r * 2, height: r * 2,
+    class: 'handle handle-move',
+    'data-handle': 'move',
+  });
+  dom.handleLayer.appendChild(hm);
+}
+
 function getHandleRadius() {
   // Scale handle size based on viewBox so they look consistent
   const viewBox = dom.svg.viewBox.baseVal;
@@ -403,6 +425,12 @@ function onDragMove(e) {
     data.x = dragOriginal.x + dx;
     data.y = dragOriginal.y + dy;
     updateTextSVG(data);
+  } else if (data.type === 'freehand') {
+    data.points = dragOriginal.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    if (data.rawPoints) {
+      data.rawPoints = dragOriginal.rawPoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    }
+    updateFreehandElement(data);
   }
 
   drawHandles(data);
@@ -433,6 +461,12 @@ function onDragEnd() {
       description: 'Move text',
       doFn: () => { data.x = final.x; data.y = final.y; updateTextSVG(data); drawHandles(data); },
       undoFn: () => { data.x = orig.x; data.y = orig.y; updateTextSVG(data); drawHandles(data); },
+    });
+  } else if (data.type === 'freehand' && (orig.points[0].x !== final.points[0].x || orig.points[0].y !== final.points[0].y)) {
+    pushAction({
+      description: 'Move freehand',
+      doFn: () => { data.points = final.points; data.rawPoints = final.rawPoints; updateFreehandElement(data); drawHandles(data); },
+      undoFn: () => { data.points = orig.points; data.rawPoints = orig.rawPoints; updateFreehandElement(data); drawHandles(data); },
     });
   }
 
@@ -663,6 +697,8 @@ export function deleteSelected() {
         addLineSVGAtIndex(data, idx);
       } else if (data.type === 'text') {
         addTextSVGAtIndex(data, idx);
+      } else if (data.type === 'freehand') {
+        addFreehandSVGAtIndex(data, idx);
       }
     },
   });
@@ -679,13 +715,20 @@ function addTextSVGAtIndex(data, _idx) {
   addTextElement(data);
 }
 
+function addFreehandSVGAtIndex(data, _idx) {
+  const { addFreehandElement } = _freehandModule;
+  addFreehandElement(data);
+}
+
 // We'll set these from main.js to avoid circular imports
 let _lineModule = {};
 let _textModule = {};
+let _freehandModule = {};
 
-export function setModuleRefs(lineMod, textMod) {
+export function setModuleRefs(lineMod, textMod, freehandMod) {
   _lineModule = lineMod;
   _textModule = textMod;
+  _freehandModule = freehandMod || {};
 }
 
 // ── SVG Update Helpers ──────────────────────────────────────────
@@ -724,7 +767,7 @@ function applyColorToSelected(color) {
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data) return;
 
-  const oldColor = data.type === 'line' ? data.stroke : data.fill;
+  const oldColor = data.type === 'text' ? data.fill : data.stroke;
   if (oldColor === color) return;
 
   if (data.type === 'line') {
@@ -733,17 +776,22 @@ function applyColorToSelected(color) {
   } else if (data.type === 'text') {
     data.fill = color;
     updateTextSVG(data);
+  } else if (data.type === 'freehand') {
+    data.stroke = color;
+    updateFreehandElement(data);
   }
 
   pushAction({
     description: 'Change color',
     doFn: () => {
       if (data.type === 'line') { data.stroke = color; updateLineSVG(data); }
-      else { data.fill = color; updateTextSVG(data); }
+      else if (data.type === 'text') { data.fill = color; updateTextSVG(data); }
+      else if (data.type === 'freehand') { data.stroke = color; updateFreehandElement(data); }
     },
     undoFn: () => {
       if (data.type === 'line') { data.stroke = oldColor; updateLineSVG(data); }
-      else { data.fill = oldColor; updateTextSVG(data); }
+      else if (data.type === 'text') { data.fill = oldColor; updateTextSVG(data); }
+      else if (data.type === 'freehand') { data.stroke = oldColor; updateFreehandElement(data); }
     },
   });
 }
@@ -751,18 +799,22 @@ function applyColorToSelected(color) {
 function applyThicknessToSelected(thickness) {
   if (!state.selectedId) return;
   const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || data.type !== 'line') return;
+  if (!data || (data.type !== 'line' && data.type !== 'freehand')) return;
 
   const oldThickness = data.strokeWidth;
   if (oldThickness === thickness) return;
 
   data.strokeWidth = thickness;
-  updateLineSVG(data);
+  if (data.type === 'line') {
+    updateLineSVG(data);
+  } else {
+    updateFreehandElement(data);
+  }
 
   pushAction({
     description: 'Change thickness',
-    doFn: () => { data.strokeWidth = thickness; updateLineSVG(data); },
-    undoFn: () => { data.strokeWidth = oldThickness; updateLineSVG(data); },
+    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else updateFreehandElement(data); },
+    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else updateFreehandElement(data); },
   });
 }
 
@@ -903,6 +955,8 @@ export function refreshSelection() {
     syncLineToolbarFromSelection(data);
   } else if (data.type === 'line') {
     setActiveLineStyle(normalizeLineStyle(data.lineStyle));
+  } else if (data.type === 'freehand') {
+    syncFreehandEpsilonSlider(data.epsilon);
   }
   drawHandles(data);
 }

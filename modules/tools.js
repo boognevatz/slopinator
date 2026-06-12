@@ -5,12 +5,14 @@ import { activateSelect, deactivateSelect } from './select.js';
 import { activateLine, deactivateLine } from './line.js';
 import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
+import { activateFreehand, deactivateFreehand } from './freehand.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
   select: ['delete'],
   line: ['color', 'thickness', 'line-style'],
   text: ['color', 'font-size'],
+  freehand: ['color', 'thickness', 'freehand-epsilon'],
   crop: ['crop'],
 };
 
@@ -19,9 +21,10 @@ export function initTools() {
   toolButtons.line = document.getElementById('btn-line');
   toolButtons.text = document.getElementById('btn-text');
   toolButtons.crop = document.getElementById('btn-crop');
+  toolButtons.freehand = document.getElementById('btn-freehand');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
-    btn.addEventListener('click', () => switchTool(tool));
+    if (btn) btn.addEventListener('click', () => switchTool(tool));
   }
 
   // Activate default tool
@@ -42,6 +45,7 @@ export function switchTool(tool) {
     case 'line': deactivateLine(); break;
     case 'text': deactivateText(); break;
     case 'crop': deactivateCrop(); break;
+    case 'freehand': deactivateFreehand(); break;
   }
 
   state.activeTool = tool;
@@ -59,6 +63,7 @@ export function switchTool(tool) {
     case 'line': activateLine(); break;
     case 'text': activateText(); break;
     case 'crop': activateCrop(); break;
+    case 'freehand': activateFreehand(); break;
   }
 }
 
@@ -73,6 +78,11 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
     visible.add('color');
     visible.add('font-size');
   }
+  if (tool === 'select' && selectedType === 'freehand') {
+    visible.add('color');
+    visible.add('thickness');
+    visible.add('freehand-epsilon');
+  }
 
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
@@ -81,5 +91,6 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('line-mode-group').hidden = !(tool === 'select' && selectedType === 'line');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
   document.getElementById('delete-group').hidden = !visible.has('delete');
+  document.getElementById('freehand-epsilon-group').hidden = !visible.has('freehand-epsilon');
   document.getElementById('crop-group').hidden = !visible.has('crop');
 }
