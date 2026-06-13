@@ -108,6 +108,11 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
     visible.add('thickness');
     visible.add('freehand-epsilon');
   }
+  if (tool === 'select' && selectedType === 'rectangle') {
+    visible.add('color');
+    visible.add('thickness');
+    visible.add('rectangle');
+  }
 
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');

@@ -33,6 +33,7 @@ function onMouseDown(e) {
   currentBgFill = state.bgColor === 'transparent' ? 'none' : state.bgColor;
   previewRect = svgEl('rect', {
     x: startPt.x, y: startPt.y, width: 0, height: 0,
+    rx: state.activeCornerRadius,
     stroke: state.activeColor,
     'stroke-width': state.activeThickness,
     fill: currentBgFill,
@@ -82,7 +83,7 @@ function onMouseUp(e) {
     id,
     type: 'rectangle',
     x, y, width: w, height: h,
-    rx: 0,
+    rx: state.activeCornerRadius,
     rotation: 0,
     stroke: state.activeColor,
     strokeWidth: state.activeThickness,
