@@ -25,6 +25,7 @@ export const state = {
   selectedId: null,
   activeTool: 'select', // 'select' | 'line' | 'text'
   activeColor: '#ff0000',
+  bgColor: '#ffffff',
   activeThickness: 2,
   activeLineStyle: 'normal',
   activeLineMarkerSize: 30,

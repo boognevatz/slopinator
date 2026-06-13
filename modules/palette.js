@@ -1,44 +1,99 @@
-// ── Palette module: Color palette & thickness presets UI ────────
-
 import { state } from './editor.js';
 
-let colorPickerTarget = null; // index of swatch being edited
+let colorPickerTarget = null;
+let activeTarget = 'foreground'; // 'foreground' | 'background'
+let dropdownOpen = false;
 
 export function initPalette() {
-  renderPalette();
+  setupIndicatorClicks();
+  updateIndicator();
+  renderSwatches();
   renderThickness();
   setupColorPicker();
+  setupDropdownPicker();
+  setupGlobalClose();
 }
 
-/** Rebuild palette after restoring state */
 export function refreshPalette() {
-  renderPalette();
+  updateIndicator();
+  renderSwatches();
   renderThickness();
 }
 
-// ── Color Palette ───────────────────────────────────────────────
+// ── Foreground/Background Indicator ──────────────────────────────
 
-function renderPalette() {
-  const container = document.getElementById('color-palette');
+function updateIndicator() {
+  setSquareColor('fg-square', state.activeColor);
+  setSquareColor('bg-square', state.bgColor);
+}
+
+function setSquareColor(id, color) {
+  const el = document.getElementById(id);
+  if (color === 'transparent') {
+    el.classList.add('chessboard');
+    el.style.background = '';
+  } else {
+    el.classList.remove('chessboard');
+    el.style.background = color;
+  }
+}
+
+function setupIndicatorClicks() {
+  document.getElementById('fg-click-area').addEventListener('click', (e) => {
+    e.stopPropagation();
+    activeTarget = 'foreground';
+    openDropdown();
+  });
+
+  document.getElementById('bg-click-area').addEventListener('click', (e) => {
+    e.stopPropagation();
+    activeTarget = 'background';
+    openDropdown();
+  });
+}
+
+// ── Dropdown ────────────────────────────────────────────────────
+
+function openDropdown() {
+  const dd = document.getElementById('color-dropdown');
+  dropdownOpen = true;
+  dd.hidden = false;
+}
+
+function closeDropdown() {
+  const dd = document.getElementById('color-dropdown');
+  dropdownOpen = false;
+  dd.hidden = true;
+}
+
+function setupGlobalClose() {
+  document.addEventListener('click', (e) => {
+    const indicator = document.getElementById('color-indicator');
+    if (dropdownOpen && !indicator.contains(e.target)) {
+      closeDropdown();
+    }
+  });
+}
+
+function renderSwatches() {
+  const container = document.getElementById('color-dropdown-swatches');
   container.innerHTML = '';
   state.palette.forEach((color, i) => {
     const swatch = document.createElement('div');
-    swatch.className = 'swatch' + (color === state.activeColor ? ' active' : '');
+    swatch.className = 'swatch' + (color === state.activeColor && activeTarget === 'foreground' ? ' active' : '');
     swatch.style.background = color;
     swatch.dataset.index = i;
     swatch.title = `${color} (right-click to edit)`;
 
-    // Left click: select color
     swatch.addEventListener('click', () => {
-      state.activeColor = color;
+      applyColor(color);
       highlightActiveSwatch();
-      // If an element is selected, update its color
-      document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color } }));
+      closeDropdown();
     });
 
-    // Right click: edit swatch color
     swatch.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       colorPickerTarget = i;
       const picker = document.getElementById('color-picker-hidden');
       picker.value = state.palette[i];
@@ -47,13 +102,40 @@ function renderPalette() {
 
     container.appendChild(swatch);
   });
+
+  // Transparent swatch
+  const transpSwatch = document.createElement('div');
+  transpSwatch.className = 'swatch chessboard' + (state.activeColor === 'transparent' && activeTarget === 'foreground' ? ' active' : '');
+  transpSwatch.title = 'transparent';
+  transpSwatch.addEventListener('click', () => {
+    applyColor('transparent');
+    highlightActiveSwatch();
+    closeDropdown();
+  });
+  container.appendChild(transpSwatch);
+}
+
+function applyColor(color) {
+  if (activeTarget === 'foreground') {
+    state.activeColor = color;
+    setSquareColor('fg-square', color);
+    document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color } }));
+  } else {
+    state.bgColor = color;
+    setSquareColor('bg-square', color);
+  }
 }
 
 function highlightActiveSwatch() {
-  const swatches = document.querySelectorAll('#color-palette .swatch');
+  const swatches = document.querySelectorAll('#color-dropdown-swatches .swatch');
+  const targetColor = activeTarget === 'foreground' ? state.activeColor : state.bgColor;
   swatches.forEach(s => {
     const idx = parseInt(s.dataset.index);
-    s.classList.toggle('active', state.palette[idx] === state.activeColor);
+    if (!isNaN(idx)) {
+      s.classList.toggle('active', state.palette[idx] === targetColor);
+    } else {
+      s.classList.toggle('active', targetColor === 'transparent');
+    }
   });
 }
 
@@ -62,13 +144,20 @@ function setupColorPicker() {
   picker.addEventListener('input', (e) => {
     if (colorPickerTarget !== null) {
       state.palette[colorPickerTarget] = e.target.value;
-      state.activeColor = e.target.value;
-      renderPalette();
-      document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color: e.target.value } }));
+      applyColor(e.target.value);
+      renderSwatches();
     }
   });
   picker.addEventListener('change', () => {
     colorPickerTarget = null;
+  });
+}
+
+function setupDropdownPicker() {
+  const picker = document.getElementById('color-dropdown-picker');
+  picker.addEventListener('input', (e) => {
+    applyColor(e.target.value);
+    highlightActiveSwatch();
   });
 }
 
@@ -83,14 +172,12 @@ function renderThickness() {
     btn.textContent = val;
     btn.title = `${val}px (right-click to edit)`;
 
-    // Left click: select thickness
     btn.addEventListener('click', () => {
       state.activeThickness = val;
       highlightActiveThickness();
       document.dispatchEvent(new CustomEvent('palette-thickness-changed', { detail: { thickness: val } }));
     });
 
-    // Right click: edit preset
     btn.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       const newVal = prompt(`Enter new thickness value (replacing ${val}):`, val);
