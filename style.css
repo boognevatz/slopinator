@@ -222,6 +222,29 @@ button.tool-btn.active {
   background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
 }
 
+/* ── Opacity Slider ────────────────────────────────── */
+
+.color-dropdown-opacity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #444;
+  margin-top: 4px;
+}
+
+.color-dropdown-opacity input[type="range"] {
+  flex: 1;
+  height: 4px;
+  accent-color: #0078d4;
+  cursor: pointer;
+}
+
+.color-dropdown-opacity .toolbar-label {
+  min-width: 24px;
+  text-align: right;
+}
+
 .color-dropdown-custom {
   display: flex;
   align-items: center;

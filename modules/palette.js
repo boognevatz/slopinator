@@ -1,10 +1,30 @@
 import { state } from './editor.js';
 
 let colorPickerTarget = null;
-let activeTarget = 'foreground'; // 'foreground' | 'background'
+let activeTarget = 'foreground';
 let dropdownOpen = false;
 
-function isLightColor(hex) {
+function getBaseHex(color) {
+  if (!color || color === 'transparent') return null;
+  if (color.startsWith('#')) return color;
+  const m = color.match(/\d+/g);
+  if (m && m.length >= 3) {
+    return '#' + [m[0], m[1], m[2]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');
+  }
+  return null;
+}
+
+function colorWithOpacity(hex, opacity) {
+  if (opacity >= 255) return hex;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${(opacity / 255).toFixed(2)})`;
+}
+
+function isLightColor(color) {
+  const hex = getBaseHex(color);
+  if (!hex) return false;
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -18,6 +38,7 @@ export function initPalette() {
   renderThickness();
   setupColorPicker();
   setupDropdownPicker();
+  setupOpacitySlider();
   setupGlobalClose();
 }
 
@@ -62,6 +83,7 @@ function setupIndicatorClicks() {
 // ── Dropdown ────────────────────────────────────────────────────
 
 function openDropdown() {
+  syncOpacitySlider();
   highlightActiveSwatch();
   const dd = document.getElementById('color-dropdown');
   dropdownOpen = true;
@@ -87,9 +109,10 @@ function renderSwatches() {
   const container = document.getElementById('color-dropdown-swatches');
   container.innerHTML = '';
   const targetColor = activeTarget === 'foreground' ? state.activeColor : state.bgColor;
+  const targetHex = getBaseHex(targetColor);
   state.palette.forEach((color, i) => {
     const swatch = document.createElement('div');
-    let cls = 'swatch' + (color === targetColor ? ' active' : '');
+    let cls = 'swatch' + (getBaseHex(color) === targetHex ? ' active' : '');
     if (isLightColor(color)) cls += ' swatch-light';
     swatch.className = cls;
     swatch.style.background = color;
@@ -114,7 +137,6 @@ function renderSwatches() {
     container.appendChild(swatch);
   });
 
-  // Transparent swatch
   const transpSwatch = document.createElement('div');
   transpSwatch.className = 'swatch chessboard swatch-light' + (targetColor === 'transparent' ? ' active' : '');
   transpSwatch.title = 'transparent';
@@ -127,28 +149,81 @@ function renderSwatches() {
 }
 
 function applyColor(color) {
-  if (activeTarget === 'foreground') {
-    state.activeColor = color;
-    setSquareColor('fg-square', color);
-    document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color } }));
-  } else {
-    state.bgColor = color;
-    setSquareColor('bg-square', color);
+  if (color === 'transparent') {
+    if (activeTarget === 'foreground') {
+      state.activeColor = 'transparent';
+      setSquareColor('fg-square', 'transparent');
+      document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color: 'transparent' } }));
+    } else {
+      state.bgColor = 'transparent';
+      setSquareColor('bg-square', 'transparent');
+    }
+    return;
   }
+  const hex = getBaseHex(color);
+  if (!hex) return;
+  if (activeTarget === 'foreground') {
+    state.activeColor = colorWithOpacity(hex, state.activeOpacity);
+    setSquareColor('fg-square', state.activeColor);
+    document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color: state.activeColor } }));
+  } else {
+    state.bgColor = colorWithOpacity(hex, state.bgOpacity);
+    setSquareColor('bg-square', state.bgColor);
+  }
+  syncOpacitySlider();
 }
 
 function highlightActiveSwatch() {
   const swatches = document.querySelectorAll('#color-dropdown-swatches .swatch');
   const targetColor = activeTarget === 'foreground' ? state.activeColor : state.bgColor;
+  const targetHex = getBaseHex(targetColor);
   swatches.forEach(s => {
     const idx = parseInt(s.dataset.index);
     if (!isNaN(idx)) {
-      s.classList.toggle('active', state.palette[idx] === targetColor);
+      s.classList.toggle('active', getBaseHex(state.palette[idx]) === targetHex);
     } else {
       s.classList.toggle('active', targetColor === 'transparent');
     }
   });
 }
+
+// ── Opacity Slider ──────────────────────────────────────────────
+
+function setupOpacitySlider() {
+  const slider = document.getElementById('color-opacity-slider');
+  slider.addEventListener('input', (e) => {
+    const opacity = parseInt(e.target.value);
+    document.getElementById('color-opacity-value').textContent = opacity;
+    if (activeTarget === 'foreground') {
+      state.activeOpacity = opacity;
+      const hex = getBaseHex(state.activeColor);
+      if (hex) {
+        state.activeColor = colorWithOpacity(hex, opacity);
+        setSquareColor('fg-square', state.activeColor);
+        document.dispatchEvent(new CustomEvent('palette-color-changed', { detail: { color: state.activeColor } }));
+      }
+    } else {
+      state.bgOpacity = opacity;
+      const hex = getBaseHex(state.bgColor);
+      if (hex) {
+        state.bgColor = colorWithOpacity(hex, opacity);
+        setSquareColor('bg-square', state.bgColor);
+      }
+    }
+    highlightActiveSwatch();
+  });
+}
+
+function syncOpacitySlider() {
+  const slider = document.getElementById('color-opacity-slider');
+  const label = document.getElementById('color-opacity-value');
+  const opacity = activeTarget === 'foreground' ? state.activeOpacity : state.bgOpacity;
+  slider.disabled = false;
+  slider.value = opacity;
+  label.textContent = opacity;
+}
+
+// ── Custom Color Pickers ────────────────────────────────────────
 
 function setupColorPicker() {
   const picker = document.getElementById('color-picker-hidden');
