@@ -4,6 +4,13 @@ let colorPickerTarget = null;
 let activeTarget = 'foreground'; // 'foreground' | 'background'
 let dropdownOpen = false;
 
+function isLightColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 0.299 + g * 0.587 + b * 0.114) > 180;
+}
+
 export function initPalette() {
   setupIndicatorClicks();
   updateIndicator();
@@ -55,6 +62,7 @@ function setupIndicatorClicks() {
 // ── Dropdown ────────────────────────────────────────────────────
 
 function openDropdown() {
+  highlightActiveSwatch();
   const dd = document.getElementById('color-dropdown');
   dropdownOpen = true;
   dd.hidden = false;
@@ -78,9 +86,12 @@ function setupGlobalClose() {
 function renderSwatches() {
   const container = document.getElementById('color-dropdown-swatches');
   container.innerHTML = '';
+  const targetColor = activeTarget === 'foreground' ? state.activeColor : state.bgColor;
   state.palette.forEach((color, i) => {
     const swatch = document.createElement('div');
-    swatch.className = 'swatch' + (color === state.activeColor && activeTarget === 'foreground' ? ' active' : '');
+    let cls = 'swatch' + (color === targetColor ? ' active' : '');
+    if (isLightColor(color)) cls += ' swatch-light';
+    swatch.className = cls;
     swatch.style.background = color;
     swatch.dataset.index = i;
     swatch.title = `${color} (right-click to edit)`;
@@ -105,7 +116,7 @@ function renderSwatches() {
 
   // Transparent swatch
   const transpSwatch = document.createElement('div');
-  transpSwatch.className = 'swatch chessboard' + (state.activeColor === 'transparent' && activeTarget === 'foreground' ? ' active' : '');
+  transpSwatch.className = 'swatch chessboard swatch-light' + (targetColor === 'transparent' ? ' active' : '');
   transpSwatch.title = 'transparent';
   transpSwatch.addEventListener('click', () => {
     applyColor('transparent');

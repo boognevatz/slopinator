@@ -205,6 +205,11 @@ button.tool-btn.active {
   box-shadow: 0 0 0 1px #0078d4;
 }
 
+.color-dropdown .swatch.active.swatch-light {
+  border-color: #888;
+  box-shadow: 0 0 0 1px #888;
+}
+
 .color-dropdown .swatch.chessboard,
 .fg-square.chessboard,
 .bg-square.chessboard {
