@@ -110,7 +110,9 @@ function onMouseDown(e) {
     y: pt.y,
     content: 'Text',
     fontSize: state.activeFontSize,
-    fill: state.activeColor,
+    fill: state.bgColor,
+    stroke: state.activeColor,
+    strokeWidth: state.activeThickness,
   };
 
   addTextElement(textData);
@@ -144,6 +146,8 @@ export function addTextElement(data) {
     y: data.y,
     'font-size': data.fontSize,
     fill: data.fill,
+    stroke: data.stroke || 'none',
+    'stroke-width': data.strokeWidth || 0,
     'font-family': 'sans-serif',
     'data-type': 'text',
     class: 'annotation-text',
@@ -236,6 +240,8 @@ export function startEditing(id) {
   textarea.style.lineHeight = (textRect.height / scaledFontSize).toFixed(3);
   textarea.style.height = '100%';
   textarea.style.color = data.fill;
+  const strokeW = data.stroke && data.stroke !== 'none' && data.strokeWidth ? data.strokeWidth * scale : 0;
+  textarea.style.webkitTextStroke = strokeW > 0 ? `${strokeW}px ${data.stroke}` : '';
   textarea.style.fontFamily = 'sans-serif';
   textarea.style.width = '100%';
   textarea.style.boxSizing = 'border-box';

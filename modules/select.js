@@ -217,7 +217,9 @@ export function selectElement(id) {
     setActiveLineStyle(data.lineStyle);
     setActiveLineMarkerSize(data.lineMarkerSize);
   } else if (data.type === 'text') {
-    state.activeColor = data.fill;
+    state.activeColor = data.stroke || state.activeColor;
+    state.bgColor = data.fill || state.bgColor;
+    state.activeThickness = data.strokeWidth || state.activeThickness;
     state.activeFontSize = data.fontSize;
     document.getElementById('font-size-input').value = data.fontSize;
   } else if (data.type === 'freehand') {
@@ -965,6 +967,8 @@ function updateTextSVG(data) {
   textEl.setAttribute('y', data.y);
   textEl.setAttribute('font-size', data.fontSize);
   textEl.setAttribute('fill', data.fill);
+  textEl.setAttribute('stroke', data.stroke || 'none');
+  textEl.setAttribute('stroke-width', data.strokeWidth || 0);
   textEl.textContent = data.content;
   
   if (data.rotation) {
@@ -1008,14 +1012,14 @@ function applyColorToSelected(color) {
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data) return;
 
-  const oldColor = data.type === 'text' ? data.fill : data.stroke;
+  const oldColor = data.type === 'text' ? data.stroke : data.stroke;
   if (oldColor === color) return;
 
   if (data.type === 'line') {
     data.stroke = color;
     updateLineSVG(data);
   } else if (data.type === 'text') {
-    data.fill = color;
+    data.stroke = color;
     updateTextSVG(data);
   } else if (data.type === 'freehand') {
     data.stroke = color;
@@ -1029,13 +1033,13 @@ function applyColorToSelected(color) {
     description: 'Change color',
     doFn: () => {
       if (data.type === 'line') { data.stroke = color; updateLineSVG(data); }
-      else if (data.type === 'text') { data.fill = color; updateTextSVG(data); }
+      else if (data.type === 'text') { data.stroke = color; updateTextSVG(data); }
       else if (data.type === 'freehand') { data.stroke = color; updateFreehandElement(data); }
       else if (data.type === 'rectangle') { data.stroke = color; updateRectangleElement(data); }
     },
     undoFn: () => {
       if (data.type === 'line') { data.stroke = oldColor; updateLineSVG(data); }
-      else if (data.type === 'text') { data.fill = oldColor; updateTextSVG(data); }
+      else if (data.type === 'text') { data.stroke = oldColor; updateTextSVG(data); }
       else if (data.type === 'freehand') { data.stroke = oldColor; updateFreehandElement(data); }
       else if (data.type === 'rectangle') { data.stroke = oldColor; updateRectangleElement(data); }
     },
@@ -1045,7 +1049,7 @@ function applyColorToSelected(color) {
 function applyThicknessToSelected(thickness) {
   if (!state.selectedId) return;
   const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || (data.type !== 'line' && data.type !== 'freehand' && data.type !== 'rectangle')) return;
+  if (!data || (data.type !== 'line' && data.type !== 'freehand' && data.type !== 'rectangle' && data.type !== 'text')) return;
 
   const oldThickness = data.strokeWidth;
   if (oldThickness === thickness) return;
@@ -1055,14 +1059,16 @@ function applyThicknessToSelected(thickness) {
     updateLineSVG(data);
   } else if (data.type === 'rectangle') {
     updateRectangleElement(data);
+  } else if (data.type === 'text') {
+    updateTextSVG(data);
   } else {
     updateFreehandElement(data);
   }
 
   pushAction({
     description: 'Change thickness',
-    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else updateFreehandElement(data); },
-    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else updateFreehandElement(data); },
+    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else if (data.type === 'text') updateTextSVG(data); else updateFreehandElement(data); },
+    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else if (data.type === 'text') updateTextSVG(data); else updateFreehandElement(data); },
   });
 }
 

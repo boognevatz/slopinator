@@ -12,7 +12,7 @@ const toolButtons = {};
 const TOOL_SETTINGS = {
   select: ['delete'],
   line: ['color', 'thickness', 'line-style'],
-  text: ['color', 'font-size'],
+  text: ['color', 'thickness', 'font-size'],
   freehand: ['color', 'thickness', 'freehand-epsilon'],
   rectangle: ['color', 'thickness', 'rectangle'],
   crop: ['crop'],
@@ -100,6 +100,7 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   }
   if (tool === 'select' && selectedType === 'text') {
     visible.add('color');
+    visible.add('thickness');
     visible.add('font-size');
   }
   if (tool === 'select' && selectedType === 'freehand') {

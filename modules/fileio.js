@@ -248,6 +248,7 @@ function resizeImage(newWidth, newHeight) {
         x: Math.round(el.x * scaleX),
         y: Math.round(el.y * scaleY),
         fontSize: Math.round(el.fontSize * uniformScale),
+        strokeWidth: Math.round((el.strokeWidth || 0) * uniformScale),
       };
     } else if (el.type === 'rectangle') {
       return {
@@ -449,6 +450,8 @@ function openSVGProject(svgText) {
       content: t.textContent,
       fontSize: parseFloat(t.getAttribute('font-size')),
       fill: t.getAttribute('fill'),
+      stroke: t.getAttribute('stroke') || 'none',
+      strokeWidth: parseFloat(t.getAttribute('stroke-width')) || 0,
       rotation: rotation,
     });
   });
@@ -566,7 +569,7 @@ export function saveSVG() {
       }
     } else if (el.type === 'text') {
       svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
-      svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
+      svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
       if (el.rotation) {
         // Need to calculate cx, cy - we can approximate it or get it from DOM
         const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
@@ -636,7 +639,7 @@ export function exportJPG(widthOption) {
         svgStr += `</g>\n`;
       }
     } else if (el.type === 'text') {
-      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" font-family="sans-serif"`;
+      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
       if (el.rotation) {
         const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
         if (textEl) {
