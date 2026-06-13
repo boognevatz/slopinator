@@ -8,6 +8,7 @@ import { selectElement } from './select.js';
 
 let textEditOverlay = null;
 let editingTextId = null;
+let editingData = null;
 let blurTimeout = null; // debounce blur to avoid race conditions
 
 export function initText() {
@@ -22,6 +23,39 @@ export function initText() {
   // Prevent clicks on the overlay from propagating to the SVG
   textEditOverlay.addEventListener('mousedown', (e) => {
     e.stopPropagation();
+  });
+
+  function updateEditingUI() {
+    const data = editingData;
+    if (!data) return;
+    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+    if (textEl) {
+      textEl.setAttribute('stroke', data.stroke || 'none');
+      textEl.setAttribute('stroke-width', data.strokeWidth || 0);
+      textEl.setAttribute('fill', data.fill);
+    }
+    const ctm = dom.svg.getScreenCTM();
+    const scale = ctm ? ctm.a : 1;
+    textarea.style.color = data.fill;
+    textarea.style.webkitTextStroke = data.strokeWidth > 0 ? `${data.strokeWidth * scale}px ${data.stroke || 'none'}` : '';
+  }
+
+  document.addEventListener('palette-thickness-changed', (e) => {
+    if (!editingData) return;
+    editingData.strokeWidth = e.detail.thickness;
+    updateEditingUI();
+  });
+
+  document.addEventListener('palette-color-changed', (e) => {
+    if (!editingData) return;
+    editingData.stroke = e.detail.color;
+    updateEditingUI();
+  });
+
+  document.addEventListener('palette-bgcolor-changed', (e) => {
+    if (!editingData) return;
+    editingData.fill = e.detail.color;
+    updateEditingUI();
   });
 
   // Debounced blur: gives focus() calls time to land before we commit
@@ -186,6 +220,7 @@ export function startEditing(id) {
   if (!data || data.type !== 'text') return;
 
   editingTextId = id;
+  editingData = data;
 
   const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
   if (!textEl) return;
@@ -267,6 +302,7 @@ function finishEditing() {
 
   // Clear state before DOM updates to prevent re-entrant calls
   editingTextId = null;
+  editingData = null;
   textEditOverlay.style.display = 'none';
   textEditOverlay.style.transform = 'none';
 
@@ -313,6 +349,7 @@ function cancelEditing() {
 
   const id = editingTextId;
   editingTextId = null;
+  editingData = null;
   textEditOverlay.style.display = 'none';
   textEditOverlay.style.transform = 'none';
 

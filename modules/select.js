@@ -35,6 +35,14 @@ export function initSelect() {
   document.addEventListener('palette-thickness-changed', (e) => {
     applyThicknessToSelected(e.detail.thickness);
   });
+  document.addEventListener('palette-bgcolor-changed', (e) => {
+    if (!state.selectedId) return;
+    const data = state.elements.find(el => el.id === state.selectedId);
+    if (!data || data.type !== 'text') return;
+    data.fill = e.detail.color;
+    updateTextSVG(data);
+    drawHandles(data);
+  });
   document.addEventListener('line-style-changed', (e) => {
     applyLineStyleToSelected(e.detail.style);
   });

@@ -157,6 +157,7 @@ function applyColor(color) {
     } else {
       state.bgColor = 'transparent';
       setSquareColor('bg-square', 'transparent');
+      document.dispatchEvent(new CustomEvent('palette-bgcolor-changed', { detail: { color: 'transparent' } }));
     }
     return;
   }
@@ -169,6 +170,7 @@ function applyColor(color) {
   } else {
     state.bgColor = colorWithOpacity(hex, state.bgOpacity);
     setSquareColor('bg-square', state.bgColor);
+    document.dispatchEvent(new CustomEvent('palette-bgcolor-changed', { detail: { color: state.bgColor } }));
   }
   syncOpacitySlider();
 }
@@ -208,6 +210,7 @@ function setupOpacitySlider() {
       if (hex) {
         state.bgColor = colorWithOpacity(hex, opacity);
         setSquareColor('bg-square', state.bgColor);
+        document.dispatchEvent(new CustomEvent('palette-bgcolor-changed', { detail: { color: state.bgColor } }));
       }
     }
     highlightActiveSwatch();
