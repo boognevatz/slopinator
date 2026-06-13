@@ -11,6 +11,7 @@ import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
+import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 
 import { dom } from './modules/editor.js';
 
@@ -18,7 +19,7 @@ function init() {
   initEditor();
 
   // Give select module references to line/text/freehand for undo recreation
-  setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement });
+  setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
   setCropModuleRefs({ addLineElement }, { addTextElement });
 
   // History: update undo/redo button states on change
@@ -31,6 +32,7 @@ function init() {
   initCrop();
   initTools();
   initFreehand();
+  initRectangle();
   initFileIO();
 
   // ── Toolbar button wiring ───────────────────────────────────
@@ -118,6 +120,9 @@ function init() {
           break;
         case 'f':
           switchTool('freehand');
+          break;
+        case 'r':
+          switchTool('rectangle');
           break;
         case 'delete':
         case 'backspace':

@@ -31,6 +31,7 @@ export const state = {
   activeLineEditMode: 'move',
   activeLineEndpoint: 'end',
   activeFreehandEpsilon: 0,
+  activeCornerRadius: 0,
   activeFontSize: 64,
   palette: [...DEFAULT_PALETTE],
   thicknessPresets: [...DEFAULT_THICKNESS],

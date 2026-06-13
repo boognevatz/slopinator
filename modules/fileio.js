@@ -4,6 +4,7 @@ import { state, dom, loadImage, restoreState, getViewBoxDims } from './editor.js
 import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLineMarkerSize, normalizeLineDecoration } from './line.js';
 import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
+import { addRectangleElement } from './rectangle.js';
 import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
@@ -248,6 +249,15 @@ function resizeImage(newWidth, newHeight) {
         y: Math.round(el.y * scaleY),
         fontSize: Math.round(el.fontSize * uniformScale),
       };
+    } else if (el.type === 'rectangle') {
+      return {
+        ...el,
+        x: Math.round(el.x * scaleX),
+        y: Math.round(el.y * scaleY),
+        width: Math.round(el.width * scaleX),
+        height: Math.round(el.height * scaleY),
+        rx: Math.round((el.rx || 0) * uniformScale),
+      };
     }
     return el;
   });
@@ -273,6 +283,8 @@ function resizeImage(newWidth, newHeight) {
         addLineElement(el);
       } else if (el.type === 'text') {
         addTextElement(el);
+      } else if (el.type === 'rectangle') {
+        addRectangleElement(el);
       }
       state.elements.push(el);
     }
@@ -459,6 +471,29 @@ function openSVGProject(svgText) {
     });
   });
 
+  // Parse rectangles
+  svgRoot.querySelectorAll('rect[data-type="rectangle"]').forEach(r => {
+    let rotation = 0;
+    const transform = r.getAttribute('transform');
+    if (transform) {
+      const m = transform.match(/rotate\(([-\d.]+)/);
+      if (m) rotation = parseFloat(m[1]);
+    }
+    elements.push({
+      id: r.id || generateId(),
+      type: 'rectangle',
+      x: parseFloat(r.getAttribute('x')),
+      y: parseFloat(r.getAttribute('y')),
+      width: parseFloat(r.getAttribute('width')),
+      height: parseFloat(r.getAttribute('height')),
+      rx: parseFloat(r.getAttribute('rx')) || 0,
+      rotation,
+      stroke: r.getAttribute('stroke') || '#ff0000',
+      strokeWidth: parseFloat(r.getAttribute('stroke-width')) || 2,
+      fill: 'transparent',
+    });
+  });
+
   // Restore state
   const parsedElements = restoreState({
     dataURI,
@@ -480,6 +515,8 @@ function openSVGProject(svgText) {
       addTextElement(el);
     } else if (el.type === 'freehand') {
       addFreehandElement(el);
+    } else if (el.type === 'rectangle') {
+      addRectangleElement(el);
     }
     state.elements.push(el);
   }
@@ -543,6 +580,12 @@ export function saveSVG() {
       svg += `</text>\n`;
     } else if (el.type === 'freehand') {
       svg += `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+    } else if (el.type === 'rectangle') {
+      svg += `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+      if (el.rotation) {
+        svg += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
+      }
+      svg += ` />\n`;
     }
   }
   svg += `</g>\n`;
@@ -606,6 +649,12 @@ export function exportJPG(widthOption) {
       svgStr += `</text>\n`;
     } else if (el.type === 'freehand') {
       svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+    } else if (el.type === 'rectangle') {
+      svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+      if (el.rotation) {
+        svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
+      }
+      svgStr += ` />\n`;
     }
   }
   svgStr += `</g>\n`;

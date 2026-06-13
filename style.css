@@ -359,6 +359,19 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+#editor-svg .rect-fill {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+#editor-svg .rect-stroke {
+  pointer-events: none;
+}
+
+#editor-svg .rect-fill:hover ~ .rect-stroke {
+  filter: brightness(1.3);
+}
+
 /* Hit area for thin lines */
 #editor-svg .line-hit-area {
   stroke: transparent;

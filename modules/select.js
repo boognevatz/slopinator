@@ -6,6 +6,7 @@ import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
 import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle, legacyStyleToDecorations } from './line.js';
 import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
+import { updateRectangleElement } from './rectangle.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -23,6 +24,7 @@ let origRotation = 0;     // original rotation angle when starting rotation
 let rotationCenter = null; // { cx, cy }
 let lineEditMode = 'move';  // 'move' | 'change-end'
 let selectedLineEndpoint = 'end'; // 'start' | 'end'
+let rotationTooltip = null;
 
 
 export function initSelect() {
@@ -57,6 +59,17 @@ export function initSelect() {
   }
 
   setLineEditMode(state.activeLineEditMode || 'move');
+
+  // Corner radius input
+  const radiusInput = document.getElementById('corner-radius-input');
+  if (radiusInput) {
+    radiusInput.addEventListener('change', () => {
+      const val = parseFloat(radiusInput.value);
+      if (isNaN(val) || val < 0) return;
+      state.activeCornerRadius = val;
+      applyCornerRadiusToSelected(val);
+    });
+  }
 }
 
 function setLineEditMode(mode) {
@@ -180,7 +193,7 @@ function onMouseDown(e) {
 function findAnnotationParent(target) {
   let el = target;
   while (el && el !== dom.svg) {
-    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand')) return el;
+    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) return el;
     if (el.dataset && el.dataset.type === 'text') return el;
     el = el.parentElement;
   }
@@ -211,6 +224,11 @@ export function selectElement(id) {
     state.activeColor = data.stroke;
     state.activeThickness = data.strokeWidth;
     syncFreehandEpsilonSlider(data.epsilon);
+  } else if (data.type === 'rectangle') {
+    state.activeColor = data.stroke;
+    state.activeThickness = data.strokeWidth;
+    state.activeCornerRadius = data.rx || 0;
+    document.getElementById('corner-radius-input').value = data.rx || 0;
   }
 
   drawHandles(data);
@@ -225,6 +243,7 @@ export function clearSelection() {
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
   textInteractMode = 'resize';
+  hideRotationTooltip();
 }
 
 function drawHandles(data) {
@@ -236,6 +255,8 @@ function drawHandles(data) {
     drawTextHandles(data);
   } else if (data.type === 'freehand') {
     drawFreehandHandles(data);
+  } else if (data.type === 'rectangle') {
+    drawRectangleHandles(data);
   }
 }
 
@@ -373,7 +394,6 @@ function drawTextHandles(data) {
 
 function drawFreehandHandles(data) {
   const r = getHandleRadius();
-  // Centroid
   let cx = 0, cy = 0;
   for (const p of data.points) { cx += p.x; cy += p.y; }
   cx /= data.points.length;
@@ -384,6 +404,70 @@ function drawFreehandHandles(data) {
     'data-handle': 'move',
   });
   dom.handleLayer.appendChild(hm);
+}
+
+function drawRectangleHandles(data) {
+  const hw = 22;
+  const hh = 22;
+  const { x, y, width: w, height: h } = data;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const isRotate = textInteractMode === 'rotate';
+
+  const handleGroup = svgEl('g', {
+    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
+  });
+
+  const selBox = svgEl('rect', {
+    x, y, width: w, height: h,
+    class: 'selection-box',
+  });
+  handleGroup.appendChild(selBox);
+
+  const corners = [
+    { handle: 'tl', x, y, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: x + w - hw, y, cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'bl', x, y: y + h - hh, cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'br', x: x + w - hw, y: y + h - hh, cursor: isRotate ? 'grab' : 'nwse-resize' },
+  ];
+
+  for (const c of corners) {
+    const h = svgEl('rect', {
+      x: c.x, y: c.y, width: hw, height: hh,
+      class: 'handle handle-resize-corner',
+      'data-handle': c.handle,
+      style: `cursor: ${c.cursor}`,
+    });
+    handleGroup.appendChild(h);
+  }
+
+  const iconSize = 24;
+  const desiredIconSize = Math.min(w, h) * 0.4;
+  const iconScale = Math.max(0.5, Math.min(1.5, desiredIconSize / iconSize));
+  const actualSize = iconSize * iconScale;
+
+  const iconG = svgEl('g', {
+    class: 'handle',
+    'data-handle': 'mode-toggle',
+    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+    style: 'cursor: pointer; opacity: 0.6;',
+  });
+
+  iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
+
+  const movePath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
+  const rotatePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+
+  iconG.appendChild(svgEl('path', {
+    d: isRotate ? rotatePath : movePath,
+    fill: '#fff',
+  }));
+
+  iconG.addEventListener('mouseenter', () => iconG.style.opacity = '1');
+  iconG.addEventListener('mouseleave', () => iconG.style.opacity = '0.6');
+
+  handleGroup.appendChild(iconG);
+  dom.handleLayer.appendChild(handleGroup);
 }
 
 function getHandleRadius() {
@@ -441,6 +525,10 @@ function onDragMove(e) {
       data.rawPoints = dragOriginal.rawPoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
     }
     updateFreehandElement(data);
+  } else if (data.type === 'rectangle') {
+    data.x = dragOriginal.x + dx;
+    data.y = dragOriginal.y + dy;
+    updateRectangleElement(data);
   }
 
   drawHandles(data);
@@ -477,6 +565,12 @@ function onDragEnd() {
       description: 'Move freehand',
       doFn: () => { data.points = final.points; data.rawPoints = final.rawPoints; updateFreehandElement(data); drawHandles(data); },
       undoFn: () => { data.points = orig.points; data.rawPoints = orig.rawPoints; updateFreehandElement(data); drawHandles(data); },
+    });
+  } else if (data.type === 'rectangle' && (orig.x !== final.x || orig.y !== final.y)) {
+    pushAction({
+      description: 'Move rectangle',
+      doFn: () => { data.x = final.x; data.y = final.y; updateRectangleElement(data); drawHandles(data); },
+      undoFn: () => { data.x = orig.x; data.y = orig.y; updateRectangleElement(data); drawHandles(data); },
     });
   }
 
@@ -556,6 +650,36 @@ function startResize(handleEl, startPt, e) {
       origDiagVec = origDiagLen > 0
         ? { x: dx / origDiagLen, y: dy / origDiagLen }
         : { x: 1, y: 1 };
+    }
+  } else if (data.type === 'rectangle') {
+    origRotation = data.rotation || 0;
+    rotationCenter = {
+      x: data.x + data.width / 2,
+      y: data.y + data.height / 2
+    };
+
+    if (textInteractMode === 'rotate') {
+      dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
+    } else if (handleType === 'tl' || handleType === 'br') {
+      const anchorMap = {
+        tl: { x: data.x + data.width, y: data.y + data.height },
+        br: { x: data.x, y: data.y },
+      };
+      resizeAnchor = anchorMap[handleType];
+      const dc = handleType === 'tl'
+        ? { x: data.x, y: data.y }
+        : { x: data.x + data.width, y: data.y + data.height };
+      const dx = dc.x - resizeAnchor.x;
+      const dy = dc.y - resizeAnchor.y;
+      origDiagLen = Math.sqrt(dx * dx + dy * dy);
+      origDiagVec = origDiagLen > 0
+        ? { x: dx / origDiagLen, y: dy / origDiagLen }
+        : { x: 1, y: 1 };
+    } else if (handleType === 'bl' || handleType === 'tr') {
+      resizeAnchor = {
+        x: handleType === 'bl' ? data.x : data.x + data.width,
+        y: handleType === 'bl' ? data.y + data.height : data.y,
+      };
     }
   }
 
@@ -641,6 +765,74 @@ function onResizeMove(e) {
       updateTextSVG(data);
       document.getElementById('font-size-input').value = data.fontSize;
     }
+  } else if (data.type === 'rectangle') {
+    if (textInteractMode === 'rotate') {
+      const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
+      const angleDiff = currentAngle - dragStart.angle;
+      let newRot = origRotation + angleDiff;
+      newRot = Math.round(newRot / 5) * 5;
+      newRot = ((newRot % 360) + 360) % 360;
+      data.rotation = newRot;
+      updateRectangleElement(data);
+      showRotationTooltip(e, newRot);
+    } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
+      const angleRad = -(data.rotation || 0) * Math.PI / 180;
+      const cosA = Math.cos(angleRad);
+      const sinA = Math.sin(angleRad);
+      const dxMouse = pt.x - rotationCenter.x;
+      const dyMouse = pt.y - rotationCenter.y;
+      const unrotatedPtX = rotationCenter.x + dxMouse * cosA - dyMouse * sinA;
+      const unrotatedPtY = rotationCenter.y + dxMouse * sinA + dyMouse * cosA;
+
+      const mx = unrotatedPtX - resizeAnchor.x;
+      const my = unrotatedPtY - resizeAnchor.y;
+      const projLen = mx * origDiagVec.x + my * origDiagVec.y;
+      const scaleFactor = origDiagLen > 0 ? Math.max(0.1, projLen / origDiagLen) : 1;
+
+      const newW = Math.max(5, Math.round(dragOriginal.width * Math.abs(scaleFactor)));
+      const newH = Math.max(5, Math.round(dragOriginal.height * Math.abs(scaleFactor)));
+
+      if (resizeHandle === 'br') {
+        data.x = resizeAnchor.x;
+        data.y = resizeAnchor.y;
+        data.width = newW;
+        data.height = newH;
+      } else { // tl
+        data.x = resizeAnchor.x - newW;
+        data.y = resizeAnchor.y - newH;
+        data.width = newW;
+        data.height = newH;
+      }
+
+      const maxRx = Math.min(data.width, data.height) / 2;
+      if (data.rx > maxRx) {
+        data.rx = maxRx;
+        document.getElementById('corner-radius-input').value = data.rx;
+        state.activeCornerRadius = data.rx;
+      }
+
+      updateRectangleElement(data);
+    } else if (resizeHandle === 'bl' || resizeHandle === 'tr') {
+      const cornerX = resizeAnchor.x;
+      const cornerY = resizeAnchor.y;
+      const dx = pt.x - cornerX;
+      const dy = pt.y - cornerY;
+
+      const diagX = resizeHandle === 'bl' ? data.width : -data.width;
+      const diagY = resizeHandle === 'bl' ? -data.height : data.height;
+      const diagLen = Math.sqrt(diagX * diagX + diagY * diagY);
+      if (diagLen > 0) {
+        const diagUnitX = diagX / diagLen;
+        const diagUnitY = diagY / diagLen;
+        const proj = dx * diagUnitX + dy * diagUnitY;
+        const origRx = dragOriginal.rx || 0;
+        const newRx = Math.max(0, Math.min(origRx + proj, Math.min(data.width, data.height) / 2));
+        data.rx = newRx;
+        updateRectangleElement(data);
+        document.getElementById('corner-radius-input').value = data.rx;
+        state.activeCornerRadius = data.rx;
+      }
+    }
   }
 
   drawHandles(data);
@@ -649,6 +841,8 @@ function onResizeMove(e) {
 function onResizeEnd() {
   document.removeEventListener('mousemove', onResizeMove);
   document.removeEventListener('mouseup', onResizeEnd);
+
+  hideRotationTooltip();
 
   if (!isResizing) return;
   isResizing = false;
@@ -670,6 +864,12 @@ function onResizeEnd() {
       description: textInteractMode === 'rotate' ? 'Rotate text' : 'Resize text',
       doFn: () => { data.fontSize = final.fontSize; data.x = final.x; data.y = final.y; data.rotation = final.rotation; updateTextSVG(data); drawHandles(data); },
       undoFn: () => { data.fontSize = orig.fontSize; data.x = orig.x; data.y = orig.y; data.rotation = orig.rotation; updateTextSVG(data); drawHandles(data); },
+    });
+  } else if (data.type === 'rectangle' && (orig.width !== final.width || orig.height !== final.height || orig.x !== final.x || orig.y !== final.y || orig.rx !== final.rx || orig.rotation !== final.rotation)) {
+    pushAction({
+      description: textInteractMode === 'rotate' ? 'Rotate rectangle' : 'Resize rectangle',
+      doFn: () => { Object.assign(data, final); updateRectangleElement(data); drawHandles(data); },
+      undoFn: () => { Object.assign(data, orig); updateRectangleElement(data); drawHandles(data); },
     });
   }
 
@@ -711,6 +911,8 @@ export function deleteSelected() {
         addTextSVGAtIndex(data, idx);
       } else if (data.type === 'freehand') {
         addFreehandSVGAtIndex(data, idx);
+      } else if (data.type === 'rectangle') {
+        addRectangleSVGAtIndex(data, idx);
       }
     },
   });
@@ -732,15 +934,22 @@ function addFreehandSVGAtIndex(data, _idx) {
   addFreehandElement(data);
 }
 
+function addRectangleSVGAtIndex(data, _idx) {
+  const { addRectangleElement } = _rectangleModule;
+  addRectangleElement(data);
+}
+
 // We'll set these from main.js to avoid circular imports
 let _lineModule = {};
 let _textModule = {};
 let _freehandModule = {};
+let _rectangleModule = {};
 
-export function setModuleRefs(lineMod, textMod, freehandMod) {
+export function setModuleRefs(lineMod, textMod, freehandMod, rectangleMod) {
   _lineModule = lineMod;
   _textModule = textMod;
   _freehandModule = freehandMod || {};
+  _rectangleModule = rectangleMod || {};
 }
 
 // ── SVG Update Helpers ──────────────────────────────────────────
@@ -772,6 +981,26 @@ function updateTextSVG(data) {
   }
 }
 
+// ── Rotation Tooltip ────────────────────────────────────────────
+
+function showRotationTooltip(e, angle) {
+  if (!rotationTooltip) {
+    rotationTooltip = document.createElement('div');
+    rotationTooltip.style.cssText = 'position:fixed;background:rgba(0,0,0,0.75);color:#fff;padding:2px 7px;border-radius:3px;font-size:12px;pointer-events:none;z-index:100;font-family:monospace;';
+    document.body.appendChild(rotationTooltip);
+  }
+  rotationTooltip.textContent = `${angle}°`;
+  rotationTooltip.style.left = (e.clientX + 14) + 'px';
+  rotationTooltip.style.top = (e.clientY - 26) + 'px';
+}
+
+function hideRotationTooltip() {
+  if (rotationTooltip) {
+    rotationTooltip.remove();
+    rotationTooltip = null;
+  }
+}
+
 // ── Apply property changes to selected ──────────────────────────
 
 function applyColorToSelected(color) {
@@ -791,6 +1020,9 @@ function applyColorToSelected(color) {
   } else if (data.type === 'freehand') {
     data.stroke = color;
     updateFreehandElement(data);
+  } else if (data.type === 'rectangle') {
+    data.stroke = color;
+    updateRectangleElement(data);
   }
 
   pushAction({
@@ -799,11 +1031,13 @@ function applyColorToSelected(color) {
       if (data.type === 'line') { data.stroke = color; updateLineSVG(data); }
       else if (data.type === 'text') { data.fill = color; updateTextSVG(data); }
       else if (data.type === 'freehand') { data.stroke = color; updateFreehandElement(data); }
+      else if (data.type === 'rectangle') { data.stroke = color; updateRectangleElement(data); }
     },
     undoFn: () => {
       if (data.type === 'line') { data.stroke = oldColor; updateLineSVG(data); }
       else if (data.type === 'text') { data.fill = oldColor; updateTextSVG(data); }
       else if (data.type === 'freehand') { data.stroke = oldColor; updateFreehandElement(data); }
+      else if (data.type === 'rectangle') { data.stroke = oldColor; updateRectangleElement(data); }
     },
   });
 }
@@ -811,7 +1045,7 @@ function applyColorToSelected(color) {
 function applyThicknessToSelected(thickness) {
   if (!state.selectedId) return;
   const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || (data.type !== 'line' && data.type !== 'freehand')) return;
+  if (!data || (data.type !== 'line' && data.type !== 'freehand' && data.type !== 'rectangle')) return;
 
   const oldThickness = data.strokeWidth;
   if (oldThickness === thickness) return;
@@ -819,14 +1053,16 @@ function applyThicknessToSelected(thickness) {
   data.strokeWidth = thickness;
   if (data.type === 'line') {
     updateLineSVG(data);
+  } else if (data.type === 'rectangle') {
+    updateRectangleElement(data);
   } else {
     updateFreehandElement(data);
   }
 
   pushAction({
     description: 'Change thickness',
-    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else updateFreehandElement(data); },
-    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else updateFreehandElement(data); },
+    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else updateFreehandElement(data); },
+    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else updateFreehandElement(data); },
   });
 }
 
@@ -1014,6 +1250,26 @@ function applyFontSizeToSelected(fontSize) {
   });
 }
 
+function applyCornerRadiusToSelected(radius) {
+  if (!state.selectedId) return;
+  const data = state.elements.find(el => el.id === state.selectedId);
+  if (!data || data.type !== 'rectangle') return;
+
+  const oldRadius = data.rx || 0;
+  if (oldRadius === radius) return;
+
+  const clampedRadius = Math.min(radius, Math.min(data.width, data.height) / 2);
+  data.rx = clampedRadius;
+  updateRectangleElement(data);
+  drawHandles(data);
+
+  pushAction({
+    description: 'Change corner radius',
+    doFn: () => { data.rx = clampedRadius; updateRectangleElement(data); drawHandles(data); },
+    undoFn: () => { data.rx = oldRadius; updateRectangleElement(data); drawHandles(data); },
+  });
+}
+
 /**
  * Refresh handles for the currently selected element (e.g., after undo/redo).
  */
@@ -1033,6 +1289,9 @@ export function refreshSelection() {
     setActiveLineStyle(normalizeLineStyle(data.lineStyle));
   } else if (data.type === 'freehand') {
     syncFreehandEpsilonSlider(data.epsilon);
+  } else if (data.type === 'rectangle') {
+    document.getElementById('corner-radius-input').value = data.rx || 0;
+    state.activeCornerRadius = data.rx || 0;
   }
   drawHandles(data);
 }

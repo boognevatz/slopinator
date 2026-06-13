@@ -6,6 +6,7 @@ import { activateLine, deactivateLine, getPendingPolylineId } from './line.js';
 import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
 import { activateFreehand, deactivateFreehand } from './freehand.js';
+import { activateRectangle, deactivateRectangle } from './rectangle.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
@@ -13,6 +14,7 @@ const TOOL_SETTINGS = {
   line: ['color', 'thickness', 'line-style'],
   text: ['color', 'font-size'],
   freehand: ['color', 'thickness', 'freehand-epsilon'],
+  rectangle: ['color', 'thickness', 'rectangle'],
   crop: ['crop'],
 };
 
@@ -22,6 +24,7 @@ export function initTools() {
   toolButtons.text = document.getElementById('btn-text');
   toolButtons.crop = document.getElementById('btn-crop');
   toolButtons.freehand = document.getElementById('btn-freehand');
+  toolButtons.rectangle = document.getElementById('btn-rectangle');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
     if (btn) btn.addEventListener('click', () => switchTool(tool));
@@ -59,6 +62,7 @@ export function switchTool(tool) {
     case 'text': deactivateText(); break;
     case 'crop': deactivateCrop(); break;
     case 'freehand': deactivateFreehand(); break;
+    case 'rectangle': deactivateRectangle(); break;
   }
 
   state.activeTool = tool;
@@ -77,6 +81,7 @@ export function switchTool(tool) {
     case 'text': activateText(); break;
     case 'crop': activateCrop(); break;
     case 'freehand': activateFreehand(); break;
+    case 'rectangle': activateRectangle(); break;
   }
 
   // If switching from line to select, select the just-finalized polyline
@@ -111,5 +116,6 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
   document.getElementById('delete-group').hidden = !visible.has('delete');
   document.getElementById('freehand-epsilon-group').hidden = !visible.has('freehand-epsilon');
+  document.getElementById('rectangle-group').hidden = !visible.has('rectangle');
   document.getElementById('crop-group').hidden = !visible.has('crop');
 }
