@@ -27,7 +27,6 @@ export function initText() {
 
   function keepEditing() {
     clearTimeout(blurTimeout);
-    textarea.focus();
   }
 
   function updateEditingUI() {
@@ -66,8 +65,11 @@ export function initText() {
     keepEditing();
   });
 
-  // Debounced blur: gives focus() calls time to land before we commit
-  textarea.addEventListener('blur', () => {
+  // Debounced blur: don't finish when focus moves to toolbar controls
+  textarea.addEventListener('blur', (e) => {
+    if (!e.relatedTarget || (e.relatedTarget.closest && e.relatedTarget.closest('#toolbar'))) {
+      return;
+    }
     clearTimeout(blurTimeout);
     blurTimeout = setTimeout(() => {
       finishEditing();

@@ -263,24 +263,16 @@ button.tool-btn.active {
   cursor: pointer;
 }
 
-/* ── Thickness Bar ───────────────────────────────────── */
+/* ── Thickness Slider ─────────────────────────────────── */
 
-.thickness-bar {
-  display: flex;
-  gap: 2px;
+#thickness-slider {
+  width: 100px;
+  vertical-align: middle;
 }
-
-.thickness-bar .thickness-btn {
-  min-width: 28px;
-  padding: 3px 5px;
-  font-size: 11px;
-  text-align: center;
-}
-
-.thickness-bar .thickness-btn.active {
-  background: #0078d4;
-  border-color: #0078d4;
-  color: #fff;
+#thickness-value {
+  display: inline-block;
+  min-width: 2.2em;
+  text-align: right;
 }
 
 .line-style-btn.active {

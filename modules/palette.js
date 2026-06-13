@@ -250,42 +250,20 @@ function setupDropdownPicker() {
   });
 }
 
-// ── Thickness Presets ───────────────────────────────────────────
+// ── Thickness Slider ────────────────────────────────────────────
 
 function renderThickness() {
-  const container = document.getElementById('thickness-presets');
-  container.innerHTML = '';
-  state.thicknessPresets.forEach((val, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'thickness-btn' + (val === state.activeThickness ? ' active' : '');
-    btn.textContent = val;
-    btn.title = `${val}px (right-click to edit)`;
+  const slider = document.getElementById('thickness-slider');
+  const valueDisplay = document.getElementById('thickness-value');
 
-    btn.addEventListener('click', () => {
-      state.activeThickness = val;
-      highlightActiveThickness();
-      document.dispatchEvent(new CustomEvent('palette-thickness-changed', { detail: { thickness: val } }));
-    });
+  const update = () => {
+    const val = parseFloat(slider.value);
+    state.activeThickness = val;
+    valueDisplay.textContent = val;
+    document.dispatchEvent(new CustomEvent('palette-thickness-changed', { detail: { thickness: val } }));
+  };
 
-    btn.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      const newVal = prompt(`Enter new thickness value (replacing ${val}):`, val);
-      const parsed = parseFloat(newVal);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 100) {
-        state.thicknessPresets[i] = parsed;
-        state.activeThickness = parsed;
-        renderThickness();
-        document.dispatchEvent(new CustomEvent('palette-thickness-changed', { detail: { thickness: parsed } }));
-      }
-    });
-
-    container.appendChild(btn);
-  });
-}
-
-function highlightActiveThickness() {
-  const btns = document.querySelectorAll('#thickness-presets .thickness-btn');
-  btns.forEach((btn, i) => {
-    btn.classList.toggle('active', state.thicknessPresets[i] === state.activeThickness);
-  });
+  slider.addEventListener('input', update);
+  slider.value = state.activeThickness;
+  valueDisplay.textContent = state.activeThickness;
 }

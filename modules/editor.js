@@ -7,8 +7,6 @@ const DEFAULT_PALETTE = [
   '#ff8800', '#8833cc', '#00cccc', '#ff00ff', '#888888', '#884400'
 ];
 
-const DEFAULT_THICKNESS = [1, 2, 4, 6, 8, 12];
-
 /** Application state – single source of truth */
 export const state = {
   image: {
@@ -37,7 +35,7 @@ export const state = {
   activeCornerRadius: 0,
   activeFontSize: 64,
   palette: [...DEFAULT_PALETTE],
-  thicknessPresets: [...DEFAULT_THICKNESS],
+
   viewerWidth: 0,
   viewerHeight: 0,
   hasImage: false,
@@ -231,7 +229,7 @@ export function restoreState(parsed) {
   state.hasImage = true;
 
   if (parsed.palette) state.palette = parsed.palette;
-  if (parsed.thicknessPresets) state.thicknessPresets = parsed.thicknessPresets;
+  // parsed.thicknessPresets is ignored; slider uses fixed range
 
   // Clear layers
   dom.imageLayer.innerHTML = '';

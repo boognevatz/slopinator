@@ -544,7 +544,6 @@ export function saveSVG() {
 
   // Palette comment
   svg += `<!-- annotator-palette: ${state.palette.join(',')} -->\n`;
-  svg += `<!-- annotator-thickness: ${state.thicknessPresets.join(',')} -->\n`;
 
   // Image
   const img = state.image;
