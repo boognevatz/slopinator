@@ -25,6 +25,11 @@ export function initText() {
     e.stopPropagation();
   });
 
+  function keepEditing() {
+    clearTimeout(blurTimeout);
+    textarea.focus();
+  }
+
   function updateEditingUI() {
     const data = editingData;
     if (!data) return;
@@ -44,18 +49,21 @@ export function initText() {
     if (!editingData) return;
     editingData.strokeWidth = e.detail.thickness;
     updateEditingUI();
+    keepEditing();
   });
 
   document.addEventListener('palette-color-changed', (e) => {
     if (!editingData) return;
     editingData.stroke = e.detail.color;
     updateEditingUI();
+    keepEditing();
   });
 
   document.addEventListener('palette-bgcolor-changed', (e) => {
     if (!editingData) return;
     editingData.fill = e.detail.color;
     updateEditingUI();
+    keepEditing();
   });
 
   // Debounced blur: gives focus() calls time to land before we commit
