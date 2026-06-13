@@ -52,11 +52,12 @@ export function initSelect() {
 
   // Font size input
   const fontSizeInput = document.getElementById('font-size-input');
-  fontSizeInput.addEventListener('change', () => {
+  fontSizeInput.addEventListener('input', () => {
     const val = parseFloat(fontSizeInput.value);
     if (isNaN(val) || val < 1) return;
     state.activeFontSize = val;
     applyFontSizeToSelected(val);
+    document.dispatchEvent(new CustomEvent('palette-fontsize-changed', { detail: { fontSize: val } }));
   });
 
   const lineModeMove = document.getElementById('btn-line-mode-move');

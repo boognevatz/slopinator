@@ -65,6 +65,49 @@ export function initText() {
     keepEditing();
   });
 
+  document.addEventListener('palette-fontsize-changed', (e) => {
+    if (!editingData) return;
+    editingData.fontSize = e.detail.fontSize;
+    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(editingData.id)}`);
+    if (!textEl) return;
+    textEl.setAttribute('font-size', editingData.fontSize);
+
+    const textRect = textEl.getBoundingClientRect();
+    const container = document.getElementById('editor-container');
+    const containerRect = container.getBoundingClientRect();
+
+    const pt = dom.svg.createSVGPoint();
+    pt.x = editingData.x;
+    pt.y = editingData.y;
+    const layerCtm = dom.annotationLayer.getScreenCTM();
+    const anchorScreen = layerCtm ? pt.matrixTransform(layerCtm) : { x: textRect.left, y: textRect.top };
+    const relX = anchorScreen.x - containerRect.left;
+    const relY = textRect.top - containerRect.top;
+    const centerY = relY + textRect.height / 2;
+    const rotation = editingData.rotation || 0;
+
+    textEditOverlay.style.width = textRect.width + 'px';
+    textEditOverlay.style.height = textRect.height + 'px';
+
+    if (rotation) {
+      const centerX = relX + textRect.width / 2;
+      textEditOverlay.style.left = centerX + 'px';
+      textEditOverlay.style.top = centerY + 'px';
+      textEditOverlay.style.transformOrigin = 'center center';
+      textEditOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+    } else {
+      textEditOverlay.style.left = relX + 'px';
+      textEditOverlay.style.top = centerY + 'px';
+      textEditOverlay.style.transformOrigin = 'left center';
+      textEditOverlay.style.transform = 'translate(0, -50%)';
+    }
+
+    const ctm = dom.svg.getScreenCTM();
+    const scale = ctm ? ctm.a : 1;
+    textarea.style.fontSize = (editingData.fontSize * scale) + 'px';
+    keepEditing();
+  });
+
   // Debounced blur: don't finish when focus moves to toolbar controls
   textarea.addEventListener('blur', (e) => {
     if (!e.relatedTarget || (e.relatedTarget.closest && e.relatedTarget.closest('#toolbar'))) {
