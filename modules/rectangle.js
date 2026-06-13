@@ -5,6 +5,7 @@ import { pushAction } from './history.js';
 let isDrawing = false;
 let startPt = null;
 let previewRect = null;
+let currentBgFill = 'none';
 
 export function initRectangle() {}
 
@@ -29,11 +30,12 @@ function onMouseDown(e) {
   isDrawing = true;
   startPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
+  currentBgFill = state.bgColor === 'transparent' ? 'none' : state.bgColor;
   previewRect = svgEl('rect', {
     x: startPt.x, y: startPt.y, width: 0, height: 0,
     stroke: state.activeColor,
     'stroke-width': state.activeThickness,
-    fill: 'transparent',
+    fill: currentBgFill,
     'stroke-dasharray': '4 3',
     'pointer-events': 'none',
   });
@@ -84,7 +86,7 @@ function onMouseUp(e) {
     rotation: 0,
     stroke: state.activeColor,
     strokeWidth: state.activeThickness,
-    fill: 'transparent',
+    fill: currentBgFill,
   };
 
   addRectangleElement(data);
@@ -122,7 +124,7 @@ export function addRectangleElement(data) {
   const fillRect = svgEl('rect', {
     x: data.x, y: data.y, width: data.width, height: data.height,
     rx: data.rx || 0,
-    fill: 'transparent',
+    fill: data.fill || 'transparent',
     class: 'rect-fill',
   });
 
@@ -160,6 +162,7 @@ export function updateRectangleElement(data) {
     fillRect.setAttribute('width', data.width);
     fillRect.setAttribute('height', data.height);
     fillRect.setAttribute('rx', data.rx || 0);
+    fillRect.setAttribute('fill', data.fill || 'transparent');
   }
   if (strokeRect) {
     strokeRect.setAttribute('x', data.x);
