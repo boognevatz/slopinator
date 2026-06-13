@@ -4,6 +4,7 @@ import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
+import { refreshPalette } from './palette.js';
 import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle, legacyStyleToDecorations } from './line.js';
 import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
 import { updateRectangleElement } from './rectangle.js';
@@ -38,10 +39,29 @@ export function initSelect() {
   document.addEventListener('palette-bgcolor-changed', (e) => {
     if (!state.selectedId) return;
     const data = state.elements.find(el => el.id === state.selectedId);
-    if (!data || data.type !== 'text') return;
-    data.fill = e.detail.color;
-    updateTextSVG(data);
-    drawHandles(data);
+    if (!data) return;
+    const color = e.detail.color;
+    const oldFill = data.fill;
+    if (oldFill === color) return;
+    if (data.type === 'text') {
+      data.fill = color;
+      updateTextSVG(data);
+      drawHandles(data);
+      pushAction({
+        description: 'Change text fill color',
+        doFn: () => { data.fill = color; updateTextSVG(data); drawHandles(data); },
+        undoFn: () => { data.fill = oldFill; updateTextSVG(data); drawHandles(data); },
+      });
+    } else if (data.type === 'rectangle') {
+      data.fill = color === 'transparent' ? 'none' : color;
+      updateRectangleElement(data);
+      drawHandles(data);
+      pushAction({
+        description: 'Change rectangle fill color',
+        doFn: () => { data.fill = color; updateRectangleElement(data); drawHandles(data); },
+        undoFn: () => { data.fill = oldFill; updateRectangleElement(data); drawHandles(data); },
+      });
+    }
   });
   document.addEventListener('line-style-changed', (e) => {
     applyLineStyleToSelected(e.detail.style);
@@ -237,6 +257,7 @@ export function selectElement(id) {
     syncFreehandEpsilonSlider(data.epsilon);
   } else if (data.type === 'rectangle') {
     state.activeColor = data.stroke;
+    state.bgColor = data.fill === 'none' ? 'transparent' : (data.fill || state.bgColor);
     state.activeThickness = data.strokeWidth;
     state.activeCornerRadius = data.rx || 0;
     document.getElementById('corner-radius-input').value = data.rx || 0;
@@ -244,6 +265,7 @@ export function selectElement(id) {
 
   drawHandles(data);
   document.getElementById('btn-delete').disabled = false;
+  refreshPalette();
 
   // Dispatch event so palette highlights update
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data } }));
