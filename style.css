@@ -335,6 +335,11 @@ body {
   display: block;
 }
 
+#editor-svg svg,
+#editor-container svg {
+  touch-action: none;
+}
+
 /* ── Empty State ─────────────────────────────────────── */
 
 #resize-notification {
@@ -436,6 +441,22 @@ body {
   stroke-width: 1;
   cursor: pointer;
   vector-effect: non-scaling-stroke;
+}
+
+#editor-svg .handle-icon {
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+#editor-svg .handle-icon:hover {
+  opacity: 1;
+}
+
+@media (pointer: coarse) {
+  #editor-svg .handle-icon {
+    opacity: 1;
+  }
 }
 
 #editor-svg .handle-endpoint {

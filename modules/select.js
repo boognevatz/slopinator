@@ -206,6 +206,15 @@ function onMouseDown(e) {
       }
     }
 
+    // Second tap on already-selected text → edit (mobile)
+    if (state.selectedId === id) {
+      const data = state.elements.find(el => el.id === id);
+      if (data && data.type === 'text') {
+        setTimeout(() => startEditing(id), 0);
+        return;
+      }
+    }
+
     selectElement(id);
     const data = state.elements.find(el => el.id === id);
     if (data && data.type === 'line' && lineEditMode === 'change-end') {
@@ -397,10 +406,9 @@ function drawTextHandles(data) {
   const actualSize = iconSize * iconScale;
 
   const iconG = svgEl('g', {
-    class: 'handle',
+    class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
     transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
-    style: 'cursor: pointer; opacity: 0.6;'
   });
 
   // Background circle for visibility
@@ -418,9 +426,6 @@ function drawTextHandles(data) {
     fill: '#fff'
   });
   iconG.appendChild(pathEl);
-
-  iconG.addEventListener('pointerenter', () => iconG.style.opacity = '1');
-  iconG.addEventListener('pointerleave', () => iconG.style.opacity = '0.6');
 
   handleGroup.appendChild(iconG);
 }
@@ -480,10 +485,9 @@ function drawRectangleHandles(data) {
   const actualSize = iconSize * iconScale;
 
   const iconG = svgEl('g', {
-    class: 'handle',
+    class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
     transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
-    style: 'cursor: pointer; opacity: 0.6;',
   });
 
   iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
@@ -495,9 +499,6 @@ function drawRectangleHandles(data) {
     d: isRotate ? rotatePath : movePath,
     fill: '#fff',
   }));
-
-  iconG.addEventListener('pointerenter', () => iconG.style.opacity = '1');
-  iconG.addEventListener('pointerleave', () => iconG.style.opacity = '0.6');
 
   handleGroup.appendChild(iconG);
   dom.handleLayer.appendChild(handleGroup);

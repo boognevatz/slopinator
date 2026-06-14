@@ -140,7 +140,7 @@ function init() {
     }
   });
 
-  // ── Mousewheel zooming ──────────────────────────────────────
+  // ── Mousewheel / Pinch zooming ──────────────────────────────
   document.getElementById('editor-container').addEventListener('wheel', (e) => {
     e.preventDefault();
     if (!state.hasImage) return;
@@ -151,6 +151,35 @@ function init() {
       zoomOut(e.clientX, e.clientY);
     }
   }, { passive: false });
+
+  let pinchPointers = [];
+  document.addEventListener('pointerdown', (e) => {
+    const idx = pinchPointers.findIndex(p => p.pointerId === e.pointerId);
+    if (idx !== -1) pinchPointers.splice(idx, 1);
+    pinchPointers.push({ pointerId: e.pointerId, x: e.clientX, y: e.clientY });
+  });
+  document.addEventListener('pointermove', (e) => {
+    const p = pinchPointers.find(p => p.pointerId === e.pointerId);
+    if (p) { p.x = e.clientX; p.y = e.clientY; }
+    if (pinchPointers.length !== 2) return;
+    if (!state.hasImage) return;
+    const p1 = pinchPointers[0], p2 = pinchPointers[1];
+    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (!pinchPointers._lastDist) { pinchPointers._lastDist = dist; return; }
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+    if (dist > pinchPointers._lastDist * 1.02) zoomIn(midX, midY);
+    else if (dist < pinchPointers._lastDist * 0.98) zoomOut(midX, midY);
+    pinchPointers._lastDist = dist;
+  });
+  document.addEventListener('pointerup', (e) => {
+    pinchPointers = pinchPointers.filter(p => p.pointerId !== e.pointerId);
+    pinchPointers._lastDist = null;
+  });
+  document.addEventListener('pointercancel', (e) => {
+    pinchPointers = pinchPointers.filter(p => p.pointerId !== e.pointerId);
+    pinchPointers._lastDist = null;
+  });
 
   // ── Window resize handling ──────────────────────────────────
   // SVG auto-scales via viewBox, no extra handling needed.

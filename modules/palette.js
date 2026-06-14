@@ -3,6 +3,8 @@ import { state } from './editor.js';
 let colorPickerTarget = null;
 let activeTarget = 'foreground';
 let dropdownOpen = false;
+let longPressTimer = null;
+let longPressTriggered = false;
 
 function getBaseHex(color) {
   if (!color || color === 'transparent') return null;
@@ -105,6 +107,29 @@ function setupGlobalClose() {
   });
 }
 
+function setupLongPress(swatch, i) {
+  swatch.addEventListener('pointerdown', () => {
+    longPressTriggered = false;
+    clearTimeout(longPressTimer);
+    longPressTimer = setTimeout(() => {
+      longPressTriggered = true;
+      colorPickerTarget = i;
+      const picker = document.getElementById('color-picker-hidden');
+      picker.value = state.palette[i];
+      picker.click();
+    }, 500);
+  });
+  swatch.addEventListener('pointermove', () => {
+    clearTimeout(longPressTimer);
+  });
+  swatch.addEventListener('pointerup', () => {
+    clearTimeout(longPressTimer);
+  });
+  swatch.addEventListener('pointercancel', () => {
+    clearTimeout(longPressTimer);
+  });
+}
+
 function renderSwatches() {
   const container = document.getElementById('color-dropdown-swatches');
   container.innerHTML = '';
@@ -119,7 +144,12 @@ function renderSwatches() {
     swatch.dataset.index = i;
     swatch.title = `${color} (right-click to edit)`;
 
-    swatch.addEventListener('click', () => {
+    swatch.addEventListener('click', (e) => {
+      if (longPressTriggered) {
+        longPressTriggered = false;
+        e.stopPropagation();
+        return;
+      }
       applyColor(color);
       highlightActiveSwatch();
       closeDropdown();
@@ -128,11 +158,17 @@ function renderSwatches() {
     swatch.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (longPressTriggered) {
+        longPressTriggered = false;
+        return;
+      }
       colorPickerTarget = i;
       const picker = document.getElementById('color-picker-hidden');
       picker.value = state.palette[i];
       picker.click();
     });
+
+    setupLongPress(swatch, i);
 
     container.appendChild(swatch);
   });
