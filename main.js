@@ -13,6 +13,7 @@ import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initPerspective } from './modules/perspective.js';
+import { initColorCorrection } from './modules/colorcorrection.js';
 
 import { dom } from './modules/editor.js';
 
@@ -56,6 +57,7 @@ function init() {
   initFreehand();
   initRectangle();
   initPerspective();
+  initColorCorrection();
   initFileIO();
 
   // ── Toolbar button wiring ───────────────────────────────────
@@ -149,6 +151,9 @@ function init() {
           break;
         case 'p':
           switchTool('perspective');
+          break;
+        case 'k':
+          switchTool('color');
           break;
         case 'delete':
         case 'backspace':

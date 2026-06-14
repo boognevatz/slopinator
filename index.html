@@ -32,6 +32,7 @@
         <button id="btn-freehand" class="tool-btn" title="Freehand (F)" data-tool="freehand">Freehand</button>
         <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
         <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
+        <button id="btn-color" class="tool-btn" title="Color Correction (K)" data-tool="color">Color</button>
       </div>
 
       <div class="toolbar-group separator">
@@ -168,6 +169,24 @@
         <span class="toolbar-label">Perspective:</span>
         <button id="btn-perspective-apply" disabled>Transform</button>
         <button id="btn-perspective-reset" disabled>Reset</button>
+      </div>
+
+      <div class="toolbar-group separator" id="color-correction-group" hidden>
+        <span class="toolbar-label">Color:</span>
+        <select id="color-algorithm" class="small-input">
+          <option value="gaussian">Gaussian</option>
+          <option value="morph">Morph</option>
+          <option value="stretch">Stretch</option>
+        </select>
+        <span class="toolbar-label" id="color-param-label">Sigma</span>
+        <input type="range" id="color-param-slider" class="color-slider" min="10" max="200" step="5" value="80">
+        <span class="toolbar-label" id="color-param-value">80</span>
+        <label class="crop-ratio-option"><input type="checkbox" id="color-show-intermediate"> L</label>
+        <label class="crop-ratio-option"><input type="checkbox" id="color-show-original"> Orig</label>
+        <label class="crop-ratio-option"><input type="checkbox" id="color-highlight"> Highlight</label>
+        <label class="crop-ratio-option"><input type="checkbox" id="color-grayscale"> Gray</label>
+        <button id="btn-color-correct" disabled>Correct</button>
+        <button id="btn-color-reset" disabled>Reset</button>
       </div>
 
     </div>

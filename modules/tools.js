@@ -8,6 +8,7 @@ import { activateCrop, deactivateCrop } from './crop.js';
 import { activateFreehand, deactivateFreehand } from './freehand.js';
 import { activateRectangle, deactivateRectangle } from './rectangle.js';
 import { activatePerspective, deactivatePerspective } from './perspective.js';
+import { activateColorCorrection, deactivateColorCorrection } from './colorcorrection.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
@@ -18,6 +19,7 @@ const TOOL_SETTINGS = {
   rectangle: ['color', 'thickness', 'rectangle'],
   crop: ['crop'],
   perspective: ['perspective'],
+  color: ['color-correction'],
 };
 
 export function initTools() {
@@ -28,6 +30,7 @@ export function initTools() {
   toolButtons.freehand = document.getElementById('btn-freehand');
   toolButtons.rectangle = document.getElementById('btn-rectangle');
   toolButtons.perspective = document.getElementById('btn-perspective');
+  toolButtons.color = document.getElementById('btn-color');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
     if (btn) btn.addEventListener('click', () => switchTool(tool));
@@ -67,6 +70,7 @@ export function switchTool(tool) {
     case 'freehand': deactivateFreehand(); break;
     case 'rectangle': deactivateRectangle(); break;
     case 'perspective': deactivatePerspective(); break;
+    case 'color': deactivateColorCorrection(); break;
   }
 
   state.activeTool = tool;
@@ -87,6 +91,7 @@ export function switchTool(tool) {
     case 'freehand': activateFreehand(); break;
     case 'rectangle': activateRectangle(); break;
     case 'perspective': activatePerspective(); break;
+    case 'color': activateColorCorrection(); break;
   }
 
   // If switching from line to select, select the just-finalized polyline
@@ -130,4 +135,5 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('rectangle-group').hidden = !visible.has('rectangle');
   document.getElementById('crop-group').hidden = !visible.has('crop');
   document.getElementById('perspective-group').hidden = !visible.has('perspective');
+  document.getElementById('color-correction-group').hidden = !visible.has('color-correction');
 }

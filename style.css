@@ -275,6 +275,11 @@ button.tool-btn.active {
   text-align: right;
 }
 
+.color-slider {
+  width: 70px;
+  vertical-align: middle;
+}
+
 .line-style-btn.active {
   background: #0078d4;
   border-color: #0078d4;
