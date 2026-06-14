@@ -17,6 +17,8 @@ let algorithm = 'gaussian';
 let paramValue = 80;
 let gaussianSigma = 80;
 let morphKernel = 15;
+let contrastBlack = 0;
+let contrastWhite = 256;
 let grayscaleMode = false;
 let showIntermediate = false;
 let showOriginal = false;
@@ -261,11 +263,13 @@ function stretchHsv(data, width, height, showInter) {
   }
 
   const vRange = maxV - minV;
-  if (vRange < 0.00001) return;
+  if (vRange === 0) return;
+
+  const stretchRange = Math.max(vRange, 0.01);
 
   if (showInter) {
     for (let i = 0; i < data.length; i += 4) {
-      const v = (hsvArr[i / 4].v - minV) / vRange;
+      const v = (hsvArr[i / 4].v - minV) / stretchRange;
       const cv = Math.round(Math.max(0, Math.min(255, v * 255)));
       data[i] = data[i + 1] = data[i + 2] = cv;
       data[i + 3] = 255;
@@ -280,7 +284,7 @@ function stretchHsv(data, width, height, showInter) {
     } else if (oldV >= maxV) {
       data[i] = data[i + 1] = data[i + 2] = 255;
     } else {
-      const v = (oldV - minV) / vRange;
+      const v = (oldV - minV) / stretchRange;
       if (s < 0.001) {
         const cv = Math.round(v * 255);
         data[i] = data[i + 1] = data[i + 2] = cv;
@@ -303,6 +307,44 @@ function stretchHsv(data, width, height, showInter) {
         data[i + 1] = Math.round(g * 255);
         data[i + 2] = Math.round(b * 255);
       }
+    }
+    data[i + 3] = 255;
+  }
+}
+
+function contrastLevels(data, width, height, blackPoint, whitePoint, showInter) {
+  blackPoint = Math.max(0, Math.min(128, blackPoint));
+  whitePoint = Math.max(128, Math.min(256, whitePoint));
+
+  const bpNorm = blackPoint / 255;
+  const wpNorm = whitePoint / 255;
+  const range = whitePoint - blackPoint;
+  const rNorm = range / 255;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255;
+    const v = Math.max(r, g, b);
+
+    if (showInter) {
+      let cv = 128;
+      if (v <= bpNorm) cv = 0;
+      else if (range <= 0 || v >= wpNorm) cv = 255;
+      else cv = Math.round((v - bpNorm) / rNorm * 255);
+      data[i] = data[i + 1] = data[i + 2] = cv;
+      data[i + 3] = 255;
+      continue;
+    }
+
+    if (v <= bpNorm) {
+      data[i] = data[i + 1] = data[i + 2] = 0;
+    } else if (range <= 0 || v >= wpNorm) {
+      data[i] = data[i + 1] = data[i + 2] = 255;
+    } else {
+      const newV = (v - bpNorm) / rNorm;
+      const scale = newV / v;
+      data[i] = Math.round(Math.max(0, Math.min(255, data[i] * scale)));
+      data[i + 1] = Math.round(Math.max(0, Math.min(255, data[i + 1] * scale)));
+      data[i + 2] = Math.round(Math.max(0, Math.min(255, data[i + 2] * scale)));
     }
     data[i + 3] = 255;
   }
@@ -349,6 +391,31 @@ function processImage(dataURI, width, height, algo, param, gray, showInter, show
         return;
       }
 
+      if (algo === 'contrast') {
+        contrastLevels(origData.data, width, height, contrastBlack, contrastWhite, showInter);
+        if (document.getElementById('color-highlight').checked) {
+          const data = origData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            if (lum > 250) {
+              data[i] = 255; data[i + 1] = 255; data[i + 2] = 0;
+            } else if (lum < 40) {
+              data[i] = 0; data[i + 1] = 255; data[i + 2] = 0;
+            }
+          }
+        }
+        if (gray) {
+          const data = origData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const v = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+            data[i] = data[i + 1] = data[i + 2] = v;
+          }
+        }
+        ctx.putImageData(origData, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.95));
+        return;
+      }
+
       const illumPromise = algo === 'morph'
         ? computeIlluminationMorph(dataURI, width, height, param)
         : computeIlluminationGaussian(dataURI, width, height, param);
@@ -368,6 +435,8 @@ function readSettings() {
   paramValue = parseInt(document.getElementById('color-param-slider').value) || 80;
   if (algorithm === 'morph') morphKernel = paramValue;
   else gaussianSigma = paramValue;
+  contrastBlack = parseInt(document.getElementById('color-contrast-black').value) || 0;
+  contrastWhite = parseInt(document.getElementById('color-contrast-white').value) || 256;
   grayscaleMode = document.getElementById('color-grayscale').checked;
   showIntermediate = document.getElementById('color-show-intermediate').checked;
   showOriginal = document.getElementById('color-show-original').checked;
@@ -377,12 +446,29 @@ function updateUIForAlgorithm() {
   const label = document.getElementById('color-param-label');
   const slider = document.getElementById('color-param-slider');
   const value = document.getElementById('color-param-value');
-  if (algorithm === 'stretch') {
-    label.hidden = true;
-    slider.hidden = true;
-    value.hidden = true;
+
+  label.hidden = true;
+  slider.hidden = true;
+  value.hidden = true;
+  document.getElementById('color-contrast-black-label').hidden = true;
+  document.getElementById('color-contrast-black').hidden = true;
+  document.getElementById('color-contrast-black-value').hidden = true;
+  document.getElementById('color-contrast-white-label').hidden = true;
+  document.getElementById('color-contrast-white').hidden = true;
+  document.getElementById('color-contrast-white-value').hidden = true;
+
+  if (algorithm === 'stretch') return;
+
+  if (algorithm === 'contrast') {
+    document.getElementById('color-contrast-black-label').hidden = false;
+    document.getElementById('color-contrast-black').hidden = false;
+    document.getElementById('color-contrast-black-value').hidden = false;
+    document.getElementById('color-contrast-white-label').hidden = false;
+    document.getElementById('color-contrast-white').hidden = false;
+    document.getElementById('color-contrast-white-value').hidden = false;
     return;
   }
+
   label.hidden = false;
   slider.hidden = false;
   value.hidden = false;
@@ -426,6 +512,8 @@ function schedulePreview() {
 
   if (!originalDataURI) return;
   document.getElementById('color-param-value').textContent = paramValue;
+  document.getElementById('color-contrast-black-value').textContent = contrastBlack;
+  document.getElementById('color-contrast-white-value').textContent = contrastWhite;
 
   previewTimer = setTimeout(() => {
     processImage(originalDataURI, origW, origH, algorithm, paramValue, grayscaleMode, showIntermediate, showOriginal)
@@ -455,6 +543,8 @@ export function initColorCorrection() {
   const showInterCheck = document.getElementById('color-show-intermediate');
   const showOrigCheck = document.getElementById('color-show-original');
   const highlightCheck = document.getElementById('color-highlight');
+  const contrastBlackSlider = document.getElementById('color-contrast-black');
+  const contrastWhiteSlider = document.getElementById('color-contrast-white');
 
   paramSlider.addEventListener('input', onSettingChange);
   algoSelect.addEventListener('change', onSettingChange);
@@ -462,6 +552,8 @@ export function initColorCorrection() {
   showInterCheck.addEventListener('change', onSettingChange);
   showOrigCheck.addEventListener('change', onSettingChange);
   highlightCheck.addEventListener('change', onSettingChange);
+  contrastBlackSlider.addEventListener('input', onSettingChange);
+  contrastWhiteSlider.addEventListener('input', onSettingChange);
 }
 
 export function activateColorCorrection() {
@@ -503,6 +595,8 @@ function resetTool() {
 
   document.getElementById('color-algorithm').value = 'gaussian';
   document.getElementById('color-param-slider').value = '80';
+  document.getElementById('color-contrast-black').value = '0';
+  document.getElementById('color-contrast-white').value = '256';
   document.getElementById('color-grayscale').checked = false;
   document.getElementById('color-show-intermediate').checked = false;
   document.getElementById('color-show-original').checked = false;
@@ -511,6 +605,8 @@ function resetTool() {
   paramValue = 80;
   gaussianSigma = 80;
   morphKernel = 15;
+  contrastBlack = 0;
+  contrastWhite = 256;
   grayscaleMode = false;
   showIntermediate = false;
   showOriginal = false;

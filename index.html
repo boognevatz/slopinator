@@ -177,10 +177,17 @@
           <option value="gaussian">Gaussian</option>
           <option value="morph">Morph</option>
           <option value="stretch">Stretch</option>
+          <option value="contrast">Contrast</option>
         </select>
         <span class="toolbar-label" id="color-param-label">Sigma</span>
         <input type="range" id="color-param-slider" class="color-slider" min="10" max="200" step="5" value="80">
         <span class="toolbar-label" id="color-param-value">80</span>
+        <span class="toolbar-label" id="color-contrast-black-label" hidden>Black</span>
+        <input type="range" id="color-contrast-black" class="color-slider" min="0" max="128" value="0" hidden>
+        <span class="toolbar-label" id="color-contrast-black-value" hidden>0</span>
+        <span class="toolbar-label" id="color-contrast-white-label" hidden>White</span>
+        <input type="range" id="color-contrast-white" class="color-slider" min="128" max="256" value="256" hidden>
+        <span class="toolbar-label" id="color-contrast-white-value" hidden>256</span>
         <label class="crop-ratio-option"><input type="checkbox" id="color-show-intermediate"> L</label>
         <label class="crop-ratio-option"><input type="checkbox" id="color-show-original"> Orig</label>
         <label class="crop-ratio-option"><input type="checkbox" id="color-highlight"> Highlight</label>
