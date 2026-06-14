@@ -21,7 +21,7 @@ export function initText() {
   document.getElementById('editor-container').appendChild(textEditOverlay);
 
   // Prevent clicks on the overlay from propagating to the SVG
-  textEditOverlay.addEventListener('mousedown', (e) => {
+  textEditOverlay.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
   });
 
@@ -158,12 +158,12 @@ export function initText() {
 
 export function activateText() {
   dom.svg.style.cursor = 'text';
-  dom.svg.addEventListener('mousedown', onMouseDown);
+  dom.svg.addEventListener('pointerdown', onMouseDown);
 }
 
 export function deactivateText() {
   dom.svg.style.cursor = '';
-  dom.svg.removeEventListener('mousedown', onMouseDown);
+  dom.svg.removeEventListener('pointerdown', onMouseDown);
   finishEditing();
 }
 

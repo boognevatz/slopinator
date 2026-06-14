@@ -66,7 +66,7 @@ export function initFileIO() {
   });
 
   // Hide notification on any tool usage
-  document.getElementById('editor-svg').addEventListener('mousedown', () => {
+  document.getElementById('editor-svg').addEventListener('pointerdown', () => {
     resizeNotification.hidden = true;
   }, { capture: true });
 

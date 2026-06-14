@@ -45,7 +45,7 @@ export function syncFreehandEpsilonSlider(value) {
 
 export function activateFreehand() {
   dom.svg.style.cursor = 'crosshair';
-  dom.svg.addEventListener('mousedown', onMouseDown);
+  dom.svg.addEventListener('pointerdown', onMouseDown);
   // Reset epsilon slider to default derived from stroke width
   const slider = document.getElementById('freehand-epsilon-slider');
   const valueDisplay = document.getElementById('freehand-epsilon-value');
@@ -59,7 +59,7 @@ export function activateFreehand() {
 
 export function deactivateFreehand() {
   dom.svg.style.cursor = '';
-  dom.svg.removeEventListener('mousedown', onMouseDown);
+  dom.svg.removeEventListener('pointerdown', onMouseDown);
   cancelDraw();
 }
 
@@ -87,8 +87,8 @@ function onMouseDown(e) {
   });
   dom.annotationLayer.appendChild(previewPolyline);
 
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
+  document.addEventListener('pointermove', onMouseMove);
+  document.addEventListener('pointerup', onMouseUp);
 }
 
 function onMouseMove(e) {
@@ -107,8 +107,8 @@ function onMouseMove(e) {
 
 function onMouseUp(e) {
   if (!isDrawing) return;
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('pointermove', onMouseMove);
+  document.removeEventListener('pointerup', onMouseUp);
 
   if (previewPolyline && previewPolyline.parentNode) {
     previewPolyline.parentNode.removeChild(previewPolyline);
@@ -176,8 +176,8 @@ function cancelDraw() {
   previewPolyline = null;
   isDrawing = false;
   rawPoints = [];
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('pointermove', onMouseMove);
+  document.removeEventListener('pointerup', onMouseUp);
 }
 
 export function addFreehandElement(data) {

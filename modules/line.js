@@ -85,7 +85,7 @@ function applySizeToPendingPolyline() {
 
 export function activateLine(selectedData) {
   dom.svg.style.cursor = 'crosshair';
-  dom.svg.addEventListener('mousedown', onMouseDown);
+  dom.svg.addEventListener('pointerdown', onMouseDown);
   if (selectedData) {
     loadExistingPolyline(selectedData);
   }
@@ -113,10 +113,10 @@ function loadExistingPolyline(data) {
 
 export function deactivateLine() {
   dom.svg.style.cursor = '';
-  dom.svg.removeEventListener('mousedown', onMouseDown);
+  dom.svg.removeEventListener('pointerdown', onMouseDown);
   if (isDraggingVertex) {
-    document.removeEventListener('mousemove', onVertexDragMove);
-    document.removeEventListener('mouseup', onVertexDragEnd);
+    document.removeEventListener('pointermove', onVertexDragMove);
+    document.removeEventListener('pointerup', onVertexDragEnd);
     isDraggingVertex = false;
   }
   cleanupDragUI();
@@ -171,8 +171,8 @@ function onMouseDown(e) {
   applyLineStyle(previewLine, state.activeLineStyle);
   dom.annotationLayer.appendChild(previewLine);
 
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
+  document.addEventListener('pointermove', onMouseMove);
+  document.addEventListener('pointerup', onMouseUp);
 }
 
 function onMouseMove(e) {
@@ -184,8 +184,8 @@ function onMouseMove(e) {
 
 function onMouseUp(e) {
   if (!isDrawing) return;
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('pointermove', onMouseMove);
+  document.removeEventListener('pointerup', onMouseUp);
 
   const endPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
@@ -240,8 +240,8 @@ function cancelDraw() {
   }
   previewLine = null;
   isDrawing = false;
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('pointermove', onMouseMove);
+  document.removeEventListener('pointerup', onMouseUp);
 }
 
 // ── Polyline extend mode ────────────────────────────────────────
@@ -392,8 +392,8 @@ function startVertexDrag(idx, e) {
   document.body.appendChild(coordTooltip);
   updateCoordTooltip(e.clientX, e.clientY, pt);
 
-  document.addEventListener('mousemove', onVertexDragMove);
-  document.addEventListener('mouseup', onVertexDragEnd);
+  document.addEventListener('pointermove', onVertexDragMove);
+  document.addEventListener('pointerup', onVertexDragEnd);
 }
 
 function onVertexDragMove(e) {
@@ -414,8 +414,8 @@ function onVertexDragMove(e) {
 }
 
 function onVertexDragEnd() {
-  document.removeEventListener('mousemove', onVertexDragMove);
-  document.removeEventListener('mouseup', onVertexDragEnd);
+  document.removeEventListener('pointermove', onVertexDragMove);
+  document.removeEventListener('pointerup', onVertexDragEnd);
 
   if (!isDraggingVertex || !pendingPolyline) return;
   isDraggingVertex = false;

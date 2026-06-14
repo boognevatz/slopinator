@@ -146,12 +146,12 @@ function syncLineToolbarFromSelection(data) {
 
 export function activateSelect() {
   dom.svg.style.cursor = 'default';
-  dom.svg.addEventListener('mousedown', onMouseDown);
+  dom.svg.addEventListener('pointerdown', onMouseDown);
 }
 
 export function deactivateSelect() {
   dom.svg.style.cursor = '';
-  dom.svg.removeEventListener('mousedown', onMouseDown);
+  dom.svg.removeEventListener('pointerdown', onMouseDown);
   clearSelection();
 }
 
@@ -419,8 +419,8 @@ function drawTextHandles(data) {
   });
   iconG.appendChild(pathEl);
 
-  iconG.addEventListener('mouseenter', () => iconG.style.opacity = '1');
-  iconG.addEventListener('mouseleave', () => iconG.style.opacity = '0.6');
+  iconG.addEventListener('pointerenter', () => iconG.style.opacity = '1');
+  iconG.addEventListener('pointerleave', () => iconG.style.opacity = '0.6');
 
   handleGroup.appendChild(iconG);
 }
@@ -496,8 +496,8 @@ function drawRectangleHandles(data) {
     fill: '#fff',
   }));
 
-  iconG.addEventListener('mouseenter', () => iconG.style.opacity = '1');
-  iconG.addEventListener('mouseleave', () => iconG.style.opacity = '0.6');
+  iconG.addEventListener('pointerenter', () => iconG.style.opacity = '1');
+  iconG.addEventListener('pointerleave', () => iconG.style.opacity = '0.6');
 
   handleGroup.appendChild(iconG);
   dom.handleLayer.appendChild(handleGroup);
@@ -522,8 +522,8 @@ function startDrag(id, startPt) {
   dragStart = startPt;
   dragOriginal = { ...data };
 
-  document.addEventListener('mousemove', onDragMove);
-  document.addEventListener('mouseup', onDragEnd);
+  document.addEventListener('pointermove', onDragMove);
+  document.addEventListener('pointerup', onDragEnd);
 }
 
 function onDragMove(e) {
@@ -568,8 +568,8 @@ function onDragMove(e) {
 }
 
 function onDragEnd() {
-  document.removeEventListener('mousemove', onDragMove);
-  document.removeEventListener('mouseup', onDragEnd);
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', onDragEnd);
 
   if (!isDragging) return;
   isDragging = false;
@@ -716,8 +716,8 @@ function startResize(handleEl, startPt, e) {
     }
   }
 
-  document.addEventListener('mousemove', onResizeMove);
-  document.addEventListener('mouseup', onResizeEnd);
+  document.addEventListener('pointermove', onResizeMove);
+  document.addEventListener('pointerup', onResizeEnd);
 }
 
 function onResizeMove(e) {
@@ -872,8 +872,8 @@ function onResizeMove(e) {
 }
 
 function onResizeEnd() {
-  document.removeEventListener('mousemove', onResizeMove);
-  document.removeEventListener('mouseup', onResizeEnd);
+  document.removeEventListener('pointermove', onResizeMove);
+  document.removeEventListener('pointerup', onResizeEnd);
 
   hideRotationTooltip();
 

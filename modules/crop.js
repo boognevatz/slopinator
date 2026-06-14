@@ -72,14 +72,14 @@ export function activateCrop() {
 
   syncCropControls();
 
-  dom.svg.addEventListener('mousedown', onMouseDown);
+  dom.svg.addEventListener('pointerdown', onMouseDown);
   drawCropOverlay();
 }
 
 export function deactivateCrop() {
   isCropping = false;
   dom.svg.style.cursor = '';
-  dom.svg.removeEventListener('mousedown', onMouseDown);
+  dom.svg.removeEventListener('pointerdown', onMouseDown);
   
   // Clean up UI
   const overlay = dom.handleLayer.querySelector('#crop-overlay-group');
@@ -204,8 +204,8 @@ function onMouseDown(e) {
     dragStart = pt;
     dragOriginal = { ...cropBox };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('pointermove', onMouseMove);
+    document.addEventListener('pointerup', onMouseUp);
     return;
   }
 
@@ -215,8 +215,8 @@ function onMouseDown(e) {
     isDragging = true;
     dragStart = pt;
     dragOriginal = { ...cropBox };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('pointermove', onMouseMove);
+    document.addEventListener('pointerup', onMouseUp);
   }
 }
 
@@ -248,8 +248,8 @@ function onMouseMove(e) {
 }
 
 function onMouseUp(e) {
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  document.removeEventListener('pointermove', onMouseMove);
+  document.removeEventListener('pointerup', onMouseUp);
   isDragging = false;
   isResizing = false;
 }
