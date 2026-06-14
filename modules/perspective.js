@@ -179,9 +179,7 @@ function drawQuad() {
 
   const scale = getScale();
   const s = (v) => v / scale;
-  const handleR = Math.max(6, 8 / scale);
 
-  const pts = corners.join(' ');
   const poly = svgEl('polygon', {
     points: corners.map(p => `${p.x},${p.y}`).join(' '),
     fill: 'rgba(0,120,212,0.08)',
@@ -191,16 +189,14 @@ function drawQuad() {
   });
   dom.handleLayer.appendChild(poly);
 
-  const labels = ['TL', 'TR', 'BR', 'BL'];
   for (let i = 0; i < 4; i++) {
-    const handle = svgEl('circle', {
-      cx: corners[i].x,
-      cy: corners[i].y,
-      r: handleR,
+    const handle = svgEl('rect', {
+      x: corners[i].x - 11,
+      y: corners[i].y - 11,
+      width: 22,
+      height: 22,
       class: 'handle',
-      fill: '#fff',
-      stroke: '#0078d4',
-      'stroke-width': 2 / scale,
+      'vector-effect': 'non-scaling-stroke',
     });
     dom.handleLayer.appendChild(handle);
   }
