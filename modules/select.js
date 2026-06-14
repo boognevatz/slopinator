@@ -26,6 +26,8 @@ let rotationCenter = null; // { cx, cy }
 let lineEditMode = 'move';  // 'move' | 'change-end'
 let selectedLineEndpoint = 'end'; // 'start' | 'end'
 let rotationTooltip = null;
+let _lastClickTime = 0;
+let _lastClickId = null;
 
 
 export function initSelect() {
@@ -196,19 +198,15 @@ function onMouseDown(e) {
     e.preventDefault();
     const id = annotGroup.id;
 
+    const data = state.elements.find(el => el.id === id);
+
     // Double-click on text → edit (defer to next frame so mousedown
     // processing completes and doesn't steal focus from the textarea)
-    if (e.detail === 2) {
-      const data = state.elements.find(el => el.id === id);
-      if (data && data.type === 'text') {
-        setTimeout(() => startEditing(id), 0);
-        return;
-      }
-    }
-
-    // Second tap on already-selected text → edit (mobile)
-    if (state.selectedId === id) {
-      const data = state.elements.find(el => el.id === id);
+    const now = Date.now();
+    const isDblClick = (e.detail >= 2) || (id === _lastClickId && now - _lastClickTime < 600);
+    _lastClickTime = now;
+    _lastClickId = id;
+    if (isDblClick) {
       if (data && data.type === 'text') {
         setTimeout(() => startEditing(id), 0);
         return;
@@ -216,7 +214,7 @@ function onMouseDown(e) {
     }
 
     selectElement(id);
-    const data = state.elements.find(el => el.id === id);
+
     if (data && data.type === 'line' && lineEditMode === 'change-end') {
       return;
     }
@@ -520,7 +518,7 @@ function startDrag(id, startPt) {
   if (!data) return;
 
   isDragging = true;
-  dragStart = startPt;
+  dragStart = { x: startPt.x, y: startPt.y, _time: Date.now() };
   dragOriginal = { ...data };
 
   document.addEventListener('pointermove', onDragMove);
@@ -580,6 +578,16 @@ function onDragEnd() {
 
   const orig = { ...dragOriginal };
   const final = { ...data };
+
+  // Long-press on text: hold >400ms without moving → enter edit mode
+  if (data.type === 'text' && dragStart && dragStart._time) {
+    const elapsed = Date.now() - dragStart._time;
+    if (elapsed >= 400 && orig.x === final.x && orig.y === final.y) {
+      dragOriginal = null;
+      setTimeout(() => startEditing(state.selectedId), 0);
+      return;
+    }
+  }
 
   // Only push to history if actually moved
   if (data.type === 'line' && (orig.x1 !== final.x1 || orig.y1 !== final.y1)) {
