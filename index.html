@@ -31,6 +31,7 @@
         <button id="btn-crop" class="tool-btn" title="Crop (C)" data-tool="crop">Crop</button>
         <button id="btn-freehand" class="tool-btn" title="Freehand (F)" data-tool="freehand">Freehand</button>
         <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
+        <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
       </div>
 
       <div class="toolbar-group separator">
@@ -161,6 +162,12 @@
         <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-original"> keep aspect</label>
         <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-4-3"> 4:3</label>
         <label class="crop-ratio-option"><input type="checkbox" id="crop-ratio-16-9"> 16:9</label>
+      </div>
+
+      <div class="toolbar-group separator" id="perspective-group" hidden>
+        <span class="toolbar-label">Perspective:</span>
+        <button id="btn-perspective-apply" disabled>Transform</button>
+        <button id="btn-perspective-reset" disabled>Reset</button>
       </div>
 
     </div>

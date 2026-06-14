@@ -7,6 +7,7 @@ import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
 import { activateFreehand, deactivateFreehand } from './freehand.js';
 import { activateRectangle, deactivateRectangle } from './rectangle.js';
+import { activatePerspective, deactivatePerspective } from './perspective.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
@@ -16,6 +17,7 @@ const TOOL_SETTINGS = {
   freehand: ['color', 'thickness', 'freehand-epsilon'],
   rectangle: ['color', 'thickness', 'rectangle'],
   crop: ['crop'],
+  perspective: ['perspective'],
 };
 
 export function initTools() {
@@ -25,6 +27,7 @@ export function initTools() {
   toolButtons.crop = document.getElementById('btn-crop');
   toolButtons.freehand = document.getElementById('btn-freehand');
   toolButtons.rectangle = document.getElementById('btn-rectangle');
+  toolButtons.perspective = document.getElementById('btn-perspective');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
     if (btn) btn.addEventListener('click', () => switchTool(tool));
@@ -63,6 +66,7 @@ export function switchTool(tool) {
     case 'crop': deactivateCrop(); break;
     case 'freehand': deactivateFreehand(); break;
     case 'rectangle': deactivateRectangle(); break;
+    case 'perspective': deactivatePerspective(); break;
   }
 
   state.activeTool = tool;
@@ -82,6 +86,7 @@ export function switchTool(tool) {
     case 'crop': activateCrop(); break;
     case 'freehand': activateFreehand(); break;
     case 'rectangle': activateRectangle(); break;
+    case 'perspective': activatePerspective(); break;
   }
 
   // If switching from line to select, select the just-finalized polyline
@@ -124,4 +129,5 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('freehand-epsilon-group').hidden = !visible.has('freehand-epsilon');
   document.getElementById('rectangle-group').hidden = !visible.has('rectangle');
   document.getElementById('crop-group').hidden = !visible.has('crop');
+  document.getElementById('perspective-group').hidden = !visible.has('perspective');
 }

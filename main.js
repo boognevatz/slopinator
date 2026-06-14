@@ -12,6 +12,7 @@ import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
+import { initPerspective } from './modules/perspective.js';
 
 import { dom } from './modules/editor.js';
 
@@ -54,6 +55,7 @@ function init() {
   initTools();
   initFreehand();
   initRectangle();
+  initPerspective();
   initFileIO();
 
   // ── Toolbar button wiring ───────────────────────────────────
@@ -144,6 +146,9 @@ function init() {
           break;
         case 'r':
           switchTool('rectangle');
+          break;
+        case 'p':
+          switchTool('perspective');
           break;
         case 'delete':
         case 'backspace':
