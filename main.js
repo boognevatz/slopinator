@@ -15,6 +15,27 @@ import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 
 import { dom } from './modules/editor.js';
 
+// ── Show last modified date of a source file ───────────
+async function showFileDate() {
+  const el = document.getElementById('file-date-label');
+  if (!el) return;
+  const files = ['index.html', 'style.css', 'main.js', 'modules/select.js', 'modules/text.js', 'modules/line.js'];
+  for (const f of files) {
+    try {
+      const r = await fetch(f, { method: 'HEAD' });
+      const header = r.headers.get('Last-Modified');
+      if (header) {
+        const d = new Date(header);
+        const pad = (n) => String(n).padStart(2, '0');
+        const formatted = `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        el.textContent = formatted;
+        return;
+      }
+    } catch {}
+  }
+}
+showFileDate();
+
 function init() {
   initEditor();
 
