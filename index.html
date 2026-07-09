@@ -16,10 +16,22 @@
         <div class="dropdown" id="export-dropdown">
           <button id="btn-export-jpg" title="Export as JPG" disabled>Export JPG ▾</button>
           <div class="dropdown-menu" id="export-menu" hidden>
-            <button data-width="320">320px wide</button>
-            <button data-width="640">640px wide</button>
-            <button data-width="1920">1920px wide</button>
-            <button data-width="original">Original size</button>
+            <div style="display:flex;flex-direction:column;gap:6px;padding:8px;white-space:nowrap;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;color:#ccc;">File:</span>
+                <input type="text" id="export-filename" class="small-input" value="annotation" style="width:120px;">
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:12px;color:#ccc;">Size:</span>
+                <select id="export-size-select" class="small-input" style="flex:1;">
+                  <option value="320">320px</option>
+                  <option value="640" selected>640px</option>
+                  <option value="1920">1920px</option>
+                  <option value="original">Original</option>
+                </select>
+              </div>
+              <button id="btn-export-do" style="width:100%;">Export</button>
+            </div>
           </div>
         </div>
       </div>

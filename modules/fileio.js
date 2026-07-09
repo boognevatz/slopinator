@@ -17,6 +17,9 @@ export function initFileIO() {
   const btnSaveSvg = document.getElementById('btn-save-svg');
   const btnExportJpg = document.getElementById('btn-export-jpg');
   const exportMenu = document.getElementById('export-menu');
+  const exportFilename = document.getElementById('export-filename');
+  const exportSizeSelect = document.getElementById('export-size-select');
+  const btnExportDo = document.getElementById('btn-export-do');
   const resizeNotification = document.getElementById('resize-notification');
 
   btnOpen.addEventListener('click', () => fileInput.click());
@@ -37,18 +40,31 @@ export function initFileIO() {
     exportMenu.hidden = !exportMenu.hidden;
   });
 
+  exportMenu.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
   document.addEventListener('click', () => {
     exportMenu.hidden = true;
   });
 
-  exportMenu.querySelectorAll('button').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const width = btn.dataset.width;
-      exportMenu.hidden = true;
-      exportJPG(width);
-    });
+  btnExportDo.addEventListener('click', (e) => {
+    e.stopPropagation();
+    doExport();
   });
+
+  exportFilename.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      doExport();
+    }
+  });
+
+  function doExport() {
+    const width = exportSizeSelect.value;
+    exportMenu.hidden = true;
+    exportJPG(width);
+  }
 
   // Resize notification logic
   document.getElementById('btn-close-notification').addEventListener('click', () => {
@@ -145,6 +161,18 @@ export function initFileIO() {
 
 function handleFileOpen(file) {
   const isSVG = file.name.toLowerCase().endsWith('.svg');
+
+  const exportFilename = document.getElementById('export-filename');
+  if (exportFilename) {
+    exportFilename.value = file.name;
+    const dot = file.name.lastIndexOf('.');
+    if (dot !== -1) {
+      exportFilename.setSelectionRange(0, dot);
+    } else {
+      exportFilename.select();
+    }
+    exportFilename.focus();
+  }
 
   if (isSVG) {
     const reader = new FileReader();
@@ -684,7 +712,17 @@ export function exportJPG(widthOption) {
 
     canvas.toBlob((blob) => {
       if (blob) {
-        downloadBlob(blob, `annotation_${targetWidth}x${targetHeight}.jpg`);
+        let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
+        const dot = filename.lastIndexOf('.');
+        let ext = '.jpg';
+        if (dot !== -1) {
+          const userExt = filename.slice(dot).toLowerCase();
+          if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
+            ext = userExt;
+            filename = filename.slice(0, dot);
+          }
+        }
+        downloadBlob(blob, `${filename}_${targetWidth}x${targetHeight}${ext}`);
       }
     }, 'image/jpeg', 0.92);
   };
