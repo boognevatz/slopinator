@@ -635,6 +635,7 @@ export function exportJPG(widthOption) {
       } else {
         svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
         svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+        svgStr += `  ${getLineDecorationsSvg(el)}\n`;
         svgStr += `</g>\n`;
       }
     } else if (el.type === 'text') {
