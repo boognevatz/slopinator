@@ -15,12 +15,20 @@ export function initFileIO() {
   const btnOpen = document.getElementById('btn-open');
   const btnOpenEmpty = document.getElementById('btn-open-empty');
   const btnSaveSvg = document.getElementById('btn-save-svg');
-  const btnExportJpg = document.getElementById('btn-export-jpg');
+  const btnExportDropdown = document.getElementById('btn-export-dropdown-btn');
   const exportMenu = document.getElementById('export-menu');
   const exportFilename = document.getElementById('export-filename');
+  const tabJpg = document.getElementById('export-tab-jpg');
+  const tabPdf = document.getElementById('export-tab-pdf');
+  const jpgOptions = document.getElementById('export-jpg-options');
+  const pdfOptions = document.getElementById('export-pdf-options');
+  const exportPdfSizeSelect = document.getElementById('export-pdf-size-select');
   const exportSizeSelect = document.getElementById('export-size-select');
+  const exportPdfResSelect = document.getElementById('export-pdf-res-select');
   const btnExportDo = document.getElementById('btn-export-do');
   const resizeNotification = document.getElementById('resize-notification');
+
+  let currentFormat = 'jpg';
 
   btnOpen.addEventListener('click', () => fileInput.click());
   btnOpenEmpty.addEventListener('click', () => fileInput.click());
@@ -34,10 +42,23 @@ export function initFileIO() {
 
   btnSaveSvg.addEventListener('click', saveSVG);
 
-  // Export JPG dropdown
-  btnExportJpg.addEventListener('click', (e) => {
+  function activateTab(format) {
+    currentFormat = format;
+    tabJpg.classList.toggle('active', format === 'jpg');
+    tabPdf.classList.toggle('active', format === 'pdf');
+    jpgOptions.hidden = format !== 'jpg';
+    pdfOptions.hidden = format !== 'pdf';
+    btnExportDropdown.textContent = format === 'jpg' ? 'Export JPG ▾' : 'Export PDF ▾';
+  }
+
+  tabJpg.addEventListener('click', (e) => { e.stopPropagation(); activateTab('jpg'); });
+  tabPdf.addEventListener('click', (e) => { e.stopPropagation(); activateTab('pdf'); });
+
+  // Export dropdown toggle
+  btnExportDropdown.addEventListener('click', (e) => {
     e.stopPropagation();
     exportMenu.hidden = !exportMenu.hidden;
+    if (!exportMenu.hidden) activateTab(currentFormat);
   });
 
   exportMenu.addEventListener('click', (e) => {
@@ -61,9 +82,15 @@ export function initFileIO() {
   });
 
   function doExport() {
-    const width = exportSizeSelect.value;
     exportMenu.hidden = true;
-    exportJPG(width);
+    if (currentFormat === 'pdf') {
+      const pageSize = exportPdfSizeSelect.value;
+      const res = exportPdfResSelect.value;
+      exportPDF(res, pageSize);
+    } else {
+      const width = exportSizeSelect.value;
+      exportJPG(width);
+    }
   }
 
   // Resize notification logic
@@ -746,13 +773,214 @@ export function exportJPG(widthOption) {
   imgEl.src = url;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────
+// ── Export PDF ──────────────────────────────────────────────────
 
-function escapeXml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+export function exportPDF(widthOption, pageSize) {
+  if (!state.hasImage) return;
+
+  const dims = getViewBoxDims();
+  let targetWidth, targetHeight;
+  if (widthOption === 'original') {
+    targetWidth = dims.width;
+    targetHeight = dims.height;
+  } else {
+    targetWidth = parseInt(widthOption);
+    targetHeight = Math.round((targetWidth / dims.width) * dims.height);
+  }
+
+  const useA4 = pageSize && pageSize !== 'fit';
+  const isLandscape = pageSize === 'A4-landscape';
+  const a4W = 595, a4H = 842; // points
+
+  // Same SVG build as JPG
+  let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
+  svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
+  svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
+  const img = state.image;
+  const imgTransform = dom.imageEl.getAttribute('transform') || '';
+  svgStr += `<image href="${img.dataURI}" `;
+  svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
+  svgStr += `transform="${imgTransform}" />\n`;
+  svgStr += `<g transform="${imgTransform}">\n`;
+  for (const el of state.elements) {
+    if (el.type === 'line') {
+      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+      if (pts.length >= 3) {
+        svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else {
+        svgStr += `<g data-type="line"`;
+        if (el.rotation) {
+          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+          svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+        }
+        svgStr += `>\n`;
+        svgStr += `  <line x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+        svgStr += `  ${getLineDecorationsSvg(el)}\n`;
+        svgStr += `</g>\n`;
+      }
+    } else if (el.type === 'text') {
+      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
+      if (el.rotation) {
+        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+        if (textEl) {
+          const transform = textEl.getAttribute('transform');
+          if (transform) svgStr += ` transform="${transform}"`;
+        }
+      }
+      svgStr += `>${escapeXml(el.content)}</text>\n`;
+    } else if (el.type === 'freehand') {
+      svgStr += `<polyline data-type="freehand" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+    } else if (el.type === 'rectangle') {
+      svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+      if (el.rotation) {
+        svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
+      }
+      svgStr += ` />\n`;
+    }
+  }
+  svgStr += `</g>\n</svg>`;
+
+  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(svgBlob);
+
+  const imgEl = new Image();
+  imgEl.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
+    URL.revokeObjectURL(url);
+
+    canvas.toBlob((jpegBlob) => {
+      if (!jpegBlob) {
+        alert('Failed to render image for PDF.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUri = reader.result;
+        const pdfBytes = buildPdf(dataUri, targetWidth, targetHeight, useA4, isLandscape, a4W, a4H);
+        let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
+        const dot = filename.lastIndexOf('.');
+        if (dot !== -1) {
+          const ext = filename.slice(dot).toLowerCase();
+          if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.pdf') {
+            filename = filename.slice(0, dot);
+          }
+        }
+        downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
+      };
+      reader.readAsDataURL(jpegBlob);
+    }, 'image/jpeg', 0.92);
+  };
+  imgEl.onerror = () => {
+    URL.revokeObjectURL(url);
+    alert('Failed to render image for PDF export.');
+  };
+  imgEl.src = url;
+}
+
+function buildPdf(jpegDataUri, imgWidth, imgHeight, useA4, isLandscape, a4W, a4H) {
+  var imgData = jpegDataUri.split(',')[1];
+  var mmPerPt = 0.352778;
+  var maxWidthMm = 200;
+
+  var pageW, pageH;
+  if (useA4) {
+    pageW = isLandscape ? a4H : a4W;
+    pageH = isLandscape ? a4W : a4H;
+  } else {
+    pageW = Math.min(imgWidth * mmPerPt, maxWidthMm);
+    pageH = pageW * (imgHeight / imgWidth);
+  }
+  var wPt = Math.round(pageW);
+  var hPt = Math.round(pageH);
+
+  // Fit image within page keeping aspect ratio, then center
+  var scale = Math.min(wPt / imgWidth, hPt / imgHeight);
+  var drawW = Math.round(imgWidth * scale);
+  var drawH = Math.round(imgHeight * scale);
+  var offsetX = Math.round((wPt - drawW) / 2);
+  var offsetY = Math.round((hPt - drawH) / 2);
+
+  var objects = [];
+  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
+  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj');
+  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wPt + ' ' + hPt + '] /Contents 4 0 R /Resources << /XObject << /Im0 5 0 R >> /ProcSet [/PDF /ImageC] >> >>\nendobj');
+
+  var stream = 'q ' + drawW + ' 0 0 ' + drawH + ' ' + offsetX + ' ' + offsetY + ' cm /Im0 Do Q';
+  objects.push('4 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
+
+  // Convert base64 JPEG data to raw binary bytes for the PDF stream
+  var rawBytes = base64ToBytes(imgData);
+  var imgLen = rawBytes.length;
+
+var imgHeader = '5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + imgWidth + ' /Height ' + imgHeight + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + imgLen + ' >>\nstream\n';
+  var imgFooter = '\nendstream\nendobj';
+  var footerBytes = new TextEncoder().encode(imgFooter);
+
+  // Build text part of the PDF (before the image bytes)
+  var textParts = ['%PDF-1.4'];
+  var offsets = [];
+  for (var i = 0; i < objects.length; i++) {
+    offsets.push(byteLength(textParts.join('\n')));
+    textParts.push(objects[i]);
+  }
+
+  // Image object starts
+  var imgObjOffset = byteLength(textParts.join('\n'));
+  textParts.push(imgHeader);
+
+  // After image bytes, append footer (xref and trailer come after)
+  var textStr = textParts.join('\n');
+  var textBytes = new TextEncoder().encode(textStr);
+
+  // Build xref/trailer (which goes after the image)
+  var trailerParts = [];
+  var xrefOffset = byteLength(textStr) + imgLen + footerBytes.length;
+  trailerParts.push('xref');
+  trailerParts.push('0 ' + (objects.length + 2));
+  trailerParts.push('0000000000 65535 f ');
+  for (var j = 0; j < offsets.length; j++) {
+    trailerParts.push(pad(offsets[j], 10) + ' 00000 n ');
+  }
+  trailerParts.push(pad(imgObjOffset, 10) + ' 00000 n ');
+  trailerParts.push('trailer');
+  trailerParts.push('<< /Size ' + (objects.length + 2) + ' /Root 1 0 R >>');
+  trailerParts.push('startxref');
+  trailerParts.push(String(xrefOffset));
+  trailerParts.push('%%EOF');
+  var trailerBytes = new TextEncoder().encode(trailerParts.join('\n'));
+
+  // Combine: textBytes + rawBytes + footerBytes + trailerBytes
+  var total = new Uint8Array(textBytes.length + imgLen + footerBytes.length + trailerBytes.length);
+  total.set(textBytes, 0);
+  total.set(rawBytes, textBytes.length);
+  total.set(footerBytes, textBytes.length + imgLen);
+  total.set(trailerBytes, textBytes.length + imgLen + footerBytes.length);
+
+  return total;
+}
+
+function base64ToBytes(b64) {
+  var binary = atob(b64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function byteLength(str) {
+  return new TextEncoder().encode(str).length;
+}
+
+function pad(n, width) {
+  var s = String(n);
+  while (s.length < width) s = '0' + s;
+  return s;
 }

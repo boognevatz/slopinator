@@ -536,3 +536,10 @@ body {
   /* Thin highlight so user knows they're editing */
   box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.5);
 }
+
+/* ── Export tabs ────────────────────────────────────── */
+
+.export-tab.active {
+  color: #fff !important;
+  border-bottom-color: #0078d4 !important;
+}

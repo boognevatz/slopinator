@@ -14,21 +14,46 @@
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.svg" hidden>
         <button id="btn-save-svg" title="Save SVG (Ctrl+S)" disabled>Save SVG</button>
         <div class="dropdown" id="export-dropdown">
-          <button id="btn-export-jpg" title="Export as JPG" disabled>Export JPG ▾</button>
+          <button id="btn-export-dropdown-btn" title="Export" disabled>Export ▾</button>
           <div class="dropdown-menu" id="export-menu" hidden>
             <div style="display:flex;flex-direction:column;gap:6px;padding:8px;white-space:nowrap;">
+              <div style="display:flex;border-bottom:1px solid #444;margin-bottom:4px;">
+                <button id="export-tab-jpg" class="export-tab active" data-format="jpg" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">JPG</button>
+                <button id="export-tab-pdf" class="export-tab" data-format="pdf" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">PDF</button>
+              </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="font-size:12px;color:#ccc;">File:</span>
                 <input type="text" id="export-filename" class="small-input" value="annotation" style="width:120px;">
               </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:12px;color:#ccc;">Size:</span>
-                <select id="export-size-select" class="small-input" style="flex:1;">
-                  <option value="320">320px</option>
-                  <option value="640" selected>640px</option>
-                  <option value="1920">1920px</option>
-                  <option value="original">Original</option>
-                </select>
+              <div id="export-jpg-options">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:12px;color:#ccc;">Size:</span>
+                  <select id="export-size-select" class="small-input" style="flex:1;">
+                    <option value="320">320px</option>
+                    <option value="640" selected>640px</option>
+                    <option value="1920">1920px</option>
+                    <option value="original">Original</option>
+                  </select>
+                </div>
+              </div>
+              <div id="export-pdf-options" hidden>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:12px;color:#ccc;">Page:</span>
+                  <select id="export-pdf-size-select" class="small-input" style="flex:1;">
+                    <option value="fit">Fit to image</option>
+                    <option value="A4-portrait">A4 Portrait</option>
+                    <option value="A4-landscape">A4 Landscape</option>
+                  </select>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="font-size:12px;color:#ccc;">Size:</span>
+                  <select id="export-pdf-res-select" class="small-input" style="flex:1;">
+                    <option value="320">320px</option>
+                    <option value="640" selected>640px</option>
+                    <option value="1920">1920px</option>
+                    <option value="original">Original</option>
+                  </select>
+                </div>
               </div>
               <button id="btn-export-do" style="width:100%;">Export</button>
             </div>
