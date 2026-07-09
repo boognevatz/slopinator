@@ -602,6 +602,12 @@ export function addLineElement(data) {
     group.appendChild(decorations);
   }
 
+  if (data.rotation) {
+    const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+    const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+    group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+  }
+
   dom.annotationLayer.appendChild(group);
 }
 

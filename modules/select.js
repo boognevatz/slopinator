@@ -170,10 +170,10 @@ function onMouseDown(e) {
     e.preventDefault();
     e.stopPropagation();
     
-    // Toggle interact mode for text center icon
+    // Toggle interact mode for center icon
     if (handleEl.dataset.handle === 'mode-toggle') {
-      textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
-      refreshSelection();
+      // Start drag immediately; onResizeEnd will detect if it was a click
+      startResize(handleEl, pt, e);
       return;
     }
 
@@ -301,38 +301,69 @@ function drawHandles(data) {
 }
 
 function drawLineHandles(data) {
-  // Endpoint handles
   const r = getHandleRadius();
   const startActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'start';
   const endActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'end';
   const startUnselected = lineEditMode === 'change-end' && !startActive;
   const endUnselected = lineEditMode === 'change-end' && !endActive;
+  const isRotateMode = textInteractMode === 'rotate';
+
+  const cursorStyle = isRotateMode ? 'cursor: grab;' : '';
+  const cx = (data.x1 + data.x2) / 2;
+  const cy = (data.y1 + data.y2) / 2;
+
+  const handleGroup = svgEl('g', {
+    transform: data.rotation ? `rotate(${data.rotation}, ${cx}, ${cy})` : ''
+  });
 
   const h1 = svgEl('circle', {
     cx: data.x1, cy: data.y1, r,
     class: 'handle handle-endpoint' + (startActive ? ' active' : '') + (startUnselected ? ' unselected' : ''),
     'data-handle': 'p1',
+    style: cursorStyle,
   });
   const h2 = svgEl('circle', {
     cx: data.x2, cy: data.y2, r,
     class: 'handle handle-endpoint' + (endActive ? ' active' : '') + (endUnselected ? ' unselected' : ''),
     'data-handle': 'p2',
+    style: cursorStyle,
   });
 
-  dom.handleLayer.appendChild(h1);
-  dom.handleLayer.appendChild(h2);
+  handleGroup.appendChild(h1);
+  handleGroup.appendChild(h2);
 
   if (lineEditMode === 'move') {
-    // Midpoint move handle
-    const mx = (data.x1 + data.x2) / 2;
-    const my = (data.y1 + data.y2) / 2;
-    const hm = svgEl('rect', {
-      x: mx - r, y: my - r, width: r * 2, height: r * 2,
-      class: 'handle handle-move',
-      'data-handle': 'move',
+    const mx = cx;
+    const my = cy;
+    const dx = data.x2 - data.x1;
+    const dy = data.y2 - data.y1;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    const iconSize = 24;
+    const desiredIconSize = Math.max(16, Math.min(36, len * 0.4));
+    const iconScale = desiredIconSize / iconSize;
+    const actualSize = iconSize * iconScale;
+
+    const iconG = svgEl('g', {
+      class: 'handle handle-icon',
+      'data-handle': 'mode-toggle',
+      transform: `translate(${mx - actualSize / 2}, ${my - actualSize / 2}) scale(${iconScale})`,
     });
-    dom.handleLayer.appendChild(hm);
+
+    iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
+
+    const movePath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
+    const rotatePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+
+    iconG.appendChild(svgEl('path', {
+      d: isRotateMode ? rotatePath : movePath,
+      fill: '#fff',
+    }));
+
+    handleGroup.appendChild(iconG);
   }
+
+  dom.handleLayer.appendChild(handleGroup);
 }
 
 function drawTextHandles(data) {
@@ -589,6 +620,18 @@ function onDragEnd() {
     }
   }
 
+  // Modal click on mode-toggle: if mouse barely moved, treat as click to toggle mode
+  if (dragStart && dragStart._dragSource === 'mode-toggle' && data.type === 'line') {
+    const dx = final.x1 - orig.x1;
+    const dy = final.y1 - orig.y1;
+    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+      dragOriginal = null;
+      textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
+      refreshSelection();
+      return;
+    }
+  }
+
   // Only push to history if actually moved
   if (data.type === 'line' && (orig.x1 !== final.x1 || orig.y1 !== final.y1)) {
     pushAction({
@@ -625,22 +668,28 @@ function startResize(handleEl, startPt, e) {
   e.preventDefault();
   const handleType = handleEl.dataset.handle;
 
-  if (handleType === 'move') {
-    // Treat move handle as drag
-    startDrag(state.selectedId, startPt);
-    return;
-  }
-
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data) return;
+
+  // Mode-toggle on a line: start drag (move). _dragSource flags for click detection
+  if (handleType === 'mode-toggle' && data.type === 'line') {
+    startDrag(state.selectedId, startPt);
+    if (dragStart) dragStart._dragSource = 'mode-toggle';
+    return;
+  }
 
   isResizing = true;
   resizeHandle = handleType;
   dragStart = startPt;
   dragOriginal = { ...data };
 
-  // For text corner handles, compute the anchor (opposite corner) and bbox info
-  if (data.type === 'text' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
+  if (data.type === 'line' && (handleType === 'p1' || handleType === 'p2') && textInteractMode === 'rotate') {
+    const cx = (data.x1 + data.x2) / 2;
+    const cy = (data.y1 + data.y2) / 2;
+    origRotation = data.rotation || 0;
+    rotationCenter = { x: cx, y: cy };
+    dragStart.angle = Math.atan2(startPt.y - cy, startPt.x - cx) * 180 / Math.PI;
+  } else if (data.type === 'text' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
     const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
     if (textEl) {
       try {
@@ -736,7 +785,16 @@ function onResizeMove(e) {
   if (!data) return;
 
   if (data.type === 'line') {
-    if (resizeHandle === 'p1') {
+    if (textInteractMode === 'rotate' && (resizeHandle === 'p1' || resizeHandle === 'p2')) {
+      const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
+      const angleDiff = currentAngle - dragStart.angle;
+      let newRot = origRotation + angleDiff;
+      newRot = Math.round(newRot / 5) * 5;
+      newRot = ((newRot % 360) + 360) % 360;
+      data.rotation = newRot;
+      updateLineSVG(data);
+      showRotationTooltip(e, newRot);
+    } else if (resizeHandle === 'p1') {
       data.x1 = pt.x;
       data.y1 = pt.y;
       if (data.points) { data.points[0] = { x: pt.x, y: pt.y }; }
@@ -896,11 +954,15 @@ function onResizeEnd() {
   const final = { ...data };
 
   if (data.type === 'line') {
-    pushAction({
-      description: 'Resize line',
-      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
-      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
-    });
+    const desc = textInteractMode === 'rotate' ? 'Rotate line' : 'Resize line';
+    const changed = orig.rotation !== final.rotation || orig.x1 !== final.x1 || orig.y1 !== final.y1 || orig.x2 !== final.x2 || orig.y2 !== final.y2;
+    if (changed) {
+      pushAction({
+        description: desc,
+        doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, rotation: final.rotation, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
+        undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, rotation: orig.rotation, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
+      });
+    }
   } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y || orig.rotation !== final.rotation)) {
     pushAction({
       description: textInteractMode === 'rotate' ? 'Rotate text' : 'Resize text',

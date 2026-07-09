@@ -588,7 +588,14 @@ export function saveSVG() {
       if (pts.length >= 3) {
         svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
       } else {
-        svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+        svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+        if (el.rotation) {
+          const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+          svg += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+        }
+        svg += `>\n`;
         svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
         svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
         svg += `  ${getLineDecorationsSvg(el)}\n`;
@@ -661,7 +668,13 @@ export function exportJPG(widthOption) {
       if (pts.length >= 3) {
         svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
       } else {
-        svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}">\n`;
+        svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+        if (el.rotation) {
+          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+          svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+        }
+        svgStr += `>\n`;
         svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
         svgStr += `  ${getLineDecorationsSvg(el)}\n`;
         svgStr += `</g>\n`;
