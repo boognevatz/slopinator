@@ -101,6 +101,64 @@ export function initSelect() {
       applyCornerRadiusToSelected(val);
     });
   }
+
+  // Element ID rename
+  var idInput = document.getElementById('element-id-input');
+  var idSaveBtn = document.getElementById('btn-id-save');
+  if (idInput) {
+    function saveId() {
+      if (!state.selectedId) return;
+      var raw = idInput.value.trim();
+      var sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (!sanitized) {
+        idInput.value = state.selectedId;
+        return;
+      }
+      var dup = state.elements.find(function (e) { return e.id === sanitized; });
+      if (dup && dup.id !== state.selectedId) {
+        idInput.value = state.selectedId;
+        return;
+      }
+      var data = state.elements.find(function (e) { return e.id === state.selectedId; });
+      if (!data) return;
+      var oldId = data.id;
+      data.id = sanitized;
+      var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(oldId));
+      if (svgEl) svgEl.id = sanitized;
+      state.selectedId = sanitized;
+      idInput.value = sanitized;
+      if (idSaveBtn) idSaveBtn.style.display = 'none';
+      idInput.blur();
+    }
+
+    function showSaveBtn() {
+      if (idSaveBtn) idSaveBtn.style.display = '';
+    }
+    function hideSaveBtn() {
+      if (idSaveBtn) idSaveBtn.style.display = 'none';
+    }
+
+    idInput.addEventListener('focus', showSaveBtn);
+    idInput.addEventListener('blur', function () {
+      // Delay so click on save button registers first
+      setTimeout(hideSaveBtn, 150);
+    });
+    idInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveId();
+      }
+    });
+    idInput.addEventListener('input', function () {
+      this.value = this.value.replace(/[^a-zA-Z0-9_-]/g, '');
+    });
+    if (idSaveBtn) {
+      idSaveBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        saveId();
+      });
+    }
+  }
 }
 
 function setLineEditMode(mode) {
@@ -274,6 +332,12 @@ export function selectElement(id) {
   document.getElementById('btn-delete').disabled = false;
   refreshPalette();
 
+  // Sync element ID display
+  var idInput = document.getElementById('element-id-input');
+  var idGroup = document.getElementById('element-id-group');
+  if (idInput) idInput.value = data.id;
+  if (idGroup) idGroup.hidden = false;
+
   // Dispatch event so palette highlights update
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data } }));
 }
@@ -282,6 +346,8 @@ export function clearSelection() {
   state.selectedId = null;
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
+  var idGroup = document.getElementById('element-id-group');
+  if (idGroup) idGroup.hidden = true;
   textInteractMode = 'resize';
   hideRotationTooltip();
 }
