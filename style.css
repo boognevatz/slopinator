@@ -508,6 +508,7 @@ body {
 
 #editor-svg .handle-endpoint {
   fill: #fff;
+  stroke: #4fc3f7;
 }
 
 #editor-svg .handle-endpoint.unselected {
@@ -515,7 +516,8 @@ body {
 }
 
 #editor-svg .handle-endpoint.active {
-  fill: #fff;
+  fill: #4fc3f7;
+  stroke: #4fc3f7;
 }
 
 #editor-svg .handle-move {

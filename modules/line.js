@@ -86,6 +86,7 @@ function applySizeToPendingPolyline() {
 export function activateLine(selectedData) {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onMouseDown);
+  document.addEventListener('keydown', onLineKeyDown);
   if (selectedData) {
     loadExistingPolyline(selectedData);
   }
@@ -114,6 +115,7 @@ function loadExistingPolyline(data) {
 export function deactivateLine() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
+  document.removeEventListener('keydown', onLineKeyDown);
   if (isDraggingVertex) {
     document.removeEventListener('pointermove', onVertexDragMove);
     document.removeEventListener('pointerup', onVertexDragEnd);
@@ -256,7 +258,7 @@ function showExtendHandles(data, activeIdx) {
     const x = pts[i].x, y = pts[i].y;
     const isFirst = i === 0;
     const isLast = i === pts.length - 1;
-    const isActive = (isFirst && activeIdx === 0) || (isLast && activeIdx === pts.length - 1);
+    const isActive = i === activeIdx;
     const handleLabel = isFirst ? 'p1' : isLast ? 'p2' : 'v' + i;
 
     // Hit area (larger, transparent, captures mouse events for hand cursor)
@@ -276,6 +278,21 @@ function showExtendHandles(data, activeIdx) {
       'pointer-events': 'none',
     });
     dom.handleLayer.appendChild(vis);
+  }
+
+  // Show coordinate tooltip for the active node
+  if (activeIdx >= 0 && activeIdx < pts.length) {
+    var pt = pts[activeIdx];
+    var svgPt = dom.svg.createSVGPoint();
+    svgPt.x = pt.x;
+    svgPt.y = pt.y;
+    var screenPt = svgPt.matrixTransform(dom.svg.getScreenCTM());
+    if (!coordTooltip) {
+      coordTooltip = document.createElement('div');
+      coordTooltip.style.cssText = 'position:fixed;background:rgba(0,0,0,0.75);color:#fff;padding:2px 7px;border-radius:3px;font-size:12px;pointer-events:none;z-index:100;font-family:monospace;';
+      document.body.appendChild(coordTooltip);
+    }
+    updateCoordTooltip(screenPt.x, screenPt.y, pt);
   }
 }
 
@@ -521,6 +538,47 @@ export function handlePolylineEscape() {
 
 export function isLineExtending() {
   return !!pendingPolyline;
+}
+
+function onLineKeyDown(e) {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  var tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!pendingPolyline) return;
+  if (isDraggingVertex) return;
+
+  var pts = pendingPolyline.points;
+  var idx = activeExtendIdx;
+  var step = 1;
+  var dx = 0, dy = 0;
+
+  switch (e.key) {
+    case 'ArrowUp': dy = -step; break;
+    case 'ArrowDown': dy = step; break;
+    case 'ArrowLeft': dx = -step; break;
+    case 'ArrowRight': dx = step; break;
+    case 'Tab':
+      e.preventDefault();
+      activeExtendIdx = (idx + 1) % pts.length;
+      showExtendHandles(pendingPolyline, activeExtendIdx);
+      return;
+    default: return;
+  }
+
+  e.preventDefault();
+  var pt = pts[idx];
+  pt.x += dx;
+  pt.y += dy;
+  syncLineEndpoints(pendingPolyline);
+  updateLineElement(pendingPolyline);
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+  if (coordTooltip) {
+    var svgPt = dom.svg.createSVGPoint();
+    svgPt.x = pt.x;
+    svgPt.y = pt.y;
+    var screenPt = svgPt.matrixTransform(dom.svg.getScreenCTM());
+    updateCoordTooltip(screenPt.x, screenPt.y, pt);
+  }
 }
 
 export function getPendingPolylineId() {
