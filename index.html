@@ -41,7 +41,7 @@
                   <span style="font-size:12px;color:#ccc;">Page:</span>
                   <select id="export-pdf-size-select" class="small-input" style="flex:1;">
                     <option value="fit">Fit to image</option>
-                    <option value="A4-portrait">A4 Portrait</option>
+                    <option value="A4-portrait" selected>A4 Portrait</option>
                     <option value="A4-landscape">A4 Landscape</option>
                   </select>
                 </div>
@@ -49,13 +49,23 @@
                   <span style="font-size:12px;color:#ccc;">Size:</span>
                   <select id="export-pdf-res-select" class="small-input" style="flex:1;">
                     <option value="320">320px</option>
-                    <option value="640" selected>640px</option>
+                    <option value="640">640px</option>
                     <option value="1920">1920px</option>
-                    <option value="original">Original</option>
+                    <option value="original" selected>Original</option>
                   </select>
                 </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <span style="font-size:12px;color:#ccc;min-width:32px;">Margins:</span>
+                  <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:32px;text-align:center;" title="Top">
+                  <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:32px;text-align:center;" title="Right">
+                  <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:32px;text-align:center;" title="Bottom">
+                  <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:32px;text-align:center;" title="Left">
+                  <span style="font-size:10px;color:#888;">mm</span>
+                </div>
               </div>
-              <button id="btn-export-do" style="width:100%;">Export</button>
+              <button id="btn-export-do" style="width:100%;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Export</button>
+              <button id="btn-test-pdf" style="width:100%;margin-top:4px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (red rect)</button>
+              <button id="btn-test-pdf-img" style="width:100%;margin-top:2px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (image embed)</button>
             </div>
           </div>
         </div>
@@ -189,7 +199,7 @@
 <div class="toolbar-group separator" id="element-id-group" hidden>
         <span class="toolbar-label">ID:</span>
         <div style="display:flex;align-items:center;gap:3px;">
-          <input type="text" id="element-id-input" class="small-input" style="width:120px;font-family:monospace;font-size:11px;" pattern="[a-zA-Z0-9_-]+" spellcheck="false">
+          <input type="text" id="element-id-input" class="small-input" style="width:120px;font-family:monospace;font-size:11px;" spellcheck="false">
           <button id="btn-id-save" style="padding:0 4px;font-size:11px;line-height:1.6;display:none;">💾</button>
         </div>
       </div>

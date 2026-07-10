@@ -108,6 +108,11 @@ export function initFileIO() {
     });
   });
 
+  // Expose test PDF generator for console debugging
+  window.buildTestPdf = buildTestPdf;
+  document.getElementById('btn-test-pdf').addEventListener('click', buildTestPdf);
+  document.getElementById('btn-test-pdf-img').addEventListener('click', buildTestPdfWithImage);
+
   // Hide notification on any tool usage
   document.getElementById('editor-svg').addEventListener('pointerdown', () => {
     resizeNotification.hidden = true;
@@ -362,7 +367,7 @@ function openSVGProject(svgText) {
     const img = new Image();
     img.onload = () => {
       // Convert to canvas then to data URI (to rasterize)
-      const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
       canvas.width = img.naturalWidth || 800;
       canvas.height = img.naturalHeight || 600;
       const ctx = canvas.getContext('2d');
@@ -790,9 +795,7 @@ export function exportPDF(widthOption, pageSize) {
 
   const useA4 = pageSize && pageSize !== 'fit';
   const isLandscape = pageSize === 'A4-landscape';
-  const a4W = 595, a4H = 842; // points
 
-  // Same SVG build as JPG
   let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
   svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
   svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
@@ -846,36 +849,33 @@ export function exportPDF(widthOption, pageSize) {
 
   const imgEl = new Image();
   imgEl.onload = () => {
-    const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
     canvas.width = targetWidth;
     canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
+    var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, targetWidth, targetHeight);
     ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
     URL.revokeObjectURL(url);
 
-    canvas.toBlob((jpegBlob) => {
-      if (!jpegBlob) {
-        alert('Failed to render image for PDF.');
-        return;
+    var marker = findActualSizeMarker();
+    var pixelsPerMm = marker ? marker.pixelsPerMm * (targetWidth / dims.width) : null;
+    var marginTopMm = parseFloat(document.getElementById('export-margin-top').value) || 0;
+    var marginRightMm = parseFloat(document.getElementById('export-margin-right').value) || 0;
+    var marginBottomMm = parseFloat(document.getElementById('export-margin-bottom').value) || 0;
+    var marginLeftMm = parseFloat(document.getElementById('export-margin-left').value) || 0;
+    console.log('PDF: viewBox=' + dims.width + 'x' + dims.height + ' target=' + targetWidth + 'x' + targetHeight + ' canvasPxPerMm=' + pixelsPerMm + ' markerPxLen=' + (marker ? marker.pixelLen : 'none') + ' markerRealMm=' + (marker ? marker.realMm : 'none'));
+    var pdfBytes = buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm);
+
+    let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
+    const dot = filename.lastIndexOf('.');
+    if (dot !== -1) {
+      const ext = filename.slice(dot).toLowerCase();
+      if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.pdf') {
+        filename = filename.slice(0, dot);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUri = reader.result;
-        const pdfBytes = buildPdf(dataUri, targetWidth, targetHeight, useA4, isLandscape, a4W, a4H);
-        let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
-        const dot = filename.lastIndexOf('.');
-        if (dot !== -1) {
-          const ext = filename.slice(dot).toLowerCase();
-          if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.pdf') {
-            filename = filename.slice(0, dot);
-          }
-        }
-        downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
-      };
-      reader.readAsDataURL(jpegBlob);
-    }, 'image/jpeg', 0.92);
+    }
+    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
   };
   imgEl.onerror = () => {
     URL.revokeObjectURL(url);
@@ -884,86 +884,263 @@ export function exportPDF(widthOption, pageSize) {
   imgEl.src = url;
 }
 
-function buildPdf(jpegDataUri, imgWidth, imgHeight, useA4, isLandscape, a4W, a4H) {
-  var imgData = jpegDataUri.split(',')[1];
-  var mmPerPt = 0.352778;
-  var maxWidthMm = 200;
+function findActualSizeMarker() {
+  var re = /^actual_size_([\d.]+)\s*(mm|cm)$/i;
+  for (var i = 0; i < state.elements.length; i++) {
+    var el = state.elements[i];
+    if (el.type !== 'line') continue;
+    var m = re.exec(el.id);
+    if (!m) continue;
+    var realValue = parseFloat(m[1]);
+    var unit = m[2].toLowerCase();
+    if (unit === 'cm') realValue *= 10;
+    var pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+    var dx = pts[pts.length - 1].x - pts[0].x;
+    var dy = pts[pts.length - 1].y - pts[0].y;
+    var pixelLen = Math.sqrt(dx * dx + dy * dy);
+    if (pixelLen < 1) continue;
+    return { pixelsPerMm: pixelLen / realValue, pixelLen: pixelLen, realMm: realValue };
+  }
+  return null;
+}
 
-  var pageW, pageH;
-  if (useA4) {
-    pageW = isLandscape ? a4H : a4W;
-    pageH = isLandscape ? a4W : a4H;
+async function deflateRgb(imageData) {
+  if (typeof CompressionStream === 'undefined') {
+    console.error('CompressionStream not supported in this browser');
+    return new Uint8Array(0);
+  }
+  var data = imageData.data;
+  var w = imageData.width, h = imageData.height;
+  var rgbLen = w * h * 3;
+  var rgb = new Uint8Array(rgbLen);
+  for (var i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    rgb[j] = data[i];
+    rgb[j + 1] = data[i + 1];
+    rgb[j + 2] = data[i + 2];
+  }
+  try {
+    var cs = new CompressionStream('deflate');
+    var writer = cs.writable.getWriter();
+    // Write in 64KB chunks to avoid oversized single writes
+    var CHUNK = 65536;
+    for (var off = 0; off < rgb.length; off += CHUNK) {
+      var end = Math.min(off + CHUNK, rgb.length);
+      await writer.write(rgb.subarray(off, end));
+    }
+    await writer.close();
+    var reader = cs.readable.getReader();
+    var chunks = [];
+    while (true) {
+      var r = await reader.read();
+      if (r.done) break;
+      chunks.push(r.value);
+    }
+    var total = chunks.reduce(function(s, c) { return s + c.length; }, 0);
+    var out = new Uint8Array(total);
+    var off2 = 0;
+    for (var ci = 0; ci < chunks.length; ci++) {
+      out.set(chunks[ci], off2);
+      off2 += chunks[ci].length;
+    }
+    return out;
+  } catch (e) {
+    console.error('deflateRgb error:', e);
+    return new Uint8Array(0);
+  }
+}
+
+function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm) {
+  // v7 — proven PDF construction (same approach as original working version)
+  var DPI = 300;
+  var ptsPerPx = 72 / DPI;
+  var pxPerMm = DPI / 25.4;
+
+  var a4PtW = 595, a4PtH = 842;
+  var pgPtW = useA4 ? (isLandscape ? a4PtH : a4PtW) : Math.round(Math.min(imgW * ptsPerPx, 595));
+  var pgPtH = useA4 ? (isLandscape ? a4PtW : a4PtH) : Math.round(pgPtW * (imgH / imgW));
+
+  var pgPxW = Math.round(pgPtW / ptsPerPx);
+  var pgPxH = Math.round(pgPtH / ptsPerPx);
+
+  // Margins in pixels at 300 DPI (only relevant for A4 tiling)
+  var marginTopPx = useA4 ? Math.round((marginTopMm || 0) * pxPerMm) : 0;
+  var marginRightPx = useA4 ? Math.round((marginRightMm || 0) * pxPerMm) : 0;
+  var marginBottomPx = useA4 ? Math.round((marginBottomMm || 0) * pxPerMm) : 0;
+  var marginLeftPx = useA4 ? Math.round((marginLeftMm || 0) * pxPerMm) : 0;
+  var prnPxW = pgPxW - marginLeftPx - marginRightPx;
+  var prnPxH = pgPxH - marginTopPx - marginBottomPx;
+
+  // ── Determine tiles ──
+  var tiles = [];
+
+  if (pixelsPerMm && useA4) {
+    var displayScale = pxPerMm / pixelsPerMm;
+    var srcPerPageW = prnPxW / displayScale;
+    var srcPerPageH = prnPxH / displayScale;
+    var cols = Math.ceil(imgW / srcPerPageW);
+    var rows = Math.ceil(imgH / srcPerPageH);
+
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        var sx = Math.round(c * srcPerPageW);
+        var sy = Math.round(r * srcPerPageH);
+        var sw = Math.min(Math.round(srcPerPageW), imgW - sx);
+        var sh = Math.min(Math.round(srcPerPageH), imgH - sy);
+        if (sw <= 0 || sh <= 0) continue;
+        var dx = marginLeftPx + Math.round(0.5 * (prnPxW - sw * displayScale));
+        var dy = marginTopPx + Math.round(0.5 * (prnPxH - sh * displayScale));
+        tiles.push({ sx: sx, sy: sy, sw: sw, sh: sh, dx: dx, dy: dy, dw: Math.round(sw * displayScale), dh: Math.round(sh * displayScale) });
+      }
+    }
   } else {
-    pageW = Math.min(imgWidth * mmPerPt, maxWidthMm);
-    pageH = pageW * (imgHeight / imgWidth);
+    var fitScale = Math.min(pgPxW / imgW, pgPxH / imgH);
+    var dw = Math.round(imgW * fitScale);
+    var dh = Math.round(imgH * fitScale);
+    var dx = Math.round((pgPxW - dw) / 2);
+    var dy = Math.round((pgPxH - dh) / 2);
+    tiles.push({ sx: 0, sy: 0, sw: imgW, sh: imgH, dx: dx, dy: dy, dw: dw, dh: dh });
   }
-  var wPt = Math.round(pageW);
-  var hPt = Math.round(pageH);
 
-  // Fit image within page keeping aspect ratio, then center
-  var scale = Math.min(wPt / imgWidth, hPt / imgHeight);
-  var drawW = Math.round(imgWidth * scale);
-  var drawH = Math.round(imgHeight * scale);
-  var offsetX = Math.round((wPt - drawW) / 2);
-  var offsetY = Math.round((hPt - drawH) / 2);
+  var numPages = tiles.length;
+  var hasRef = (numPages > 1 && pixelsPerMm);
+  var totalPages = numPages + (hasRef ? 1 : 0);
+  console.log('buildPdf[v7]: img=' + imgW + 'x' + imgH + ' cropPages=' + numPages + ' totalPages=' + totalPages);
 
-  var objects = [];
-  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
-  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj');
-  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wPt + ' ' + hPt + '] /Contents 4 0 R /Resources << /XObject << /Im0 5 0 R >> /ProcSet [/PDF /ImageC] >> >>\nendobj');
+  // ── Render all pages to JPEG ──
+  var jpegs = [];
 
-  var stream = 'q ' + drawW + ' 0 0 ' + drawH + ' ' + offsetX + ' ' + offsetY + ' cm /Im0 Do Q';
-  objects.push('4 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
+  if (hasRef) {
+    var ref = document.createElement('canvas');
+    ref.width = pgPxW;
+    ref.height = pgPxH;
+    var rctx = ref.getContext('2d');
+    rctx.fillStyle = '#ffffff';
+    rctx.fillRect(0, 0, pgPxW, pgPxH);
+    var fit = Math.min(prnPxW / imgW, prnPxH / imgH);
+    var fw = Math.round(imgW * fit);
+    var fh = Math.round(imgH * fit);
+    var fx = marginLeftPx + Math.round((prnPxW - fw) / 2);
+    var fy = marginTopPx + Math.round((prnPxH - fh) / 2);
+    rctx.drawImage(srcCanvas, 0, 0, imgW, imgH, fx, fy, fw, fh);
+    rctx.strokeStyle = '#ff0000';
+    rctx.lineWidth = 3;
+    for (var rr = 0; rr <= rows; rr++) {
+      var yy = fy + Math.round(rr * srcPerPageH * fit);
+      rctx.beginPath(); rctx.moveTo(fx, yy); rctx.lineTo(fx + fw, yy); rctx.stroke();
+    }
+    for (var cc = 0; cc <= cols; cc++) {
+      var xx = fx + Math.round(cc * srcPerPageW * fit);
+      rctx.beginPath(); rctx.moveTo(xx, fy); rctx.lineTo(xx, fy + fh); rctx.stroke();
+    }
+    jpegs.push(base64ToBytes(ref.toDataURL('image/jpeg', 0.92).split(',')[1]));
+  }
 
-  // Convert base64 JPEG data to raw binary bytes for the PDF stream
-  var rawBytes = base64ToBytes(imgData);
-  var imgLen = rawBytes.length;
+  for (var ti = 0; ti < numPages; ti++) {
+    var t = tiles[ti];
+    var c = document.createElement('canvas');
+    c.width = pgPxW;
+    c.height = pgPxH;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, pgPxW, pgPxH);
+    ctx.drawImage(srcCanvas, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
+    jpegs.push(base64ToBytes(c.toDataURL('image/jpeg', 0.92).split(',')[1]));
+  }
 
-var imgHeader = '5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + imgWidth + ' /Height ' + imgHeight + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + imgLen + ' >>\nstream\n';
-  var imgFooter = '\nendstream\nendobj';
-  var footerBytes = new TextEncoder().encode(imgFooter);
+  // ── Build PDF using proven original approach ──
 
-  // Build text part of the PDF (before the image bytes)
+  // Build all text objects (Catalog, Pages, all Page+Content pairs, image headers)
   var textParts = ['%PDF-1.4'];
+
+  // Track object offsets
   var offsets = [];
-  for (var i = 0; i < objects.length; i++) {
+
+  function addObj(text) {
     offsets.push(byteLength(textParts.join('\n')));
-    textParts.push(objects[i]);
+    textParts.push(text);
   }
 
-  // Image object starts
-  var imgObjOffset = byteLength(textParts.join('\n'));
-  textParts.push(imgHeader);
+  // Obj 1: Catalog
+  addObj('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
+  // Obj 2: Pages
+  var kids = [];
+  for (var p = 0; p < totalPages; p++) kids.push((3 + p * 2) + ' 0 R');
+  addObj('2 0 obj\n<< /Type /Pages /Kids [' + kids.join(' ') + '] /Count ' + totalPages + ' >>\nendobj');
 
-  // After image bytes, append footer (xref and trailer come after)
+  var imgBase = 3 + totalPages * 2;
+
+  // Page and Content stream objects
+  for (var p = 0; p < totalPages; p++) {
+    var pN = 3 + p * 2;
+    var cN = pN + 1;
+    var iN = imgBase + p;
+    addObj(pN + ' 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pgPtW + ' ' + pgPtH + '] /Contents ' + cN + ' 0 R /Resources << /XObject << /Im' + p + ' ' + iN + ' 0 R >> /ProcSet [/PDF /ImageC] >> >>\nendobj');
+    var stream = 'q ' + pgPtW + ' 0 0 ' + pgPtH + ' 0 0 cm /Im' + p + ' Do Q';
+    addObj(cN + ' 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
+  }
+
+  // Build image objects (self-contained: header + JPEG binary + endstream/endobj)
+  var imgObjOffsets = [];
+  var imageObjs = [];
+  for (var p = 0; p < totalPages; p++) {
+    var iN = imgBase + p;
+    var hdr = iN + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pgPxW + ' /Height ' + pgPxH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegs[p].length + ' >>\nstream\n';
+    var ftr = '\nendstream\nendobj';
+    var hdrBytes = new TextEncoder().encode(hdr);
+    var ftrBytes = new TextEncoder().encode(ftr);
+    var obj = new Uint8Array(hdrBytes.length + jpegs[p].length + ftrBytes.length);
+    obj.set(hdrBytes, 0);
+    obj.set(jpegs[p], hdrBytes.length);
+    obj.set(ftrBytes, hdrBytes.length + jpegs[p].length);
+    imageObjs.push(obj);
+  }
+
+  // Convert text parts to bytes
   var textStr = textParts.join('\n');
   var textBytes = new TextEncoder().encode(textStr);
 
-  // Build xref/trailer (which goes after the image)
+  // Compute image object offsets relative to file start
+  var imgSectionStart = textBytes.length;
+  for (var p = 0; p < totalPages; p++) {
+    imgObjOffsets.push(imgSectionStart);
+    imgSectionStart += imageObjs[p].length;
+  }
+  var imgSectionLen = imgSectionStart - textBytes.length;
+  var xrefOffset = imgSectionStart;
+
+  // Build xref/trailer
   var trailerParts = [];
-  var xrefOffset = byteLength(textStr) + imgLen + footerBytes.length;
+  var totalObjs = imgBase + totalPages;
   trailerParts.push('xref');
-  trailerParts.push('0 ' + (objects.length + 2));
+  trailerParts.push('0 ' + totalObjs);
   trailerParts.push('0000000000 65535 f ');
   for (var j = 0; j < offsets.length; j++) {
     trailerParts.push(pad(offsets[j], 10) + ' 00000 n ');
   }
-  trailerParts.push(pad(imgObjOffset, 10) + ' 00000 n ');
+  for (var p = 0; p < totalPages; p++) {
+    trailerParts.push(pad(imgObjOffsets[p], 10) + ' 00000 n ');
+  }
   trailerParts.push('trailer');
-  trailerParts.push('<< /Size ' + (objects.length + 2) + ' /Root 1 0 R >>');
+  trailerParts.push('<< /Size ' + totalObjs + ' /Root 1 0 R >>');
   trailerParts.push('startxref');
   trailerParts.push(String(xrefOffset));
   trailerParts.push('%%EOF');
   var trailerBytes = new TextEncoder().encode(trailerParts.join('\n'));
 
-  // Combine: textBytes + rawBytes + footerBytes + trailerBytes
-  var total = new Uint8Array(textBytes.length + imgLen + footerBytes.length + trailerBytes.length);
-  total.set(textBytes, 0);
-  total.set(rawBytes, textBytes.length);
-  total.set(footerBytes, textBytes.length + imgLen);
-  total.set(trailerBytes, textBytes.length + imgLen + footerBytes.length);
-
+  // Assemble final PDF
+  var finalLen = textBytes.length + imgSectionLen + trailerBytes.length;
+  var total = new Uint8Array(finalLen);
+  var off = 0;
+  total.set(textBytes, off); off += textBytes.length;
+  for (var p = 0; p < totalPages; p++) {
+    total.set(imageObjs[p], off); off += imageObjs[p].length;
+  }
+  total.set(trailerBytes, off);
   return total;
+}
+
+function escapeXml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
 function base64ToBytes(b64) {
@@ -983,4 +1160,110 @@ function pad(n, width) {
   var s = String(n);
   while (s.length < width) s = '0' + s;
   return s;
+}
+
+// ── Diagnostic: Test PDF with red rectangle (no images, no external resources) ──
+export function buildTestPdf() {
+  var pts = [0, 0, 595, 842];
+  var stream = 'q\n1 0 0 rg\n100 100 395 642 re\nf\nQ';
+  var sLen = new TextEncoder().encode(stream).length;
+  var objs = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /ProcSet [/PDF] >> >>\nendobj',
+    '4 0 obj\n<< /Length ' + sLen + ' >>\nstream\n' + stream + '\nendstream\nendobj'
+  ];
+  var segs = ['%PDF-1.4\n'];
+  var offs = [0];
+  for (var i = 0; i < objs.length; i++) {
+    offs.push(byteLength(segs.join('')));
+    segs.push(objs[i] + '\n');
+  }
+  var totalObjs = objs.length + 1;
+  var xref = 'xref\n0 ' + totalObjs + '\n0000000000 65535 f \n';
+  for (var j = 1; j < totalObjs; j++) {
+    xref += pad(offs[j], 10) + ' 00000 n \n';
+  }
+  xref += 'trailer\n<< /Size ' + totalObjs + ' /Root 1 0 R >>\nstartxref\n' + byteLength(segs.join('')) + '\n%%EOF';
+  segs.push(xref);
+  var all = new TextEncoder().encode(segs.join(''));
+  downloadBlob(new Blob([all], { type: 'application/pdf' }), 'test-red-rectangle.pdf');
+  console.log('buildTestPdf: downloaded test-red-rectangle.pdf (' + all.length + ' bytes)');
+}
+
+// ── Diagnostic: Test PDF using ORIGINAL working buildPdf pattern ──
+export function buildTestPdfWithImage() {
+  var W = 200, H = 200;
+  var c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#0000ff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#ffff00';
+  ctx.beginPath(); ctx.arc(W/2, H/2, 60, 0, Math.PI*2); ctx.fill();
+  // Get JPEG data URI (same as original canvas.toBlob approach)
+  var jpegDataUri = c.toDataURL('image/jpeg', 0.92);
+  var imgData = jpegDataUri.split(',')[1];
+  var rawBytes = base64ToBytes(imgData);
+  console.log('  test jpeg=' + rawBytes.length + ' bytes valid=' + (rawBytes[0]===0xFF && rawBytes[1]===0xD8));
+
+  // ── ORIGINAL-style PDF construction ──
+  var imgWidth = W, imgHeight = H;
+  var a4W = 595, a4H = 842;
+  var wPt = a4W, hPt = a4H;
+  var scale = Math.min(wPt / imgWidth, hPt / imgHeight);
+  var drawW = Math.round(imgWidth * scale);
+  var drawH = Math.round(imgHeight * scale);
+  var offsetX = Math.round((wPt - drawW) / 2);
+  var offsetY = Math.round((hPt - drawH) / 2);
+
+  var objects = [];
+  objects.push('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
+  objects.push('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj');
+  objects.push('3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + wPt + ' ' + hPt + '] /Contents 4 0 R /Resources << /XObject << /Im0 5 0 R >> /ProcSet [/PDF /ImageC] >> >>\nendobj');
+
+  var stream = 'q ' + drawW + ' 0 0 ' + drawH + ' ' + offsetX + ' ' + offsetY + ' cm /Im0 Do Q';
+  objects.push('4 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
+
+  var imgLen = rawBytes.length;
+  var imgHeader = '5 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + imgWidth + ' /Height ' + imgHeight + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + imgLen + ' >>\nstream\n';
+  var imgFooter = '\nendstream\nendobj';
+  var footerBytes = new TextEncoder().encode(imgFooter);
+
+  var textParts = ['%PDF-1.4'];
+  var offsets = [];
+  for (var i = 0; i < objects.length; i++) {
+    offsets.push(byteLength(textParts.join('\n')));
+    textParts.push(objects[i]);
+  }
+  var imgObjOffset = byteLength(textParts.join('\n'));
+  textParts.push(imgHeader);
+
+  var textStr = textParts.join('\n');
+  var textBytes = new TextEncoder().encode(textStr);
+
+  var trailerParts = [];
+  var xrefOffset = byteLength(textStr) + imgLen + footerBytes.length;
+  trailerParts.push('xref');
+  trailerParts.push('0 ' + (objects.length + 2));
+  trailerParts.push('0000000000 65535 f ');
+  for (var j = 0; j < offsets.length; j++) {
+    trailerParts.push(pad(offsets[j], 10) + ' 00000 n ');
+  }
+  trailerParts.push(pad(imgObjOffset, 10) + ' 00000 n ');
+  trailerParts.push('trailer');
+  trailerParts.push('<< /Size ' + (objects.length + 2) + ' /Root 1 0 R >>');
+  trailerParts.push('startxref');
+  trailerParts.push(String(xrefOffset));
+  trailerParts.push('%%EOF');
+  var trailerBytes = new TextEncoder().encode(trailerParts.join('\n'));
+
+  var total = new Uint8Array(textBytes.length + imgLen + footerBytes.length + trailerBytes.length);
+  total.set(textBytes, 0);
+  total.set(rawBytes, textBytes.length);
+  total.set(footerBytes, textBytes.length + imgLen);
+  total.set(trailerBytes, textBytes.length + imgLen + footerBytes.length);
+
+  downloadBlob(new Blob([total], { type: 'application/pdf' }), 'test-image-embed.pdf');
+  console.log('buildTestPdfWithImage: ' + total.length + ' bytes xrefOff=' + xrefOffset + ' imgObjOff=' + imgObjOffset + ' offsets=' + JSON.stringify(offsets));
 }
