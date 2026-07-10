@@ -118,6 +118,7 @@ export function deactivateLine() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
   document.removeEventListener('keydown', onLineKeyDown);
+  cleanupVertexClickState();
   if (isDraggingVertex) {
     document.removeEventListener('pointermove', onVertexDragMove);
     document.removeEventListener('pointerup', onVertexDragEnd);
@@ -156,7 +157,17 @@ function onMouseDown(e) {
         return;
       }
       e.preventDefault();
-      startVertexDrag(nearIdx, e);
+
+      // Select the node immediately — show handles + tooltip without dragging
+      activeExtendIdx = nearIdx;
+      dragVertexIdx = nearIdx;
+      dragVertexOrigPoints = pendingPolyline.points.map(p => ({...p}));
+      isDraggingVertex = false;
+
+      showExtendHandles(pendingPolyline, activeExtendIdx);
+
+      document.addEventListener('pointermove', onVertexDragPrepare);
+      document.addEventListener('pointerup', onVertexClickEnd);
       return;
     }
     // Clicking on other annotation → don't interfere
@@ -488,6 +499,49 @@ function onVertexDragEnd() {
   dom.svg.style.cursor = 'crosshair';
   cleanupDragUI();
   showExtendHandles(pendingPolyline, activeExtendIdx);
+}
+
+function onVertexDragPrepare(e) {
+  if (!pendingPolyline) { cleanupVertexClickState(); return; }
+  const startPt = pendingPolyline.points[dragVertexIdx];
+  const currentPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const dx = currentPt.x - startPt.x;
+  const dy = currentPt.y - startPt.y;
+  if (Math.sqrt(dx * dx + dy * dy) < 3) return;
+
+  document.removeEventListener('pointermove', onVertexDragPrepare);
+  document.removeEventListener('pointerup', onVertexClickEnd);
+
+  isDraggingVertex = true;
+  dom.svg.style.cursor = 'move';
+  dom.handleLayer.innerHTML = '';
+
+  const r = getExtendHandleRadius();
+  const pt = pendingPolyline.points[dragVertexIdx];
+  dragVisualHandle = svgEl('circle', {
+    cx: pt.x, cy: pt.y, r,
+    class: 'handle handle-endpoint active',
+    'pointer-events': 'none',
+  });
+  dom.handleLayer.appendChild(dragVisualHandle);
+
+  document.addEventListener('pointermove', onVertexDragMove);
+  document.addEventListener('pointerup', onVertexDragEnd);
+}
+
+function onVertexClickEnd() {
+  document.removeEventListener('pointermove', onVertexDragPrepare);
+  document.removeEventListener('pointerup', onVertexClickEnd);
+  dragVertexOrigPoints = null;
+  dragVertexIdx = -1;
+}
+
+function cleanupVertexClickState() {
+  document.removeEventListener('pointermove', onVertexDragPrepare);
+  document.removeEventListener('pointerup', onVertexClickEnd);
+  dragVertexOrigPoints = null;
+  dragVertexIdx = -1;
+  isDraggingVertex = false;
 }
 
 export function deleteActiveNode() {
