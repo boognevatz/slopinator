@@ -974,15 +974,16 @@ export function exportPDF(widthOption, pageSize) {
 }
 
 function findActualSizeMarker() {
-  var re = /^actual_size_([\d.]+)\s*(mm|cm)$/i;
+  var re = /^(?:actual_size|real_size)_([\d_]+)\s*(mm|cm|in)$|^(?:actual-size|real-size)-([\d_]+)\s*(mm|cm|in)$/i;
   for (var i = 0; i < state.elements.length; i++) {
     var el = state.elements[i];
     if (el.type !== 'line') continue;
     var m = re.exec(el.id);
     if (!m) continue;
-    var realValue = parseFloat(m[1]);
-    var unit = m[2].toLowerCase();
+    var realValue = parseFloat((m[1] || m[3]).replace(/_/g, '.'));
+    var unit = (m[2] || m[4]).toLowerCase();
     if (unit === 'cm') realValue *= 10;
+    else if (unit === 'in') realValue *= 25.4;
     var pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
     var dx = pts[pts.length - 1].x - pts[0].x;
     var dy = pts[pts.length - 1].y - pts[0].y;
