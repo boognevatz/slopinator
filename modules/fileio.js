@@ -9,7 +9,7 @@ import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
 import { switchTool } from './tools.js';
-import { isLayerVisible } from './layers.js';
+import { isLayerVisible, updateWatermark } from './layers.js';
 
 export function initFileIO() {
   const fileInput = document.getElementById('file-input');
@@ -315,6 +315,7 @@ function openImageFile(file) {
       loadImage(dataURI, img.naturalWidth, img.naturalHeight);
       clearHistory();
       switchTool('text');
+      updateWatermark();
       
       const maxDim = Math.max(img.naturalWidth, img.naturalHeight);
       const resizeNotification = document.getElementById('resize-notification');
@@ -362,6 +363,7 @@ function physicallyResizeImage(targetWidth) {
     loadImage(newDataURI, targetWidth, targetHeight);
     clearHistory();
     switchTool('text');
+    updateWatermark();
   };
   imgEl.src = state.image.dataURI;
 }
@@ -440,6 +442,7 @@ function resizeImage(newWidth, newHeight) {
 
     clearHistory();
     switchTool('text');
+    updateWatermark();
   };
   imgEl.src = state.image.dataURI;
 }
@@ -464,6 +467,7 @@ function openSVGProject(svgText) {
       loadImage(dataURI, canvas.width, canvas.height);
       clearHistory();
       switchTool('text');
+      updateWatermark();
       URL.revokeObjectURL(url);
     };
     img.onerror = () => {
@@ -675,6 +679,7 @@ function openSVGProject(svgText) {
   clearHistory();
   refreshPalette();
   switchTool('text');
+  updateWatermark();
 }
 
 // ── Save SVG ────────────────────────────────────────────────────
@@ -753,7 +758,10 @@ export function saveSVG() {
 
   // Watermark
   if (isLayerVisible('watermark-layer')) {
-    svg += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+    svg += buildWatermarkDefs();
+    svg += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svg += dom.watermarkLayer.innerHTML;
+    svg += `</g>\n`;
   }
 
   svg += `</svg>`;
@@ -838,7 +846,10 @@ export function exportJPG(widthOption) {
 
   // Watermark
   if (isLayerVisible('watermark-layer')) {
-    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+    svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
+    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svgStr += dom.watermarkLayer.innerHTML;
+    svgStr += `</g>\n`;
   }
 
   svgStr += `</svg>`;
@@ -954,7 +965,10 @@ export function exportPDF(widthOption, pageSize) {
     svgStr += `</g>\n`;
   }
   if (isLayerVisible('watermark-layer')) {
-    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+    svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
+    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svgStr += dom.watermarkLayer.innerHTML;
+    svgStr += `</g>\n`;
   }
   svgStr += `</svg>`;
 
@@ -1064,6 +1078,14 @@ async function deflateRgb(imageData) {
     console.error('deflateRgb error:', e);
     return new Uint8Array(0);
   }
+}
+
+function buildWatermarkDefs() {
+  var select = document.getElementById('watermark-select');
+  if (!select || select.value === 'none') return '';
+  var colorMap = { 'blue-grid': '#4488ff', 'red-grid': '#ff4444', 'black-grid': '#000000' };
+  var color = colorMap[select.value] || '#4488ff';
+  return '<defs>\n<pattern id="watermark-pattern" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">\n<path d="M 40 0 L 0 0 0 40" fill="none" stroke="' + color + '" stroke-width="1" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
 function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm) {
