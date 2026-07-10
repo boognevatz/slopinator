@@ -45,6 +45,23 @@ export function initFileIO() {
     updatePageBox();
   });
 
+  // Margin unit switching
+  var currentMarginUnit = 'mm';
+  const marginIds = ['export-margin-top', 'export-margin-right', 'export-margin-bottom', 'export-margin-left'];
+  const unitToMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 };
+  document.getElementById('margin-unit-select').addEventListener('change', function() {
+    var newUnit = this.value;
+    var toMm = unitToMm[currentMarginUnit];
+    var fromMm = 1 / unitToMm[newUnit];
+    for (var i = 0; i < marginIds.length; i++) {
+      var el = document.getElementById(marginIds[i]);
+      var valMm = parseFloat(el.value) || 0;
+      el.value = Math.round(valMm * fromMm * 100) / 100;
+    }
+    currentMarginUnit = newUnit;
+    document.querySelectorAll('.margin-unit-label').forEach(function(el) { el.textContent = newUnit; });
+  });
+
   btnOpen.addEventListener('click', () => fileInput.click());
   btnOpenEmpty.addEventListener('click', () => fileInput.click());
 
@@ -875,10 +892,12 @@ export function exportPDF(widthOption, pageSize) {
 
     var marker = findActualSizeMarker();
     var pixelsPerMm = marker ? marker.pixelsPerMm * (targetWidth / dims.width) : null;
-    var marginTopMm = parseFloat(document.getElementById('export-margin-top').value) || 0;
-    var marginRightMm = parseFloat(document.getElementById('export-margin-right').value) || 0;
-    var marginBottomMm = parseFloat(document.getElementById('export-margin-bottom').value) || 0;
-    var marginLeftMm = parseFloat(document.getElementById('export-margin-left').value) || 0;
+    var marginUnit = document.getElementById('margin-unit-select').value;
+    var toMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 }[marginUnit] || 1;
+    var marginTopMm = (parseFloat(document.getElementById('export-margin-top').value) || 0) * toMm;
+    var marginRightMm = (parseFloat(document.getElementById('export-margin-right').value) || 0) * toMm;
+    var marginBottomMm = (parseFloat(document.getElementById('export-margin-bottom').value) || 0) * toMm;
+    var marginLeftMm = (parseFloat(document.getElementById('export-margin-left').value) || 0) * toMm;
     console.log('PDF: viewBox=' + dims.width + 'x' + dims.height + ' target=' + targetWidth + 'x' + targetHeight + ' canvasPxPerMm=' + pixelsPerMm + ' markerPxLen=' + (marker ? marker.pixelLen : 'none') + ' markerRealMm=' + (marker ? marker.realMm : 'none'));
     var pdfBytes = buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm);
 

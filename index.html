@@ -46,19 +46,40 @@
                 </div>
                 <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;">
                   <div style="display:flex;align-items:center;gap:4px;">
-                    <div style="width:36px;"></div>
-                    <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:36px;text-align:center;" title="Top (mm)">
-                    <div style="width:36px;"></div>
+                    <div style="width:44px;"></div>
+                    <div style="display:flex;align-items:center;gap:1px;">
+                      <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                    </div>
+                    <div style="width:44px;"></div>
                   </div>
                   <div style="display:flex;align-items:center;gap:4px;">
-                    <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:36px;text-align:center;" title="Left (mm)">
+                    <div style="display:flex;align-items:center;gap:1px;">
+                      <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                    </div>
                     <div id="pdf-page-box" style="width:130px;height:80px;border:2px solid #888;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#2d2d2d;color:#ccc;font-size:11px;text-align:center;line-height:1.3;user-select:none;" title="Click to change page size">A4<br>Portrait</div>
-                    <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:36px;text-align:center;" title="Right (mm)">
+                    <div style="display:flex;align-items:center;gap:1px;">
+                      <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                    </div>
                   </div>
                   <div style="display:flex;align-items:center;gap:4px;">
-                    <div style="width:36px;"></div>
-                    <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:36px;text-align:center;" title="Bottom (mm)">
-                    <div style="width:36px;"></div>
+                    <div style="width:44px;"></div>
+                    <div style="display:flex;align-items:center;gap:1px;">
+                      <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                    </div>
+                    <div style="width:44px;"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+                    <span style="font-size:10px;color:#888;">Unit:</span>
+                    <select id="margin-unit-select" style="font-size:10px;width:52px;padding:1px 2px;">
+                      <option value="mm" selected>mm</option>
+                      <option value="cm">cm</option>
+                      <option value="pt">pt</option>
+                      <option value="in">in</option>
+                    </select>
                   </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
