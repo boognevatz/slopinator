@@ -184,7 +184,7 @@ function onKeyDown(e) {
     case 'Tab':
       if (selectedEndpoint >= 0 && pt1 && pt2) {
         e.preventDefault();
-        selectedEndpoint = selectedEndpoint === 0 ? 1 : 0;
+        selectedEndpoint = e.shiftKey ? 0 : 1;
         dom.handleLayer.innerHTML = '';
         showHandles();
       }

@@ -559,7 +559,11 @@ function onLineKeyDown(e) {
     case 'ArrowRight': dx = step; break;
     case 'Tab':
       e.preventDefault();
-      activeExtendIdx = (idx + 1) % pts.length;
+      if (e.shiftKey) {
+        activeExtendIdx = (idx - 1 + pts.length) % pts.length;
+      } else {
+        activeExtendIdx = (idx + 1) % pts.length;
+      }
       showExtendHandles(pendingPolyline, activeExtendIdx);
       return;
     default: return;
