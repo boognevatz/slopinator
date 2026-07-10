@@ -30,21 +30,6 @@ export function initFileIO() {
 
   let currentFormat = 'jpg';
 
-  // Page size box cycling
-  const pdfPageBox = document.getElementById('pdf-page-box');
-  const pageSizeLabels = { 'A4-portrait': 'A4<br>Portrait', 'A4-landscape': 'A4<br>Landscape', 'fit': 'Fit to<br>image' };
-  const pageSizeOrder = ['A4-portrait', 'A4-landscape', 'fit'];
-  function updatePageBox() {
-    const val = exportPdfSizeSelect.value;
-    pdfPageBox.innerHTML = pageSizeLabels[val] || val;
-  }
-  pdfPageBox.addEventListener('click', () => {
-    var idx = pageSizeOrder.indexOf(exportPdfSizeSelect.value);
-    idx = (idx + 1) % pageSizeOrder.length;
-    exportPdfSizeSelect.value = pageSizeOrder[idx];
-    updatePageBox();
-  });
-
   // Margin unit switching
   var currentMarginUnit = 'mm';
   const marginIds = ['export-margin-top', 'export-margin-right', 'export-margin-bottom', 'export-margin-left'];
