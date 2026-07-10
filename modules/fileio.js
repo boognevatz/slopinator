@@ -335,18 +335,30 @@ export function initFileIO() {
     }
   });
 
+  function saveDpi() {
+    var v = parseInt(dpiInput.value);
+    if (!isNaN(v) && v > 0) {
+      state.image.dpi = v;
+      document.getElementById('dpi-display').textContent = v + ' DPI';
+      document.dispatchEvent(new CustomEvent('dpi-changed'));
+    }
+    resizeMenu.hidden = true;
+  }
+
   function doApplyResize() {
     const w = parseInt(resizeW.value);
     const h = parseInt(resizeH.value);
     if (isNaN(w) || isNaN(h) || w < 1 || h < 1) return;
-    var v = parseInt(dpiInput.value);
-    if (!isNaN(v) && v > 0) state.image.dpi = v;
     resizeMenu.hidden = true;
-    resizeImage(w, h);
+    var dims = getViewBoxDims();
+    if (w !== Math.round(dims.width) || h !== Math.round(dims.height)) {
+      resizeImage(w, h);
+    }
   }
 
   btnResizeApply.addEventListener('click', doApplyResize);
-  dpiInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
+  dpiInput.addEventListener('change', saveDpi);
+  dpiInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); saveDpi(); } });
   resizeW.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
   resizeH.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
 
@@ -1121,6 +1133,7 @@ export function recalcDpi() {
     state.image.dpi = Math.round(marker.pixelsPerMm * 25.4);
   }
   display.textContent = state.image.dpi + ' DPI';
+  document.dispatchEvent(new CustomEvent('dpi-changed'));
 }
 
 async function deflateRgb(imageData) {

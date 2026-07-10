@@ -176,6 +176,7 @@ export function updateImageTransform() {
 
   dom.imageEl.setAttribute('transform', transforms.join(' '));
   dom.annotationLayer.setAttribute('transform', transforms.join(' '));
+  dom.watermarkLayer.setAttribute('transform', transforms.join(' '));
   dom.handleLayer.setAttribute('transform', transforms.join(' '));
 
   updateLabels();

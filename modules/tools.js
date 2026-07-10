@@ -10,6 +10,7 @@ import { activateRectangle, deactivateRectangle } from './rectangle.js';
 import { activatePerspective, deactivatePerspective } from './perspective.js';
 import { activateColorCorrection, deactivateColorCorrection } from './colorcorrection.js';
 import { activateWatermark } from './layers.js';
+import { activateMeasure, deactivateMeasure } from './measure.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
@@ -34,6 +35,7 @@ export function initTools() {
   toolButtons.perspective = document.getElementById('btn-perspective');
   toolButtons.color = document.getElementById('btn-color');
   toolButtons.watermark = document.getElementById('btn-watermark');
+  toolButtons.measure = document.getElementById('btn-measure');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
     if (btn) btn.addEventListener('click', () => switchTool(tool));
@@ -74,6 +76,7 @@ export function switchTool(tool) {
     case 'rectangle': deactivateRectangle(); break;
     case 'perspective': deactivatePerspective(); break;
     case 'color': deactivateColorCorrection(); break;
+    case 'measure': deactivateMeasure(); break;
   }
 
   state.activeTool = tool;
@@ -96,6 +99,7 @@ export function switchTool(tool) {
     case 'perspective': activatePerspective(); break;
     case 'color': activateColorCorrection(); break;
     case 'watermark': activateWatermark(); break;
+    case 'measure': activateMeasure(); break;
   }
 
   // If switching from line to select, select the just-finalized polyline

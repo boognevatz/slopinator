@@ -156,6 +156,9 @@ function init() {
         case 'k':
           switchTool('color');
           break;
+        case 'm':
+          switchTool('measure');
+          break;
         case 'delete':
         case 'backspace':
           if (state.selectedId) {
