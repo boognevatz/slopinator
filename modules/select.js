@@ -129,6 +129,7 @@ export function initSelect() {
       idInput.value = sanitized;
       if (idSaveBtn) idSaveBtn.style.display = 'none';
       idInput.blur();
+      document.dispatchEvent(new CustomEvent('selection-changed'));
     }
 
     function showSaveBtn() {
