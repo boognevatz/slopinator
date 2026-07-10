@@ -41,6 +41,8 @@ export function initLine() {
     btn.addEventListener('click', () => setActiveLineStyle(style));
   }
 
+  document.getElementById('btn-line-delete-node').addEventListener('click', deleteActiveNode);
+
   lineMarkerSizeInput.addEventListener('change', () => {
     const val = parseFloat(lineMarkerSizeInput.value);
     if (Number.isNaN(val) || val < 2) return;
@@ -473,6 +475,23 @@ function onVertexDragEnd() {
   showExtendHandles(pendingPolyline, activeExtendIdx);
 }
 
+export function deleteActiveNode() {
+  if (!pendingPolyline) return;
+  const pts = pendingPolyline.points;
+  if (pts.length <= 2) return; // can't go below 2 points
+
+  const idx = activeExtendIdx;
+  pts.splice(idx, 1);
+
+  // Clamp activeExtendIdx to valid range
+  if (activeExtendIdx >= pts.length) activeExtendIdx = pts.length - 1;
+  if (pts.length === 2) activeExtendIdx = 1;
+
+  syncLineEndpoints(pendingPolyline);
+  updateLineElement(pendingPolyline);
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+}
+
 export function finalizePolyline() {
   if (!pendingPolyline) return;
 
@@ -568,6 +587,11 @@ function onLineKeyDown(e) {
         activeExtendIdx = (idx + 1) % pts.length;
       }
       showExtendHandles(pendingPolyline, activeExtendIdx);
+      return;
+    case 'Delete':
+    case 'Backspace':
+      e.preventDefault();
+      deleteActiveNode();
       return;
     default: return;
   }
