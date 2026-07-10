@@ -45,7 +45,77 @@ export function initFileIO() {
     }
     currentMarginUnit = newUnit;
     document.querySelectorAll('.margin-unit-label').forEach(function(el) { el.textContent = newUnit; });
+    redrawPageBox();
   });
+
+  // Page box canvas rendering — select sits at bottom below canvas
+  var a4W = 210, a4H = 297, pad = 8, selectH = 22;
+  var toMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 };
+  function updatePageBox() {
+    var box = document.getElementById('pdf-page-box');
+    var canvas = document.getElementById('pdf-page-canvas');
+    var size = exportPdfSizeSelect.value;
+    var cw, ch;
+    if (size === 'A4-landscape') { cw = 240; ch = Math.round(240 * a4W / a4H); }
+    else if (size === 'A4-portrait') { cw = 170; ch = Math.round(170 * a4H / a4W); }
+    else {
+      if (state.hasImage && state.image.naturalWidth > 0 && state.image.naturalHeight > 0) {
+        var iw = state.image.naturalWidth, ih = state.image.naturalHeight;
+        var maxW = 220, maxH = 180, sc = Math.min(maxW / iw, maxH / ih, 1);
+        cw = Math.max(80, Math.round(iw * sc)); ch = Math.max(60, Math.round(ih * sc));
+      } else { cw = 200; ch = 140; }
+    }
+    canvas.width = cw; canvas.height = ch;
+    canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+    box.style.width = cw + 'px'; box.style.height = ch + 'px';
+    redrawPageBox();
+  }
+
+  function redrawPageBox() {
+    var canvas = document.getElementById('pdf-page-canvas');
+    var ctx = canvas.getContext('2d');
+    var cw = canvas.width, ch = canvas.height;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cw, ch);
+
+    var size = exportPdfSizeSelect.value;
+    var unit = document.getElementById('margin-unit-select').value;
+    var ml = (parseFloat(document.getElementById('export-margin-left').value) || 0) * toMm[unit];
+    var mt = (parseFloat(document.getElementById('export-margin-top').value) || 0) * toMm[unit];
+    var mr = (parseFloat(document.getElementById('export-margin-right').value) || 0) * toMm[unit];
+    var mb = (parseFloat(document.getElementById('export-margin-bottom').value) || 0) * toMm[unit];
+
+    if (size === 'fit') {
+      ctx.strokeStyle = '#666'; ctx.lineWidth = 1;
+      ctx.strokeRect(pad, pad, cw - pad * 2, ch - pad * 2);
+      return;
+    }
+
+    var pageW = size === 'A4-landscape' ? a4H : a4W;
+    var pageH = size === 'A4-landscape' ? a4W : a4H;
+    var sc = Math.min((cw - pad * 2) / pageW, (ch - pad * 2) / pageH);
+    var pw = pageW * sc, ph = pageH * sc;
+    var px = (cw - pw) / 2, py = (ch - ph) / 2;
+
+    var innerX = px + ml * sc, innerY = py + mt * sc;
+    var innerW = pw - (ml + mr) * sc, innerH = ph - (mt + mb) * sc;
+
+    if (ml > 0 || mr > 0 || mt > 0 || mb > 0) {
+      ctx.save(); ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#4a9eff'; ctx.lineWidth = 1.5;
+      if (mt > 0) { ctx.beginPath(); ctx.moveTo(px, innerY); ctx.lineTo(px + pw, innerY); ctx.stroke(); }
+      if (mr > 0) { ctx.beginPath(); ctx.moveTo(innerX + innerW, py); ctx.lineTo(innerX + innerW, py + ph); ctx.stroke(); }
+      if (mb > 0) { ctx.beginPath(); ctx.moveTo(px, innerY + innerH); ctx.lineTo(px + pw, innerY + innerH); ctx.stroke(); }
+      if (ml > 0) { ctx.beginPath(); ctx.moveTo(innerX, py); ctx.lineTo(innerX, py + ph); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
+  // Wire up page box events
+  exportPdfSizeSelect.addEventListener('change', updatePageBox);
+  for (var i = 0; i < marginIds.length; i++) {
+    (function(id) { document.getElementById(id).addEventListener('input', redrawPageBox); })(marginIds[i]);
+  }
+  setTimeout(updatePageBox, 0);
 
   btnOpen.addEventListener('click', () => fileInput.click());
   btnOpenEmpty.addEventListener('click', () => fileInput.click());
