@@ -9,6 +9,7 @@ import { activateFreehand, deactivateFreehand } from './freehand.js';
 import { activateRectangle, deactivateRectangle } from './rectangle.js';
 import { activatePerspective, deactivatePerspective } from './perspective.js';
 import { activateColorCorrection, deactivateColorCorrection } from './colorcorrection.js';
+import { activateWatermark } from './layers.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
@@ -20,6 +21,7 @@ const TOOL_SETTINGS = {
   crop: ['crop'],
   perspective: ['perspective'],
   color: ['color-correction'],
+  watermark: ['watermark', 'color'],
 };
 
 export function initTools() {
@@ -31,6 +33,7 @@ export function initTools() {
   toolButtons.rectangle = document.getElementById('btn-rectangle');
   toolButtons.perspective = document.getElementById('btn-perspective');
   toolButtons.color = document.getElementById('btn-color');
+  toolButtons.watermark = document.getElementById('btn-watermark');
 
   for (const [tool, btn] of Object.entries(toolButtons)) {
     if (btn) btn.addEventListener('click', () => switchTool(tool));
@@ -92,6 +95,7 @@ export function switchTool(tool) {
     case 'rectangle': activateRectangle(); break;
     case 'perspective': activatePerspective(); break;
     case 'color': activateColorCorrection(); break;
+    case 'watermark': activateWatermark(); break;
   }
 
   // If switching from line to select, select the just-finalized polyline
@@ -136,4 +140,5 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('crop-group').hidden = !visible.has('crop');
   document.getElementById('perspective-group').hidden = !visible.has('perspective');
   document.getElementById('color-correction-group').hidden = !visible.has('color-correction');
+  document.getElementById('watermark-group').hidden = !visible.has('watermark');
 }

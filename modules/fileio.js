@@ -1081,11 +1081,12 @@ async function deflateRgb(imageData) {
 }
 
 function buildWatermarkDefs() {
-  var select = document.getElementById('watermark-select');
-  if (!select || select.value === 'none') return '';
-  var colorMap = { 'blue-grid': '#4488ff', 'red-grid': '#ff4444', 'black-grid': '#000000' };
-  var color = colorMap[select.value] || '#4488ff';
-  return '<defs>\n<pattern id="watermark-pattern" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">\n<path d="M 40 0 L 0 0 0 40" fill="none" stroke="' + color + '" stroke-width="1" opacity="0.4"/>\n</pattern>\n</defs>\n';
+  if (!isLayerVisible('watermark-layer')) return '';
+  if (!state.activeColor || state.activeColor === 'transparent') return '';
+  var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
+  var color = state.activeColor;
+  var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
+  return '<defs>\n<pattern id="watermark-pattern" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M 40 0 L 0 0 0 40" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
 function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm) {

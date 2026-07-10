@@ -100,16 +100,6 @@
         </div>
       </div>
 
-      <div class="toolbar-group separator" id="watermark-group">
-        <span class="toolbar-label">Watermark:</span>
-        <select id="watermark-select" class="small-input" style="width:110px;">
-          <option value="none">None</option>
-          <option value="blue-grid">Blue Grid 45°</option>
-          <option value="red-grid">Red Grid</option>
-          <option value="black-grid">Black Grid</option>
-        </select>
-      </div>
-
       <div class="toolbar-group separator">
         <button id="btn-select" class="tool-btn active" title="Select (V)" data-tool="select">Select</button>
         <button id="btn-line" class="tool-btn" title="Line (L)" data-tool="line">Line</button>
@@ -119,6 +109,7 @@
         <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
         <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
         <button id="btn-color" class="tool-btn" title="Color Correction (K)" data-tool="color">Color</button>
+        <button id="btn-watermark" class="tool-btn" title="Watermark" data-tool="watermark">Watermark</button>
       </div>
 
       <div class="toolbar-group separator">
@@ -288,6 +279,15 @@
         <label class="crop-ratio-option"><input type="checkbox" id="color-grayscale"> Gray</label>
         <button id="btn-color-correct" disabled>Correct</button>
         <button id="btn-color-reset" disabled>Reset</button>
+      </div>
+
+      <div class="toolbar-group separator" id="watermark-group" hidden>
+        <span class="toolbar-label">Thickness:</span>
+        <input type="range" id="wm-thickness" min="0.5" max="5" step="0.5" value="1" style="width:60px;">
+        <span class="toolbar-label" id="wm-thickness-val" style="min-width:2em;">1</span>
+        <span class="toolbar-label">Rot:</span>
+        <input type="range" id="wm-rotation" min="0" max="90" step="1" value="45" style="width:60px;">
+        <span class="toolbar-label" id="wm-rotation-val" style="min-width:3em;">45°</span>
       </div>
 
     </div>

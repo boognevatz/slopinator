@@ -1,6 +1,12 @@
 import { dom, state } from './editor.js';
 
 export function initLayers() {
+  // Watermark hidden by default
+  var wmLayer = document.getElementById('watermark-layer');
+  var wmEye = document.querySelector('.layer-entry[data-layer="watermark-layer"] .layer-eye');
+  if (wmLayer) wmLayer.setAttribute('visibility', 'hidden');
+  if (wmEye) wmEye.classList.add('hidden');
+
   document.querySelectorAll('.layer-eye').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -19,7 +25,18 @@ export function initLayers() {
     });
   });
 
-  document.getElementById('watermark-select').addEventListener('change', updateWatermark);
+  // Sliders
+  document.getElementById('wm-thickness').addEventListener('input', function() {
+    document.getElementById('wm-thickness-val').textContent = this.value;
+    updateWatermark();
+  });
+  document.getElementById('wm-rotation').addEventListener('input', function() {
+    document.getElementById('wm-rotation-val').textContent = this.value + '\u00B0';
+    updateWatermark();
+  });
+
+  // Re-render watermark when foreground color changes
+  document.addEventListener('palette-color-changed', updateWatermark);
 }
 
 export function isLayerVisible(layerId) {
@@ -27,22 +44,32 @@ export function isLayerVisible(layerId) {
   return el && el.getAttribute('visibility') !== 'hidden';
 }
 
+export function activateWatermark() {
+  var layer = dom.watermarkLayer;
+  var eye = document.querySelector('.layer-entry[data-layer="watermark-layer"] .layer-eye');
+  if (layer) layer.removeAttribute('visibility');
+  if (eye) eye.classList.remove('hidden');
+  updateWatermark();
+}
+
 export function updateWatermark() {
-  var select = document.getElementById('watermark-select');
-  if (!select) return;
-  var value = select.value;
   var layer = dom.watermarkLayer;
   if (!layer) return;
 
-  // Clear old watermark content and defs
+  // Clear old watermark content and pattern def
   layer.innerHTML = '';
   var oldPattern = document.getElementById('watermark-pattern');
   if (oldPattern) oldPattern.remove();
 
-  if (value === 'none' || !state.hasImage) return;
+  if (!state.hasImage) return;
 
-  var colorMap = { 'blue-grid': '#4488ff', 'red-grid': '#ff4444', 'black-grid': '#000000' };
-  var color = colorMap[value] || '#4488ff';
+  // Don't render if watermark layer is hidden or color is transparent
+  if (!isLayerVisible('watermark-layer')) return;
+  if (!state.activeColor || state.activeColor === 'transparent') return;
+
+  var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
+  var color = state.activeColor;
+  var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
 
   var patternId = 'watermark-pattern';
   var defs = dom.svg.querySelector('defs');
@@ -53,13 +80,13 @@ export function updateWatermark() {
   pattern.setAttribute('width', '40');
   pattern.setAttribute('height', '40');
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('patternTransform', 'rotate(45)');
+  pattern.setAttribute('patternTransform', 'rotate(' + rotation + ')');
 
   var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.setAttribute('d', 'M 40 0 L 0 0 0 40');
   path.setAttribute('fill', 'none');
   path.setAttribute('stroke', color);
-  path.setAttribute('stroke-width', '1');
+  path.setAttribute('stroke-width', String(thickness));
   path.setAttribute('opacity', '0.4');
   pattern.appendChild(path);
   defs.appendChild(pattern);
