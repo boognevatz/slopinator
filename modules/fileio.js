@@ -670,14 +670,18 @@ function openSVGProject(svgText) {
     });
   });
 
-  // Parse polyline lines (3+ points)
-  svgRoot.querySelectorAll('polyline[data-type="line"]').forEach(p => {
+  // Parse polyline/polygon lines (3+ points)
+  function parsePolyPoints(p) {
     const ptsAttr = p.getAttribute('points') || '';
-    const pts = ptsAttr.trim().split(/\s+/).filter(Boolean).map(pair => {
+    return ptsAttr.trim().split(/\s+/).filter(Boolean).map(pair => {
       const [x, y] = pair.split(',').map(Number);
       return { x, y };
     });
+  }
+  svgRoot.querySelectorAll('polyline[data-type="line"], polygon[data-type="line"]').forEach(p => {
+    const pts = parsePolyPoints(p);
     if (pts.length < 2) return;
+    const closed = p.tagName === 'polygon' || p.getAttribute('data-closed') === 'true';
     elements.push({
       id: p.id || generateId(),
       type: 'line',
@@ -688,6 +692,7 @@ function openSVGProject(svgText) {
       strokeWidth: parseFloat(p.getAttribute('stroke-width')) || 2,
       lineStyle: normalizeLineStyle(p.getAttribute('data-line-style') || 'normal'),
       lineMarkerSize: normalizeLineMarkerSize(p.getAttribute('data-line-marker-size') || 30),
+      closed,
     });
   });
 
@@ -820,7 +825,11 @@ export function saveSVG() {
       if (el.type === 'line') {
         const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
         if (pts.length >= 3) {
-          svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          if (el.closed) {
+            svg += `<polygon id="${el.id}" data-type="line" data-closed="true" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          } else {
+            svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          }
         } else {
           svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
           if (el.rotation) {
@@ -912,7 +921,11 @@ export function exportJPG(widthOption) {
       if (el.type === 'line') {
         const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
         if (pts.length >= 3) {
-          svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          if (el.closed) {
+            svgStr += `<polygon data-type="line" data-closed="true" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          } else {
+            svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          }
         } else {
           svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
           if (el.rotation) {
@@ -1035,7 +1048,11 @@ export function exportPDF(widthOption, pageSize) {
       if (el.type === 'line') {
         const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
         if (pts.length >= 3) {
-          svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          if (el.closed) {
+            svgStr += `<polygon data-type="line" data-closed="true" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          } else {
+            svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+          }
         } else {
           svgStr += `<g data-type="line"`;
           if (el.rotation) {

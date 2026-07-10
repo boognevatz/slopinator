@@ -140,6 +140,21 @@ function onMouseDown(e) {
     const threshold = getExtendHitRadius();
     const nearIdx = findNearestVertex(clickPt, pendingPolyline.points, threshold);
     if (nearIdx !== -1) {
+      // Check if clicking opposite endpoint to close polygon
+      const pts = pendingPolyline.points;
+      if (pts.length >= 3 &&
+          ((activeExtendIdx === 0 && nearIdx === pts.length - 1) ||
+           (activeExtendIdx === pts.length - 1 && nearIdx === 0))) {
+        e.preventDefault();
+        pendingPolyline.closed = true;
+        pendingPolyline.startDecoration = 'none';
+        pendingPolyline.endDecoration = 'none';
+        updateLineElement(pendingPolyline);
+        dom.handleLayer.innerHTML = '';
+        cleanupDragUI();
+        finalizePolyline();
+        return;
+      }
       e.preventDefault();
       startVertexDrag(nearIdx, e);
       return;
@@ -646,28 +661,47 @@ export function addLineElement(data) {
   }
 
   if (pts.length >= 3) {
-    // Render as polyline
     const ptsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
-    const polyline = svgEl('polyline', {
-      points: ptsStr,
-      fill: 'none',
-      stroke: data.stroke,
-      'stroke-width': data.strokeWidth,
-      class: 'annotation-line',
-    });
-    applyLineStyle(polyline, data.lineStyle);
+    if (data.closed) {
+      const polygon = svgEl('polygon', {
+        points: ptsStr,
+        fill: 'none',
+        stroke: data.stroke,
+        'stroke-width': data.strokeWidth,
+        class: 'annotation-line',
+      });
+      applyLineStyle(polygon, data.lineStyle);
 
-    const hitArea = svgEl('polyline', {
-      points: ptsStr,
-      fill: 'none',
-      class: 'line-hit-area',
-    });
+      const hitArea = svgEl('polygon', {
+        points: ptsStr,
+        fill: 'none',
+        class: 'line-hit-area',
+      });
 
-    const decorations = buildLineDecorations(decorData);
+      group.appendChild(hitArea);
+      group.appendChild(polygon);
+    } else {
+      const polyline = svgEl('polyline', {
+        points: ptsStr,
+        fill: 'none',
+        stroke: data.stroke,
+        'stroke-width': data.strokeWidth,
+        class: 'annotation-line',
+      });
+      applyLineStyle(polyline, data.lineStyle);
 
-    group.appendChild(hitArea);
-    group.appendChild(polyline);
-    group.appendChild(decorations);
+      const hitArea = svgEl('polyline', {
+        points: ptsStr,
+        fill: 'none',
+        class: 'line-hit-area',
+      });
+
+      const decorations = buildLineDecorations(decorData);
+
+      group.appendChild(hitArea);
+      group.appendChild(polyline);
+      group.appendChild(decorations);
+    }
   } else {
     // Render as line (2 points)
     const line = svgEl('line', {
