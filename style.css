@@ -331,6 +331,34 @@ button.tool-btn.active {
   margin: 0;
 }
 
+/* ── Main Area (toolbar rows below editor area) ─────── */
+
+#main-area {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+#right-panel {
+  width: 180px;
+  background: #252525;
+  border-left: 1px solid #444;
+  overflow-y: auto;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+#right-panel .layer-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+#left-panel .layer-entry:hover {
+  background: #3a3a3a;
+}
+
 /* ── Editor Container ────────────────────────────────── */
 
 #editor-container {
@@ -549,31 +577,6 @@ body {
 
 /* ── Layers Panel ───────────────────────────────────── */
 
-#layers-panel {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: #2d2d2d;
-  border: 1px solid #555;
-  border-radius: 4px;
-  padding: 4px 0;
-  min-width: 130px;
-  z-index: 20;
-  user-select: none;
-}
-
-.layer-entry {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  cursor: pointer;
-}
-
-.layer-entry:hover {
-  background: #3a3a3a;
-}
-
 .layer-eye {
   font-size: 14px;
   line-height: 1;
@@ -589,11 +592,6 @@ body {
 
 .layer-eye.hidden {
   opacity: 0.3;
-}
-
-.layer-name {
-  font-size: 12px;
-  color: #ccc;
 }
 
 /* ── About Popup ───────────────────────────────────── */

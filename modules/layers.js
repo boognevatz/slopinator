@@ -1,6 +1,14 @@
 import { dom, state } from './editor.js';
 
 export function initLayers() {
+  // Toggle right panel
+  var rightPanel = document.getElementById('right-panel');
+  var layersIndicator = document.getElementById('layers-indicator');
+  document.getElementById('btn-layers').addEventListener('click', function() {
+    rightPanel.hidden = !rightPanel.hidden;
+    layersIndicator.textContent = rightPanel.hidden ? '\u25B8' : '\u25C2';
+  });
+
   // Watermark hidden by default
   var wmLayer = document.getElementById('watermark-layer');
   var wmEye = document.querySelector('.layer-entry[data-layer="watermark-layer"] .layer-eye');
