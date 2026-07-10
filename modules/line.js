@@ -24,6 +24,9 @@ let dragVertexOrigPoints = null;
 let dragVisualHandle = null;
 let coordTooltip = null;
 
+// Multi-selection (for closed polygons)
+let selectedNodeIndices = new Set();
+
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
 const LINE_DECORATIONS = ['none', 'arrow', 'circle'];
 
@@ -42,6 +45,7 @@ export function initLine() {
   }
 
   document.getElementById('btn-line-delete-node').addEventListener('click', deleteActiveNode);
+  document.getElementById('btn-line-cut').addEventListener('click', cutPolygonEdge);
 
   lineMarkerSizeInput.addEventListener('change', () => {
     const val = parseFloat(lineMarkerSizeInput.value);
@@ -125,6 +129,7 @@ export function deactivateLine() {
     isDraggingVertex = false;
   }
   cleanupDragUI();
+  selectedNodeIndices.clear();
   finalizePolyline();
   cancelDraw();
 }
@@ -141,7 +146,23 @@ function onMouseDown(e) {
     const threshold = getExtendHitRadius();
     const nearIdx = findNearestVertex(clickPt, pendingPolyline.points, threshold);
     if (nearIdx !== -1) {
-      // Check if clicking opposite endpoint to close polygon
+      // Shift+click → toggle multi-selection without drag
+      if (e.shiftKey) {
+        e.preventDefault();
+        if (selectedNodeIndices.has(nearIdx)) {
+          selectedNodeIndices.delete(nearIdx);
+        } else {
+          selectedNodeIndices.add(nearIdx);
+        }
+        activeExtendIdx = nearIdx;
+        showExtendHandles(pendingPolyline, activeExtendIdx);
+        updateCutButtonState();
+        return;
+      }
+
+      // Non-Shift click → clear multi-selection
+      selectedNodeIndices.clear();
+
       const pts = pendingPolyline.points;
       if (pts.length >= 3 &&
           ((activeExtendIdx === 0 && nearIdx === pts.length - 1) ||
@@ -151,9 +172,10 @@ function onMouseDown(e) {
         pendingPolyline.startDecoration = 'none';
         pendingPolyline.endDecoration = 'none';
         updateLineElement(pendingPolyline);
-        dom.handleLayer.innerHTML = '';
-        cleanupDragUI();
-        finalizePolyline();
+        activeExtendIdx = nearIdx;
+        selectedNodeIndices.add(nearIdx);
+        showExtendHandles(pendingPolyline, activeExtendIdx);
+        updateCutButtonState();
         return;
       }
       e.preventDefault();
@@ -174,7 +196,8 @@ function onMouseDown(e) {
     if (target.classList.contains('annotation-line') ||
         target.classList.contains('annotation-text') ||
         target.classList.contains('line-hit-area')) return;
-    // Clicked empty space → one-click extend from active endpoint
+    // Clicked empty space → one-click extend from active endpoint (not for closed polygons)
+    if (pendingPolyline.closed) return;
     addExtensionPoint(e);
     return;
   }
@@ -286,7 +309,7 @@ function showExtendHandles(data, activeIdx) {
     const x = pts[i].x, y = pts[i].y;
     const isFirst = i === 0;
     const isLast = i === pts.length - 1;
-    const isActive = i === activeIdx;
+    const isActive = i === activeIdx || selectedNodeIndices.has(i);
     const handleLabel = isFirst ? 'p1' : isLast ? 'p2' : 'v' + i;
 
     // Hit area (larger, transparent, captures mouse events for hand cursor)
@@ -296,6 +319,7 @@ function showExtendHandles(data, activeIdx) {
       fill: 'transparent',
       stroke: 'none',
       'data-handle': handleLabel,
+      'data-index': i,
     });
     dom.handleLayer.appendChild(hit);
 
@@ -534,6 +558,7 @@ function onVertexClickEnd() {
   document.removeEventListener('pointerup', onVertexClickEnd);
   dragVertexOrigPoints = null;
   dragVertexIdx = -1;
+  updateCutButtonState();
 }
 
 function cleanupVertexClickState() {
@@ -544,21 +569,77 @@ function cleanupVertexClickState() {
   isDraggingVertex = false;
 }
 
+function updateCutButtonState() {
+  const btn = document.getElementById('btn-line-cut');
+  if (!btn) return;
+  const canCut = pendingPolyline && pendingPolyline.closed &&
+    selectedNodeIndices.size === 2 &&
+    areAdjacent([...selectedNodeIndices], pendingPolyline.points.length);
+  btn.disabled = !canCut;
+}
+
+function areAdjacent(indices, pointCount) {
+  const [a, b] = indices.sort((x, y) => x - y);
+  return (b === a + 1) || (a === 0 && b === pointCount - 1);
+}
+
+function cutPolygonEdge() {
+  if (!pendingPolyline || !pendingPolyline.closed) return;
+  if (selectedNodeIndices.size !== 2) return;
+
+  const [i1, i2] = [...selectedNodeIndices].sort((a, b) => a - b);
+  const pts = pendingPolyline.points;
+  const N = pts.length;
+
+  if (!areAdjacent([i1, i2], N)) return;
+
+  let startIdx, endIdx;
+  if (i2 === i1 + 1) {
+    startIdx = i2;
+    endIdx = i1;
+  } else {
+    startIdx = i1;
+    endIdx = i2;
+  }
+
+  const newPts = [];
+  let idx = startIdx;
+  while (true) {
+    newPts.push({ x: pts[idx].x, y: pts[idx].y });
+    if (idx === endIdx) break;
+    idx = (idx + 1) % N;
+  }
+
+  pendingPolyline.points = newPts;
+  pendingPolyline.closed = false;
+  syncLineEndpoints(pendingPolyline);
+  updateLineElement(pendingPolyline);
+
+  selectedNodeIndices.clear();
+  activeExtendIdx = newPts.length - 1;
+  showExtendHandles(pendingPolyline, activeExtendIdx);
+  updateCutButtonState();
+}
+
 export function deleteActiveNode() {
   if (!pendingPolyline) return;
   const pts = pendingPolyline.points;
-  if (pts.length <= 2) return; // can't go below 2 points
+  if (pts.length <= 2) return;
 
   const idx = activeExtendIdx;
   pts.splice(idx, 1);
 
-  // Clamp activeExtendIdx to valid range
   if (activeExtendIdx >= pts.length) activeExtendIdx = pts.length - 1;
-  if (pts.length === 2) activeExtendIdx = 1;
+  if (pts.length === 2) {
+    activeExtendIdx = 1;
+    pendingPolyline.closed = false;
+  }
 
   syncLineEndpoints(pendingPolyline);
   updateLineElement(pendingPolyline);
+  selectedNodeIndices.clear();
   showExtendHandles(pendingPolyline, activeExtendIdx);
+  updateCutButtonState();
 }
 
 export function finalizePolyline() {
@@ -617,6 +698,7 @@ export function finalizePolyline() {
   }
 
   pendingPolyline = null;
+  updateCutButtonState();
 }
 
 export function handlePolylineEscape() {
