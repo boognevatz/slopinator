@@ -111,6 +111,16 @@
                 </div>
               </div>
               <div style="border-top:1px solid #444;margin:4px 8px;"></div>
+              <div class="nested-dropdown" id="settings-nested">
+                <div class="file-menu-item" id="btn-settings-nested-btn" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:12px;color:#ccc;cursor:pointer;">Settings <span style="font-size:10px;">▸</span></div>
+                <div class="nested-menu" id="settings-menu" hidden>
+                  <div style="display:flex;flex-direction:column;gap:4px;padding:6px 10px;white-space:nowrap;">
+                    <span style="font-size:11px;color:#aaa;">Origin Coordinate</span>
+                    <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="top-left" checked> Top-Left (0,0)</label>
+                    <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="bottom-left"> Bottom-Left (0,0)</label>
+                  </div>
+                </div>
+              </div>
               <button id="btn-about" class="file-menu-item">ℹ About</button>
             </div>
           </div>

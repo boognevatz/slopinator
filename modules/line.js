@@ -375,7 +375,10 @@ function cleanupDragUI() {
 function updateCoordTooltip(clientX, clientY, pt) {
   if (!coordTooltip) return;
   const x = Math.round(pt.x);
-  const y = Math.round(pt.y);
+  var y = Math.round(pt.y);
+  if (state.originCoordinate === 'bottom-left') {
+    y = Math.round(dom.svg.viewBox.baseVal.height - pt.y);
+  }
   coordTooltip.textContent = `${x}, ${y}`;
   coordTooltip.style.left = (clientX + 14) + 'px';
   coordTooltip.style.top = (clientY - 26) + 'px';

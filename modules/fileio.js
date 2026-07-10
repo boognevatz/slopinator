@@ -204,6 +204,21 @@ export function initFileIO() {
     if (!exportMenu.hidden) activateTab(currentFormat);
   });
 
+  // Settings nested dropdown toggle
+  const settingsNestedBtn = document.getElementById('btn-settings-nested-btn');
+  const settingsMenu = document.getElementById('settings-menu');
+  settingsNestedBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.hidden = !settingsMenu.hidden;
+  });
+
+  document.querySelectorAll('input[name="origin-coord"]').forEach(function(r) {
+    r.addEventListener('change', function() {
+      state.originCoordinate = this.value;
+      document.dispatchEvent(new CustomEvent('origin-changed'));
+    });
+  });
+
   fileMenu.addEventListener('click', (e) => {
     e.stopPropagation();
   });
@@ -211,6 +226,7 @@ export function initFileIO() {
   document.addEventListener('click', () => {
     fileMenu.hidden = true;
     exportMenu.hidden = true;
+    settingsMenu.hidden = true;
   });
 
   btnExportDo.addEventListener('click', (e) => {

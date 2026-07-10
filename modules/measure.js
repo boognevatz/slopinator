@@ -228,6 +228,7 @@ function updateLabel() {
   if (!pt1 || !pt2) return;
   var dx = pt2.x - pt1.x;
   var dy = pt2.y - pt1.y;
+  if (state.originCoordinate === 'bottom-left') dy = -dy;
   var pixelLen = Math.sqrt(dx * dx + dy * dy);
   var mmLen = pixelLen / (state.image.dpi / 25.4);
   var dpi = state.image.dpi;

@@ -40,6 +40,7 @@ export const state = {
   viewerWidth: 0,
   viewerHeight: 0,
   hasImage: false,
+  originCoordinate: 'top-left',
 };
 
 /** DOM references */
