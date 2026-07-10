@@ -10,91 +10,99 @@
   <div id="toolbar">
     <div class="toolbar-row">
       <div class="toolbar-group">
-        <button id="btn-open" title="Open Image or SVG Project">Open</button>
         <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.svg" hidden>
-        <button id="btn-save-svg" title="Save SVG (Ctrl+S)" disabled>Save SVG</button>
-        <div class="dropdown" id="export-dropdown">
-          <button id="btn-export-dropdown-btn" title="Export" disabled>Export ▾</button>
-          <div class="dropdown-menu" id="export-menu" hidden style="min-width:280px;">
-            <div style="display:flex;flex-direction:column;gap:6px;padding:8px;white-space:nowrap;">
-              <div style="display:flex;border-bottom:1px solid #444;margin-bottom:4px;">
-                <button id="export-tab-jpg" class="export-tab active" data-format="jpg" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">JPG</button>
-                <button id="export-tab-pdf" class="export-tab" data-format="pdf" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">PDF</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;">
-                <span style="font-size:12px;color:#ccc;">File:</span>
-                <input type="text" id="export-filename" class="small-input" value="annotation" style="width:240px;">
-              </div>
-              <div id="export-jpg-options">
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="font-size:12px;color:#ccc;">Size:</span>
-                  <select id="export-size-select" class="small-input" style="flex:1;">
-                    <option value="320">320px</option>
-                    <option value="640" selected>640px</option>
-                    <option value="1920">1920px</option>
-                    <option value="original">Original</option>
-                  </select>
+        <div class="dropdown" id="file-dropdown">
+          <button id="btn-file-dropdown-btn" title="File" style="font-weight:bold;">File ▾</button>
+          <div class="dropdown-menu" id="file-menu" hidden style="min-width:200px;">
+            <div style="display:flex;flex-direction:column;gap:2px;padding:4px 0;white-space:nowrap;">
+              <button id="btn-open" class="file-menu-item">📂 Open</button>
+              <button id="btn-save-svg" class="file-menu-item" disabled>💾 Save SVG</button>
+              <div style="border-top:1px solid #444;margin:4px 8px;"></div>
+              <div class="nested-dropdown" id="export-nested">
+                <div class="file-menu-item" id="btn-export-nested-btn" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:12px;color:#ccc;cursor:pointer;">Export <span style="font-size:10px;">▸</span></div>
+                <div class="nested-menu" id="export-menu" hidden>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:8px;min-width:280px;">
+                    <div style="display:flex;border-bottom:1px solid #444;margin-bottom:4px;">
+                      <button id="export-tab-jpg" class="export-tab active" data-format="jpg" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">JPG</button>
+                      <button id="export-tab-pdf" class="export-tab" data-format="pdf" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">PDF</button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span style="font-size:12px;color:#ccc;">File:</span>
+                      <input type="text" id="export-filename" class="small-input" value="annotation" style="width:240px;">
+                    </div>
+                    <div id="export-jpg-options">
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:12px;color:#ccc;">Size:</span>
+                        <select id="export-size-select" class="small-input" style="flex:1;">
+                          <option value="320">320px</option>
+                          <option value="640" selected>640px</option>
+                          <option value="1920">1920px</option>
+                          <option value="original">Original</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div id="export-pdf-options" hidden>
+                      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;">
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="width:44px;"></div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div style="width:44px;"></div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div id="pdf-page-box" style="position:relative;display:flex;flex-direction:column;">
+                            <canvas id="pdf-page-canvas"></canvas>
+                            <select id="export-pdf-size-select" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:#3c3c3c;border:1px solid #555;border-right:none;color:#ccc;font-size:11px;text-align:center;text-align-last:center;cursor:pointer;outline:none;padding:2px 4px;border-radius:3px 0 0 3px;">
+                              <option value="A4-portrait" selected>A4 Portrait</option>
+                              <option value="A4-landscape">A4 Landscape</option>
+                              <option value="fit">Fit to image</option>
+                            </select>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="width:44px;"></div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div style="width:44px;"></div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+                          <span style="font-size:10px;color:#888;">Unit:</span>
+                          <select id="margin-unit-select" style="font-size:10px;width:52px;padding:1px 2px;">
+                            <option value="mm" selected>mm</option>
+                            <option value="cm">cm</option>
+                            <option value="pt">pt</option>
+                            <option value="in">in</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                        <span style="font-size:12px;color:#ccc;">Size:</span>
+                        <select id="export-pdf-res-select" class="small-input" style="flex:1;">
+                          <option value="320">320px</option>
+                          <option value="640">640px</option>
+                          <option value="1920">1920px</option>
+                          <option value="original" selected>Original</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button id="btn-export-do" style="width:100%;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Export</button>
+                    <button id="btn-test-pdf" style="width:100%;margin-top:4px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (red rect)</button>
+                    <button id="btn-test-pdf-img" style="width:100%;margin-top:2px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (image embed)</button>
+                  </div>
                 </div>
               </div>
-              <div id="export-pdf-options" hidden>
-                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;">
-                  <div style="display:flex;align-items:center;gap:4px;">
-                    <div style="width:44px;"></div>
-                    <div style="display:flex;align-items:center;gap:1px;">
-                      <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
-                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
-                    </div>
-                    <div style="width:44px;"></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:4px;">
-                    <div style="display:flex;align-items:center;gap:1px;">
-                      <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
-                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
-                    </div>
-                    <div id="pdf-page-box" style="position:relative;display:flex;flex-direction:column;">
-                      <canvas id="pdf-page-canvas"></canvas>
-                      <select id="export-pdf-size-select" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:#3c3c3c;border:1px solid #555;border-right:none;color:#ccc;font-size:11px;text-align:center;text-align-last:center;cursor:pointer;outline:none;padding:2px 4px;border-radius:3px 0 0 3px;">
-                        <option value="A4-portrait" selected>A4 Portrait</option>
-                        <option value="A4-landscape">A4 Landscape</option>
-                        <option value="fit">Fit to image</option>
-                      </select>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:1px;">
-                      <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
-                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:4px;">
-                    <div style="width:44px;"></div>
-                    <div style="display:flex;align-items:center;gap:1px;">
-                      <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
-                      <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
-                    </div>
-                    <div style="width:44px;"></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
-                    <span style="font-size:10px;color:#888;">Unit:</span>
-                    <select id="margin-unit-select" style="font-size:10px;width:52px;padding:1px 2px;">
-                      <option value="mm" selected>mm</option>
-                      <option value="cm">cm</option>
-                      <option value="pt">pt</option>
-                      <option value="in">in</option>
-                    </select>
-                  </div>
-                </div>
-                <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
-                  <span style="font-size:12px;color:#ccc;">Size:</span>
-                  <select id="export-pdf-res-select" class="small-input" style="flex:1;">
-                    <option value="320">320px</option>
-                    <option value="640">640px</option>
-                    <option value="1920">1920px</option>
-                    <option value="original" selected>Original</option>
-                  </select>
-                </div>
-              </div>
-              <button id="btn-export-do" style="width:100%;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Export</button>
-              <button id="btn-test-pdf" style="width:100%;margin-top:4px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (red rect)</button>
-              <button id="btn-test-pdf-img" style="width:100%;margin-top:2px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (image embed)</button>
             </div>
           </div>
         </div>

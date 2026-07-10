@@ -16,7 +16,8 @@ export function initFileIO() {
   const btnOpen = document.getElementById('btn-open');
   const btnOpenEmpty = document.getElementById('btn-open-empty');
   const btnSaveSvg = document.getElementById('btn-save-svg');
-  const btnExportDropdown = document.getElementById('btn-export-dropdown-btn');
+  const btnFileDropdown = document.getElementById('btn-file-dropdown-btn');
+  const fileMenu = document.getElementById('file-menu');
   const exportMenu = document.getElementById('export-menu');
   const exportFilename = document.getElementById('export-filename');
   const tabJpg = document.getElementById('export-tab-jpg');
@@ -136,24 +137,33 @@ export function initFileIO() {
     tabPdf.classList.toggle('active', format === 'pdf');
     jpgOptions.hidden = format !== 'jpg';
     pdfOptions.hidden = format !== 'pdf';
-    btnExportDropdown.textContent = format === 'jpg' ? 'Export JPG ▾' : 'Export PDF ▾';
   }
 
   tabJpg.addEventListener('click', (e) => { e.stopPropagation(); activateTab('jpg'); });
   tabPdf.addEventListener('click', (e) => { e.stopPropagation(); activateTab('pdf'); });
 
-  // Export dropdown toggle
-  btnExportDropdown.addEventListener('click', (e) => {
+  // File dropdown toggle
+  btnFileDropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileMenu.hidden = !fileMenu.hidden;
+    if (!fileMenu.hidden) activateTab(currentFormat);
+  });
+
+  // Nested export dropdown toggle
+  const exportNestedBtn = document.getElementById('btn-export-nested-btn');
+  const exportNested = document.getElementById('export-nested');
+  exportNestedBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     exportMenu.hidden = !exportMenu.hidden;
     if (!exportMenu.hidden) activateTab(currentFormat);
   });
 
-  exportMenu.addEventListener('click', (e) => {
+  fileMenu.addEventListener('click', (e) => {
     e.stopPropagation();
   });
 
   document.addEventListener('click', () => {
+    fileMenu.hidden = true;
     exportMenu.hidden = true;
   });
 
@@ -170,7 +180,7 @@ export function initFileIO() {
   });
 
   function doExport() {
-    exportMenu.hidden = true;
+    fileMenu.hidden = true;
     if (currentFormat === 'pdf') {
       const pageSize = exportPdfSizeSelect.value;
       const res = exportPdfResSelect.value;
