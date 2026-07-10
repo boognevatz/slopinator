@@ -10,11 +10,14 @@ let pt2 = null;
 let isDragging = false;
 let dragIdx = -1;
 let dragHandle = null;
+var selectedEndpoint = -1;
+var arrowKeyStep = 1;
 
 export function activateMeasure() {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onPointerDown);
   document.addEventListener('dpi-changed', updateLabel);
+  document.addEventListener('keydown', onKeyDown);
 }
 
 export function deactivateMeasure() {
@@ -23,6 +26,7 @@ export function deactivateMeasure() {
   document.removeEventListener('pointermove', onPointerMove);
   document.removeEventListener('pointerup', onPointerUp);
   document.removeEventListener('dpi-changed', updateLabel);
+  document.removeEventListener('keydown', onKeyDown);
   isDrawing = false;
   isDragging = false;
   cleanupElements();
@@ -118,6 +122,7 @@ function onPointerUp(e) {
     pt2 = { x: endPt.x, y: endPt.y };
     measureLine.setAttribute('x2', pt2.x);
     measureLine.setAttribute('y2', pt2.y);
+    selectedEndpoint = 1;
     updateLabel();
     showHandles();
     return;
@@ -125,6 +130,7 @@ function onPointerUp(e) {
 
   if (isDragging) {
     isDragging = false;
+    selectedEndpoint = dragIdx;
     dom.handleLayer.innerHTML = '';
     showHandles();
   }
@@ -143,13 +149,46 @@ function showHandles() {
       'data-handle': 'p' + (i + 1),
     });
     dom.handleLayer.appendChild(hit);
+    var isActive = i === selectedEndpoint;
     var vis = svgEl('circle', {
       cx: pts[i].x, cy: pts[i].y, r: r,
-      fill: '#fff', stroke: '#4fc3f7', 'stroke-width': 1.5,
+      fill: isActive ? '#4fc3f7' : '#fff',
+      stroke: '#4fc3f7', 'stroke-width': 1.5,
       'pointer-events': 'none',
     });
     dom.handleLayer.appendChild(vis);
   }
+}
+
+function onKeyDown(e) {
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  var tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  var step = arrowKeyStep;
+  var moved = false;
+  switch (e.key) {
+    case 'ArrowUp': moveEndpoint(0, -step); moved = true; break;
+    case 'ArrowDown': moveEndpoint(0, step); moved = true; break;
+    case 'ArrowLeft': moveEndpoint(-step, 0); moved = true; break;
+    case 'ArrowRight': moveEndpoint(step, 0); moved = true; break;
+  }
+  if (moved) e.preventDefault();
+}
+
+function moveEndpoint(dx, dy) {
+  if (!measureLine || selectedEndpoint < 0) return;
+  var pt = selectedEndpoint === 0 ? pt1 : pt2;
+  if (!pt) return;
+  pt.x += dx;
+  pt.y += dy;
+  measureLine.setAttribute('x1', pt1.x);
+  measureLine.setAttribute('y1', pt1.y);
+  measureLine.setAttribute('x2', pt2.x);
+  measureLine.setAttribute('y2', pt2.y);
+  updateLabel();
+  dom.handleLayer.innerHTML = '';
+  showHandles();
 }
 
 function startHandleDrag(idx, e) {
