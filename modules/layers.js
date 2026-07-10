@@ -34,6 +34,10 @@ export function initLayers() {
     document.getElementById('wm-rotation-val').textContent = this.value + '\u00B0';
     updateWatermark();
   });
+  document.getElementById('wm-spacing').addEventListener('input', function() {
+    document.getElementById('wm-spacing-val').textContent = this.value;
+    updateWatermark();
+  });
 
   // Re-render watermark when foreground color changes
   document.addEventListener('palette-color-changed', updateWatermark);
@@ -70,6 +74,7 @@ export function updateWatermark() {
   var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
   var color = state.activeColor;
   var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
+  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 40;
 
   var patternId = 'watermark-pattern';
   var defs = dom.svg.querySelector('defs');
@@ -77,13 +82,13 @@ export function updateWatermark() {
 
   var pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
   pattern.setAttribute('id', patternId);
-  pattern.setAttribute('width', '40');
-  pattern.setAttribute('height', '40');
+  pattern.setAttribute('width', String(spacing));
+  pattern.setAttribute('height', String(spacing));
   pattern.setAttribute('patternUnits', 'userSpaceOnUse');
   pattern.setAttribute('patternTransform', 'rotate(' + rotation + ')');
 
   var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', 'M 40 0 L 0 0 0 40');
+  path.setAttribute('d', 'M ' + spacing + ' 0 L 0 0 0 ' + spacing);
   path.setAttribute('fill', 'none');
   path.setAttribute('stroke', color);
   path.setAttribute('stroke-width', String(thickness));

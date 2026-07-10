@@ -131,6 +131,21 @@ export function initFileIO() {
 
   btnSaveSvg.addEventListener('click', saveSVG);
 
+  // About button
+  const btnAbout = document.getElementById('btn-about');
+  const aboutPopup = document.getElementById('about-popup');
+  btnAbout.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileMenu.hidden = true;
+    aboutPopup.hidden = false;
+  });
+  document.getElementById('btn-about-close').addEventListener('click', () => {
+    aboutPopup.hidden = true;
+  });
+  aboutPopup.addEventListener('click', (e) => {
+    if (e.target === aboutPopup) aboutPopup.hidden = true;
+  });
+
   function activateTab(format) {
     currentFormat = format;
     tabJpg.classList.toggle('active', format === 'jpg');
@@ -1096,7 +1111,8 @@ function buildWatermarkDefs() {
   var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
   var color = state.activeColor;
   var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
-  return '<defs>\n<pattern id="watermark-pattern" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M 40 0 L 0 0 0 40" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
+  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 40;
+  return '<defs>\n<pattern id="watermark-pattern" width="' + spacing + '" height="' + spacing + '" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M ' + spacing + ' 0 L 0 0 0 ' + spacing + '" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
 function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm) {

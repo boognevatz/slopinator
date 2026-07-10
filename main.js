@@ -20,8 +20,7 @@ import { dom } from './modules/editor.js';
 
 // ── Show last modified date of a source file ───────────
 async function showFileDate() {
-  const el = document.getElementById('file-date-label');
-  if (!el) return;
+  const aboutVersion = document.getElementById('about-version');
   const files = ['index.html', 'style.css', 'main.js', 'modules/select.js', 'modules/text.js', 'modules/line.js'];
   for (const f of files) {
     try {
@@ -31,7 +30,7 @@ async function showFileDate() {
         const d = new Date(header);
         const pad = (n) => String(n).padStart(2, '0');
         const formatted = `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        el.textContent = formatted;
+        if (aboutVersion) aboutVersion.textContent = formatted;
         return;
       }
     } catch {}

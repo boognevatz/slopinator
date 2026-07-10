@@ -596,6 +596,14 @@ body {
   color: #ccc;
 }
 
+/* ── About Popup ───────────────────────────────────── */
+#about-popup {
+  display: none;
+}
+#about-popup:not([hidden]) {
+  display: flex;
+}
+
 /* ── Export tabs ────────────────────────────────────── */
 
 .export-tab.active {
