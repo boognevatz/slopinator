@@ -131,6 +131,37 @@ export function initFileIO() {
 
   btnSaveSvg.addEventListener('click', saveSVG);
 
+  function createNewImage(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    var dataURI = c.toDataURL('image/png');
+    var img = new Image();
+    img.onload = function() {
+      loadImage(dataURI, w, h);
+      clearHistory();
+      switchTool('text');
+      updateWatermark();
+    };
+    img.src = dataURI;
+  }
+
+  document.getElementById('btn-new-create').addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileMenu.hidden = true;
+    var w = parseInt(document.getElementById('new-width').value) || 640;
+    var h = parseInt(document.getElementById('new-height').value) || 480;
+    createNewImage(w, h);
+  });
+
+  document.getElementById('btn-new-create-empty').addEventListener('click', () => {
+    var w = parseInt(document.getElementById('new-width-empty').value) || 640;
+    var h = parseInt(document.getElementById('new-height-empty').value) || 480;
+    createNewImage(w, h);
+  });
+
   // About button
   const btnAbout = document.getElementById('btn-about');
   const aboutPopup = document.getElementById('about-popup');

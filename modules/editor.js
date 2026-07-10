@@ -209,7 +209,7 @@ function updateLabels() {
 }
 
 function enableImageButtons(enabled) {
-  const ids = ['btn-save-svg', 'btn-export-dropdown-btn', 'btn-rotate-cw', 'btn-rotate-ccw', 'btn-flip-h', 'btn-flip-v', 'btn-zoom-in', 'btn-zoom-out', 'btn-zoom-fit', 'btn-zoom-11'];
+  const ids = ['btn-save-svg', 'btn-rotate-cw', 'btn-rotate-ccw', 'btn-flip-h', 'btn-flip-v', 'btn-zoom-in', 'btn-zoom-out', 'btn-zoom-fit', 'btn-zoom-11'];
   // btn-crop is a tool button, so it isn't strictly disabled on load natively, but let's leave it as is.
   for (const id of ids) {
     document.getElementById(id).disabled = !enabled;
