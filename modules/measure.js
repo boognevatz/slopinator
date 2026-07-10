@@ -35,8 +35,14 @@ export function deactivateMeasure() {
 
 function cleanupElements() {
   if (measureLine && measureLine.parentNode) measureLine.parentNode.removeChild(measureLine);
-  if (labelText && labelText.parentNode) labelText.parentNode.removeChild(labelText);
-  if (labelDeltaText && labelDeltaText.parentNode) labelDeltaText.parentNode.removeChild(labelDeltaText);
+  if (labelText) {
+    if (labelText._bg && labelText._bg.parentNode) labelText._bg.parentNode.removeChild(labelText._bg);
+    if (labelText.parentNode) labelText.parentNode.removeChild(labelText);
+  }
+  if (labelDeltaText) {
+    if (labelDeltaText._bg && labelDeltaText._bg.parentNode) labelDeltaText._bg.parentNode.removeChild(labelDeltaText._bg);
+    if (labelDeltaText.parentNode) labelDeltaText.parentNode.removeChild(labelDeltaText);
+  }
   dom.handleLayer.innerHTML = '';
   measureLine = null;
   labelText = null;
@@ -175,6 +181,14 @@ function onKeyDown(e) {
     case 'ArrowDown': moveEndpoint(0, step); moved = true; break;
     case 'ArrowLeft': moveEndpoint(-step, 0); moved = true; break;
     case 'ArrowRight': moveEndpoint(step, 0); moved = true; break;
+    case 'Tab':
+      if (selectedEndpoint >= 0 && pt1 && pt2) {
+        e.preventDefault();
+        selectedEndpoint = selectedEndpoint === 0 ? 1 : 0;
+        dom.handleLayer.innerHTML = '';
+        showHandles();
+      }
+      break;
   }
   if (moved) e.preventDefault();
 }
