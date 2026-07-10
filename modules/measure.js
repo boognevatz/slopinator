@@ -4,6 +4,7 @@ import { svgEl, screenToCoords } from './utils.js';
 let isDrawing = false;
 let measureLine = null;
 let labelText = null;
+let labelDeltaText = null;
 let startPt = null;
 let pt1 = null;
 let pt2 = null;
@@ -35,9 +36,11 @@ export function deactivateMeasure() {
 function cleanupElements() {
   if (measureLine && measureLine.parentNode) measureLine.parentNode.removeChild(measureLine);
   if (labelText && labelText.parentNode) labelText.parentNode.removeChild(labelText);
+  if (labelDeltaText && labelDeltaText.parentNode) labelDeltaText.parentNode.removeChild(labelDeltaText);
   dom.handleLayer.innerHTML = '';
   measureLine = null;
   labelText = null;
+  labelDeltaText = null;
   pt1 = null;
   pt2 = null;
   startPt = null;
@@ -213,10 +216,15 @@ function updateLabel() {
   var dy = pt2.y - pt1.y;
   var pixelLen = Math.sqrt(dx * dx + dy * dy);
   var mmLen = pixelLen / (state.image.dpi / 25.4);
+  var dpi = state.image.dpi;
   var midX = (pt1.x + pt2.x) / 2;
   var midY = (pt1.y + pt2.y) / 2;
 
   var text = Math.round(pixelLen) + 'px  \u00B7  ' + mmLen.toFixed(1) + 'mm';
+  var deltaPx = '(' + Math.round(dx) + ', ' + Math.round(dy) + ')px';
+  var ddx = dx / (dpi / 25.4);
+  var ddy = dy / (dpi / 25.4);
+  var deltaMm = '(' + ddx.toFixed(1) + ', ' + ddy.toFixed(1) + ')mm';
 
   if (!labelText) {
     labelText = svgEl('text', {
@@ -230,7 +238,6 @@ function updateLabel() {
     });
     dom.annotationLayer.appendChild(labelText);
   }
-
   labelText.setAttribute('x', midX);
   labelText.setAttribute('y', midY - 12);
   labelText.textContent = text;
@@ -245,11 +252,42 @@ function updateLabel() {
     labelText.parentNode.insertBefore(bg, labelText);
     labelText._bg = bg;
   }
+
+  if (!labelDeltaText) {
+    labelDeltaText = svgEl('text', {
+      x: midX, y: midY + 18,
+      'text-anchor': 'middle',
+      fill: '#4fc3f7',
+      'font-size': '13',
+      'font-family': 'monospace',
+      'font-weight': 'bold',
+      'pointer-events': 'none',
+    });
+    dom.annotationLayer.appendChild(labelDeltaText);
+    var bg2 = svgEl('rect', {
+      fill: 'rgba(0,0,0,0.65)',
+      rx: 3, ry: 3,
+      'pointer-events': 'none',
+    });
+    labelDeltaText.parentNode.insertBefore(bg2, labelDeltaText);
+    labelDeltaText._bg = bg2;
+  }
+  labelDeltaText.setAttribute('x', midX);
+  labelDeltaText.setAttribute('y', midY + 18);
+  labelDeltaText.textContent = deltaPx + '  ' + deltaMm;
+
   var bbox = labelText.getBBox();
   bg.setAttribute('x', bbox.x - 4);
   bg.setAttribute('y', bbox.y - 2);
   bg.setAttribute('width', bbox.width + 8);
   bg.setAttribute('height', bbox.height + 4);
+
+  var bbox2 = labelDeltaText.getBBox();
+  var bg2 = labelDeltaText._bg;
+  bg2.setAttribute('x', bbox2.x - 4);
+  bg2.setAttribute('y', bbox2.y - 2);
+  bg2.setAttribute('width', bbox2.width + 8);
+  bg2.setAttribute('height', bbox2.height + 4);
 }
 
 function getHandleRadius() {
