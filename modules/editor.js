@@ -46,6 +46,7 @@ export const dom = {
   svg: null,
   imageLayer: null,
   annotationLayer: null,
+  watermarkLayer: null,
   handleLayer: null,
   imageEl: null,
   emptyState: null,
@@ -56,6 +57,7 @@ export function initEditor() {
   dom.svg = document.getElementById('editor-svg');
   dom.imageLayer = document.getElementById('image-layer');
   dom.annotationLayer = document.getElementById('annotation-layer');
+  dom.watermarkLayer = document.getElementById('watermark-layer');
   dom.handleLayer = document.getElementById('handle-layer');
   dom.emptyState = document.getElementById('empty-state');
 }

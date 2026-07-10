@@ -9,6 +9,7 @@ import { clearHistory } from './history.js';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
 import { switchTool } from './tools.js';
+import { isLayerVisible } from './layers.js';
 
 export function initFileIO() {
   const fileInput = document.getElementById('file-input');
@@ -695,56 +696,65 @@ export function saveSVG() {
   // Image
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  svg += `<image data-type="background" href="${img.dataURI}" `;
-  svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-  svg += `transform="${imgTransform}" />\n`;
+  if (isLayerVisible('image-layer')) {
+    svg += `<image data-type="background" href="${img.dataURI}" `;
+    svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
+    svg += `transform="${imgTransform}" />\n`;
+  }
 
   // Annotations
-  svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
-  for (const el of state.elements) {
-    if (el.type === 'line') {
-      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-      if (pts.length >= 3) {
-        svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-      } else {
-        svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+  if (isLayerVisible('annotation-layer')) {
+    svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
+    for (const el of state.elements) {
+      if (el.type === 'line') {
+        const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+        if (pts.length >= 3) {
+          svg += `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+        } else {
+          svg += `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+          if (el.rotation) {
+            const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+            const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+            const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+            svg += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+          }
+          svg += `>\n`;
+          svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
+          svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+          svg += `  ${getLineDecorationsSvg(el)}\n`;
+          svg += `</g>\n`;
+        }
+      } else if (el.type === 'text') {
+        svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
+        svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
         if (el.rotation) {
-          const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-          svg += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+          // Need to calculate cx, cy - we can approximate it or get it from DOM
+          const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+          if (textEl) {
+            const transform = textEl.getAttribute('transform');
+            if (transform) svg += ` transform="${transform}"`;
+          }
         }
-        svg += `>\n`;
-        svg += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
-        svg += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-        svg += `  ${getLineDecorationsSvg(el)}\n`;
-        svg += `</g>\n`;
-      }
-    } else if (el.type === 'text') {
-      svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
-      svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-      if (el.rotation) {
-        // Need to calculate cx, cy - we can approximate it or get it from DOM
-        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-        if (textEl) {
-          const transform = textEl.getAttribute('transform');
-          if (transform) svg += ` transform="${transform}"`;
+        svg += `>`;
+        svg += escapeXml(el.content);
+        svg += `</text>\n`;
+      } else if (el.type === 'freehand') {
+        svg += `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else if (el.type === 'rectangle') {
+        svg += `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+        if (el.rotation) {
+          svg += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
         }
+        svg += ` />\n`;
       }
-      svg += `>`;
-      svg += escapeXml(el.content);
-      svg += `</text>\n`;
-    } else if (el.type === 'freehand') {
-      svg += `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-    } else if (el.type === 'rectangle') {
-      svg += `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
-      if (el.rotation) {
-        svg += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-      }
-      svg += ` />\n`;
     }
+    svg += `</g>\n`;
   }
-  svg += `</g>\n`;
+
+  // Watermark
+  if (isLayerVisible('watermark-layer')) {
+    svg += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+  }
 
   svg += `</svg>`;
 
@@ -775,52 +785,61 @@ export function exportJPG(widthOption) {
   // Image
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  svgStr += `<image href="${img.dataURI}" `;
-  svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-  svgStr += `transform="${imgTransform}" />\n`;
+  if (isLayerVisible('image-layer')) {
+    svgStr += `<image href="${img.dataURI}" `;
+    svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
+    svgStr += `transform="${imgTransform}" />\n`;
+  }
 
   // Annotations
-  svgStr += `<g transform="${imgTransform}">\n`;
-  for (const el of state.elements) {
-    if (el.type === 'line') {
-      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-      if (pts.length >= 3) {
-        svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-      } else {
-        svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+  if (isLayerVisible('annotation-layer')) {
+    svgStr += `<g transform="${imgTransform}">\n`;
+    for (const el of state.elements) {
+      if (el.type === 'line') {
+        const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+        if (pts.length >= 3) {
+          svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+        } else {
+          svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+          if (el.rotation) {
+            const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+            const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+            svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+          }
+          svgStr += `>\n`;
+          svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+          svgStr += `  ${getLineDecorationsSvg(el)}\n`;
+          svgStr += `</g>\n`;
+        }
+      } else if (el.type === 'text') {
+        svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
         if (el.rotation) {
-          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-          svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+          const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+          if (textEl) {
+            const transform = textEl.getAttribute('transform');
+            if (transform) svgStr += ` transform="${transform}"`;
+          }
         }
-        svgStr += `>\n`;
-        svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-        svgStr += `  ${getLineDecorationsSvg(el)}\n`;
-        svgStr += `</g>\n`;
-      }
-    } else if (el.type === 'text') {
-      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-      if (el.rotation) {
-        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-        if (textEl) {
-          const transform = textEl.getAttribute('transform');
-          if (transform) svgStr += ` transform="${transform}"`;
+        svgStr += `>`;
+        svgStr += escapeXml(el.content);
+        svgStr += `</text>\n`;
+      } else if (el.type === 'freehand') {
+        svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else if (el.type === 'rectangle') {
+        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+        if (el.rotation) {
+          svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
         }
+        svgStr += ` />\n`;
       }
-      svgStr += `>`;
-      svgStr += escapeXml(el.content);
-      svgStr += `</text>\n`;
-    } else if (el.type === 'freehand') {
-      svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-    } else if (el.type === 'rectangle') {
-      svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
-      if (el.rotation) {
-        svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-      }
-      svgStr += ` />\n`;
     }
+    svgStr += `</g>\n`;
   }
-  svgStr += `</g>\n`;
+
+  // Watermark
+  if (isLayerVisible('watermark-layer')) {
+    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+  }
 
   svgStr += `</svg>`;
 
@@ -888,48 +907,56 @@ export function exportPDF(widthOption, pageSize) {
   svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  svgStr += `<image href="${img.dataURI}" `;
-  svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-  svgStr += `transform="${imgTransform}" />\n`;
-  svgStr += `<g transform="${imgTransform}">\n`;
-  for (const el of state.elements) {
-    if (el.type === 'line') {
-      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-      if (pts.length >= 3) {
-        svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-      } else {
-        svgStr += `<g data-type="line"`;
-        if (el.rotation) {
-          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-          svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
-        }
-        svgStr += `>\n`;
-        svgStr += `  <line x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-        svgStr += `  ${getLineDecorationsSvg(el)}\n`;
-        svgStr += `</g>\n`;
-      }
-    } else if (el.type === 'text') {
-      svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-      if (el.rotation) {
-        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-        if (textEl) {
-          const transform = textEl.getAttribute('transform');
-          if (transform) svgStr += ` transform="${transform}"`;
-        }
-      }
-      svgStr += `>${escapeXml(el.content)}</text>\n`;
-    } else if (el.type === 'freehand') {
-      svgStr += `<polyline data-type="freehand" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-    } else if (el.type === 'rectangle') {
-      svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
-      if (el.rotation) {
-        svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-      }
-      svgStr += ` />\n`;
-    }
+  if (isLayerVisible('image-layer')) {
+    svgStr += `<image href="${img.dataURI}" `;
+    svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
+    svgStr += `transform="${imgTransform}" />\n`;
   }
-  svgStr += `</g>\n</svg>`;
+  if (isLayerVisible('annotation-layer')) {
+    svgStr += `<g transform="${imgTransform}">\n`;
+    for (const el of state.elements) {
+      if (el.type === 'line') {
+        const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+        if (pts.length >= 3) {
+          svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+        } else {
+          svgStr += `<g data-type="line"`;
+          if (el.rotation) {
+            const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+            const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+            svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+          }
+          svgStr += `>\n`;
+          svgStr += `  <line x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+          svgStr += `  ${getLineDecorationsSvg(el)}\n`;
+          svgStr += `</g>\n`;
+        }
+      } else if (el.type === 'text') {
+        svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
+        if (el.rotation) {
+          const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+          if (textEl) {
+            const transform = textEl.getAttribute('transform');
+            if (transform) svgStr += ` transform="${transform}"`;
+          }
+        }
+        svgStr += `>${escapeXml(el.content)}</text>\n`;
+      } else if (el.type === 'freehand') {
+        svgStr += `<polyline data-type="freehand" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else if (el.type === 'rectangle') {
+        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+        if (el.rotation) {
+          svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
+        }
+        svgStr += ` />\n`;
+      }
+    }
+    svgStr += `</g>\n`;
+  }
+  if (isLayerVisible('watermark-layer')) {
+    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n</g>\n`;
+  }
+  svgStr += `</svg>`;
 
   const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);

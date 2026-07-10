@@ -547,6 +547,55 @@ body {
   box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.5);
 }
 
+/* ── Layers Panel ───────────────────────────────────── */
+
+#layers-panel {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #2d2d2d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 130px;
+  z-index: 20;
+  user-select: none;
+}
+
+.layer-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.layer-entry:hover {
+  background: #3a3a3a;
+}
+
+.layer-eye {
+  font-size: 14px;
+  line-height: 1;
+  width: 18px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.layer-eye:hover {
+  opacity: 1;
+}
+
+.layer-eye.hidden {
+  opacity: 0.3;
+}
+
+.layer-name {
+  font-size: 12px;
+  color: #ccc;
+}
+
 /* ── Export tabs ────────────────────────────────────── */
 
 .export-tab.active {

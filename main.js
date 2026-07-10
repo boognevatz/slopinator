@@ -14,6 +14,7 @@ import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initPerspective } from './modules/perspective.js';
 import { initColorCorrection } from './modules/colorcorrection.js';
+import { initLayers } from './modules/layers.js';
 
 import { dom } from './modules/editor.js';
 
@@ -58,6 +59,7 @@ function init() {
   initRectangle();
   initPerspective();
   initColorCorrection();
+  initLayers();
   initFileIO();
 
   // ── Toolbar button wiring ───────────────────────────────────
