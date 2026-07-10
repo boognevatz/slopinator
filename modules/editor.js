@@ -18,6 +18,7 @@ export const state = {
     flipV: false,
     zoomScale: 1.0,
     fitScale: 1.0,
+    dpi: 300,
   },
   elements: [],         // { id, type, ...props }
   selectedId: null,
@@ -102,6 +103,7 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
 
   // Enable toolbar buttons
   enableImageButtons(true);
+  document.dispatchEvent(new CustomEvent('image-loaded'));
 }
 
 /**
@@ -256,6 +258,7 @@ export function restoreState(parsed) {
 
   dom.emptyState.classList.add('hidden');
   enableImageButtons(true);
+  document.dispatchEvent(new CustomEvent('image-loaded'));
 
   // Return parsed elements so caller can recreate them
   return parsed.elements || [];

@@ -262,13 +262,14 @@ export function initFileIO() {
     resizeNotification.hidden = true;
   }, { capture: true });
 
-  // ── Resize dropdown ─────────────────────────────────────────
+  // ── Resize dropdown + DPI (combined popup) ──────────────
   const sizeLabel = document.getElementById('image-size-label');
   const resizeMenu = document.getElementById('resize-menu');
   const resizeW = document.getElementById('resize-width-input');
   const resizeH = document.getElementById('resize-height-input');
   const resizeRatioRadios = document.querySelectorAll('input[name="resize-ratio"]');
   const btnResizeApply = document.getElementById('btn-resize-apply');
+  const dpiInput = document.getElementById('dpi-input');
   let lastResizeInput = 'width';
 
   function getResizeRatio() {
@@ -300,14 +301,24 @@ export function initFileIO() {
     }
   }
 
-  sizeLabel.addEventListener('click', (e) => {
-    e.stopPropagation();
+  function openResizePopup() {
     if (!state.hasImage) return;
     const dims = getViewBoxDims();
     resizeW.value = Math.round(dims.width);
     resizeH.value = Math.round(dims.height);
+    dpiInput.value = state.image.dpi;
     resizeMenu.hidden = !resizeMenu.hidden;
     if (!resizeMenu.hidden) { resizeW.focus(); resizeW.select(); }
+  }
+
+  sizeLabel.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openResizePopup();
+  });
+
+  document.getElementById('dpi-display').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openResizePopup();
   });
 
   resizeW.addEventListener('focus', () => { lastResizeInput = 'width'; });
@@ -324,13 +335,24 @@ export function initFileIO() {
     }
   });
 
-  btnResizeApply.addEventListener('click', () => {
+  function doApplyResize() {
     const w = parseInt(resizeW.value);
     const h = parseInt(resizeH.value);
     if (isNaN(w) || isNaN(h) || w < 1 || h < 1) return;
+    var v = parseInt(dpiInput.value);
+    if (!isNaN(v) && v > 0) state.image.dpi = v;
     resizeMenu.hidden = true;
     resizeImage(w, h);
-  });
+  }
+
+  btnResizeApply.addEventListener('click', doApplyResize);
+  dpiInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
+  resizeW.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
+  resizeH.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doApplyResize(); } });
+
+  document.addEventListener('image-loaded', recalcDpi);
+  document.addEventListener('selection-changed', recalcDpi);
+  recalcDpi();
 }
 
 // ── Open File ───────────────────────────────────────────────────
@@ -1089,6 +1111,16 @@ function findActualSizeMarker() {
     return { pixelsPerMm: pixelLen / realValue, pixelLen: pixelLen, realMm: realValue };
   }
   return null;
+}
+
+export function recalcDpi() {
+  var display = document.getElementById('dpi-display');
+  if (!display) return;
+  var marker = findActualSizeMarker();
+  if (marker) {
+    state.image.dpi = Math.round(marker.pixelsPerMm * 25.4);
+  }
+  display.textContent = state.image.dpi + ' DPI';
 }
 
 async function deflateRgb(imageData) {

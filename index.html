@@ -156,10 +156,16 @@
       </div>
 
       <div class="toolbar-group separator" style="margin-left: auto;">
+        <span class="toolbar-label" id="dpi-display" title="Click to edit DPI" style="cursor:pointer;">300 DPI</span>
         <div class="dropdown" id="resize-dropdown">
           <span class="toolbar-label" id="image-size-label" style="cursor: pointer;"></span>
           <div class="dropdown-menu dropdown-menu-right" id="resize-menu" hidden>
             <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 10px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="toolbar-label">DPI:</span>
+                <input type="number" id="dpi-input" value="300" min="1" max="9999" class="small-input" style="width:60px;">
+              </div>
+              <div style="border-top:1px solid #444;margin:2px 0;"></div>
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span class="toolbar-label">W:</span>
                 <input type="number" id="resize-width-input" class="small-input crop-size-input" min="1">
@@ -173,7 +179,7 @@
                 <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="4:3"> 4:3</label>
                 <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="16:9"> 16:9</label>
               </div>
-              <button id="btn-resize-apply" style="width:100%;">Resize</button>
+              <button id="btn-resize-apply" style="width:100%;">Apply</button>
             </div>
           </div>
         </div>
