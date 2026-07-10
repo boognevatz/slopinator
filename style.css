@@ -337,15 +337,19 @@ button.tool-btn.active {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 #right-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
   width: 180px;
-  background: #252525;
-  border-left: 1px solid #444;
+  background: rgba(37, 37, 37, 0.9);
   overflow-y: auto;
-  flex-shrink: 0;
   user-select: none;
+  z-index: 10;
 }
 
 #right-panel .layer-entry {
@@ -355,7 +359,7 @@ button.tool-btn.active {
   padding: 6px 10px;
   cursor: pointer;
 }
-#left-panel .layer-entry:hover {
+#right-panel .layer-entry:hover {
   background: #3a3a3a;
 }
 
