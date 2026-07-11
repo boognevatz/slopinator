@@ -66,6 +66,21 @@ export function initLine() {
       applySizeToPendingPolyline();
     }
   });
+  document.addEventListener('palette-color-changed', (e) => {
+    if (isDrawing && previewLine) {
+      previewLine.setAttribute('stroke', e.detail.color);
+    }
+    if (pendingPolyline) {
+      pendingPolyline.stroke = e.detail.color;
+      updateLineElement(pendingPolyline);
+    }
+  });
+  document.addEventListener('palette-bgcolor-changed', (e) => {
+    if (pendingPolyline && pendingPolyline.closed) {
+      pendingPolyline.fill = e.detail.color === 'transparent' ? 'none' : e.detail.color;
+      updateLineElement(pendingPolyline);
+    }
+  });
 }
 
 function applyStyleToPendingPolyline() {
@@ -219,7 +234,6 @@ function onMouseDown(e) {
     y2: startPt.y,
     stroke: state.activeColor,
     'stroke-width': state.activeThickness,
-    opacity: '0.6',
     'pointer-events': 'none',
   });
   applyLineStyle(previewLine, state.activeLineStyle);
