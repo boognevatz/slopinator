@@ -800,13 +800,16 @@ export function addLineElement(data) {
   if (pts.length >= 3) {
     const ptsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
     if (data.closed) {
-      const polygon = svgEl('polygon', {
+      const hasFill = data.fill && data.fill !== 'none' && data.fill !== 'transparent';
+      const polygonAttrs = {
         points: ptsStr,
-        fill: data.fill || 'none',
+        fill: hasFill ? data.fill : 'none',
         stroke: data.stroke,
         'stroke-width': data.strokeWidth,
         class: 'annotation-line',
-      });
+      };
+      if (hasFill) polygonAttrs.style = 'pointer-events: visibleFill';
+      const polygon = svgEl('polygon', polygonAttrs);
       applyLineStyle(polygon, data.lineStyle);
 
       const hitArea = svgEl('polygon', {
