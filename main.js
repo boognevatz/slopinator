@@ -61,6 +61,29 @@ function init() {
   initLayers();
   initFileIO();
 
+  // ── Mobile dropdown toggle ────────────────────────────────
+
+  document.querySelectorAll('.mobile-group-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
+      const content = document.querySelector(`[data-group-content="${group}"]`);
+      if (content) {
+        const isOpen = content.classList.toggle('open');
+        btn.textContent = group.charAt(0).toUpperCase() + group.slice(1) + (isOpen ? ' ▴' : ' ▾');
+      }
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.mobile-group-wrap')) {
+      document.querySelectorAll('[data-group-content].open').forEach(el => {
+        el.classList.remove('open');
+        const group = el.dataset.groupContent;
+        const btn = document.querySelector(`.mobile-group-btn[data-group="${group}"]`);
+        if (btn) btn.textContent = group.charAt(0).toUpperCase() + group.slice(1) + ' ▾';
+      });
+    }
+  });
+
   // ── Toolbar button wiring ───────────────────────────────────
 
   document.getElementById('btn-rotate-cw').addEventListener('click', rotateCW);

@@ -127,43 +127,55 @@
         </div>
       </div>
 
-      <div class="toolbar-group separator">
-        <button id="btn-select" class="tool-btn active" title="Select (V)" data-tool="select">✋</button>
-        <button id="btn-line" class="tool-btn" title="Line (L)" data-tool="line">Line</button>
-        <button id="btn-text" class="tool-btn" title="Text (T)" data-tool="text">Text</button>
-        <button id="btn-crop" class="tool-btn" title="Crop (C)" data-tool="crop">Crop</button>
-        <button id="btn-freehand" class="tool-btn" title="Freehand (F)" data-tool="freehand">Freehand</button>
-        <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
-        <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
-        <button id="btn-color" class="tool-btn" title="Color Correction (K)" data-tool="color">Color</button>
-        <button id="btn-watermark" class="tool-btn" title="Watermark" data-tool="watermark">Watermark</button>
-        <button id="btn-measure" class="tool-btn" title="Measure" data-tool="measure">📏</button>
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="tools">Tools ▾</button>
+        <div class="toolbar-group separator" data-group-content="tools">
+          <button id="btn-select" class="tool-btn active" title="Select (V)" data-tool="select">✋</button>
+          <button id="btn-line" class="tool-btn" title="Line (L)" data-tool="line">Line</button>
+          <button id="btn-text" class="tool-btn" title="Text (T)" data-tool="text">Text</button>
+          <button id="btn-crop" class="tool-btn" title="Crop (C)" data-tool="crop">Crop</button>
+          <button id="btn-freehand" class="tool-btn" title="Freehand (F)" data-tool="freehand">Freehand</button>
+          <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
+          <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
+          <button id="btn-color" class="tool-btn" title="Color Correction (K)" data-tool="color">Color</button>
+          <button id="btn-watermark" class="tool-btn" title="Watermark" data-tool="watermark">Watermark</button>
+          <button id="btn-measure" class="tool-btn" title="Measure" data-tool="measure">📏</button>
+        </div>
       </div>
 
-      <div class="toolbar-group separator">
-        <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
-        <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="undo">Undo ▾</button>
+        <div class="toolbar-group separator" data-group-content="undo">
+          <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+          <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
+        </div>
       </div>
 
-      <div class="toolbar-group separator">
-        <button id="btn-rotate-ccw" title="Rotate 90° CCW" disabled>⟲ CCW</button>
-        <button id="btn-rotate-cw" title="Rotate 90° CW" disabled>⟳ CW</button>
-        <button id="btn-flip-h" title="Flip Horizontal" disabled>↔ Flip H</button>
-        <button id="btn-flip-v" title="Flip Vertical" disabled>↕ Flip V</button>
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="rotate">Rotate ▾</button>
+        <div class="toolbar-group separator" data-group-content="rotate">
+          <button id="btn-rotate-ccw" title="Rotate 90° CCW" disabled>⟲ CCW</button>
+          <button id="btn-rotate-cw" title="Rotate 90° CW" disabled>⟳ CW</button>
+          <button id="btn-flip-h" title="Flip Horizontal" disabled>↔ Flip H</button>
+          <button id="btn-flip-v" title="Flip Vertical" disabled>↕ Flip V</button>
+        </div>
       </div>
 
-      <div class="toolbar-group separator">
-        <button id="btn-zoom-in" title="Zoom In (+)" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-        <button id="btn-zoom-out" title="Zoom Out (-)" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-        <button id="btn-zoom-fit" title="Zoom Fit" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
-        </button>
-        <button id="btn-zoom-11" title="1:1 (Actual Pixels)" disabled>1:1</button>
-        <span class="toolbar-label" id="zoom-label" style="min-width: 140px; text-align: center;">100%</span>
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="zoom">Zoom ▾</button>
+        <div class="toolbar-group separator" data-group-content="zoom">
+          <button id="btn-zoom-in" title="Zoom In (+)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button id="btn-zoom-out" title="Zoom Out (-)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button id="btn-zoom-fit" title="Zoom Fit" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+          </button>
+          <button id="btn-zoom-11" title="1:1 (Actual Pixels)" disabled>1:1</button>
+          <span class="toolbar-label" id="zoom-label" style="min-width: 140px; text-align: center;">100%</span>
+        </div>
       </div>
 
       <div class="toolbar-group separator" style="margin-left: auto;">

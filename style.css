@@ -365,6 +365,52 @@ button.tool-btn.active {
 
 /* ── Editor Container ────────────────────────────────── */
 
+/* ── Mobile Dropdown Groups ──────────────────────────── */
+
+.mobile-group-wrap {
+  position: relative;
+}
+
+.mobile-group-btn {
+  display: none;
+}
+
+[data-group-content].open {
+  display: flex !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-group-btn {
+    display: block;
+  }
+  .mobile-group-wrap [data-group-content] {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 6px 8px;
+    z-index: 200;
+    flex-direction: column;
+    gap: 4px;
+    white-space: nowrap;
+    min-width: max-content;
+  }
+  .mobile-group-wrap [data-group-content].open {
+    display: flex !important;
+  }
+  #toolbar {
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+  }
+  .toolbar-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+
 #editor-container {
   flex: 1;
   position: relative;
