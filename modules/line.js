@@ -169,6 +169,7 @@ function onMouseDown(e) {
            (activeExtendIdx === pts.length - 1 && nearIdx === 0))) {
         e.preventDefault();
         pendingPolyline.closed = true;
+        pendingPolyline.fill = state.bgColor && state.bgColor !== 'transparent' ? state.bgColor : 'none';
         pendingPolyline.startDecoration = 'none';
         pendingPolyline.endDecoration = 'none';
         updateLineElement(pendingPolyline);
@@ -801,7 +802,7 @@ export function addLineElement(data) {
     if (data.closed) {
       const polygon = svgEl('polygon', {
         points: ptsStr,
-        fill: 'none',
+        fill: data.fill || 'none',
         stroke: data.stroke,
         'stroke-width': data.strokeWidth,
         class: 'annotation-line',

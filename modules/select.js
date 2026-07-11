@@ -67,6 +67,15 @@ export function initSelect() {
         doFn: () => { data.fill = color; updateRectangleElement(data); drawHandles(data); },
         undoFn: () => { data.fill = oldFill; updateRectangleElement(data); drawHandles(data); },
       });
+    } else if (data.type === 'line' && data.closed) {
+      data.fill = color === 'transparent' ? 'none' : color;
+      updateLineSVG(data);
+      drawHandles(data);
+      pushAction({
+        description: 'Change polygon fill color',
+        doFn: () => { data.fill = color; updateLineSVG(data); drawHandles(data); },
+        undoFn: () => { data.fill = oldFill; updateLineSVG(data); drawHandles(data); },
+      });
     }
   });
   document.addEventListener('line-style-changed', (e) => {
@@ -352,6 +361,9 @@ export function selectElement(id) {
     state.activeThickness = data.strokeWidth;
     setActiveLineStyle(data.lineStyle);
     setActiveLineMarkerSize(data.lineMarkerSize);
+    if (data.closed) {
+      state.bgColor = data.fill && data.fill !== 'none' ? data.fill : 'transparent';
+    }
   } else if (data.type === 'text') {
     state.activeColor = data.stroke || state.activeColor;
     state.bgColor = data.fill || state.bgColor;
