@@ -29,6 +29,10 @@ let rotationTooltip = null;
 let _lastClickTime = 0;
 let _lastClickId = null;
 
+// Pan state
+let isPanning = false;
+let panStart = null;
+
 
 export function initSelect() {
   // Listen for color/thickness changes on selected element
@@ -213,6 +217,12 @@ export function activateSelect() {
 export function deactivateSelect() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
+  if (isPanning) {
+    document.removeEventListener('pointermove', onPanMove);
+    document.removeEventListener('pointerup', onPanEnd);
+    isPanning = false;
+    panStart = null;
+  }
   clearSelection();
 }
 
@@ -281,8 +291,39 @@ function onMouseDown(e) {
     return;
   }
 
-  // Clicked empty space → deselect
+  // Clicked empty space → pan
   clearSelection();
+  if (state.hasImage) {
+    e.preventDefault();
+    const container = dom.svg.parentElement;
+    isPanning = true;
+    panStart = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      scrollLeft: container.scrollLeft,
+      scrollTop: container.scrollTop,
+    };
+    dom.svg.style.cursor = 'grabbing';
+    document.addEventListener('pointermove', onPanMove);
+    document.addEventListener('pointerup', onPanEnd);
+  }
+}
+
+function onPanMove(e) {
+  if (!isPanning || !panStart) return;
+  const container = dom.svg.parentElement;
+  const dx = panStart.clientX - e.clientX;
+  const dy = panStart.clientY - e.clientY;
+  container.scrollLeft = panStart.scrollLeft + dx;
+  container.scrollTop = panStart.scrollTop + dy;
+}
+
+function onPanEnd() {
+  document.removeEventListener('pointermove', onPanMove);
+  document.removeEventListener('pointerup', onPanEnd);
+  isPanning = false;
+  panStart = null;
+  dom.svg.style.cursor = 'default';
 }
 
 function findAnnotationParent(target) {
