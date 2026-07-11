@@ -729,9 +729,10 @@ function onDragEnd() {
   }
 
   // Modal click on mode-toggle: if mouse barely moved, treat as click to toggle mode
-  if (dragStart && dragStart._dragSource === 'mode-toggle' && data.type === 'line') {
-    const dx = final.x1 - orig.x1;
-    const dy = final.y1 - orig.y1;
+  if (dragStart && dragStart._dragSource === 'mode-toggle') {
+    let dx, dy;
+    if (data.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
+    else { dx = (final.x || 0) - (orig.x || 0); dy = (final.y || 0) - (orig.y || 0); }
     if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
       dragOriginal = null;
       textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
@@ -779,8 +780,8 @@ function startResize(handleEl, startPt, e) {
   const data = state.elements.find(el => el.id === state.selectedId);
   if (!data) return;
 
-  // Mode-toggle on a line: start drag (move). _dragSource flags for click detection
-  if (handleType === 'mode-toggle' && data.type === 'line') {
+  // Mode-toggle: start drag (move). _dragSource flags for click detection
+  if (handleType === 'mode-toggle' && (data.type === 'line' || data.type === 'text' || data.type === 'rectangle')) {
     startDrag(state.selectedId, startPt);
     if (dragStart) dragStart._dragSource = 'mode-toggle';
     return;
