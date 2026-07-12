@@ -403,29 +403,12 @@
     <div id="right-panel" hidden>
       <div id="layer-list">
         <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layers</div>
-        <div class="layer-entry" data-layer="watermark-layer">
-          <div class="layer-header">
-            <span class="layer-eye">👁</span>
-            <span class="layer-name">Watermark</span>
-          </div>
-        </div>
-        <div class="layer-entry" data-layer="annotation-layer">
-          <div class="layer-header">
-            <span class="layer-eye">👁</span>
-            <span class="layer-name">Annotations</span>
-          </div>
-        </div>
-        <div class="layer-entry" data-layer="grid-layer">
-          <div class="layer-header">
-            <span class="layer-eye">👁</span>
-            <span class="layer-name">Grid</span>
-          </div>
-        </div>
-        <div class="layer-entry" data-layer="image-layer">
-          <div class="layer-header">
-            <span class="layer-eye">👁</span>
-            <span class="layer-name">Image</span>
-          </div>
+        <div id="layer-entries"></div>
+        <div style="display:flex;border-top:1px solid var(--color-border);">
+          <button id="btn-layer-add" style="flex:1;border:none;border-radius:0;padding:4px;font-size:14px;cursor:pointer;">+</button>
+          <button id="btn-layer-remove" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">−</button>
+          <button id="btn-layer-up" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">^</button>
+          <button id="btn-layer-down" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">v</button>
         </div>
       </div>
       <div id="layer-props">

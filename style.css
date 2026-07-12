@@ -415,7 +415,7 @@ button.tool-btn.active {
   background: var(--color-bg-hover);
 }
 #right-panel .layer-entry.selected .layer-header {
-  background: var(--color-bg-hover);
+  background: var(--color-accent);
 }
 
 /* ── Editor Container ────────────────────────────────── */

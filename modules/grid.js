@@ -8,25 +8,18 @@ export function initGrid() {
 
   // Grid hidden by default
   dom.gridLayer.setAttribute('visibility', 'hidden');
-  const gridEye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
-  if (gridEye) gridEye.classList.add('hidden');
+  syncGridEye();
 
   bindGridControls();
 
   document.addEventListener('palette-color-changed', () => {
     if (state.grid.visible) updateGrid();
   });
+}
 
-  // Sync state when layers panel eye toggles grid layer
-  const eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
-  if (eye) {
-    eye.addEventListener('click', () => {
-      const hidden = dom.gridLayer.getAttribute('visibility') === 'hidden';
-      state.grid.visible = !hidden;
-      updateGridButtonState();
-      if (state.grid.visible) updateGrid();
-    });
-  }
+export function syncGridEye() {
+  var eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
+  if (eye) eye.classList.toggle('hidden', dom.gridLayer.getAttribute('visibility') === 'hidden');
 }
 
 export function bindGridControls() {
@@ -172,7 +165,7 @@ export function updateGrid() {
   layer.appendChild(rect);
 }
 
-function updateGridButtonState() {
+export function updateGridButtonState() {
   const btn = document.getElementById('btn-grid');
   if (btn) btn.classList.toggle('active', state.grid.visible);
 }
