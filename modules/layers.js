@@ -124,6 +124,7 @@ function renderLayerList() {
       if (hidden) {
         el.removeAttribute('visibility');
         this.classList.remove('hidden');
+        if (entryData.id === 'watermark-layer') updateWatermark();
       } else {
         el.setAttribute('visibility', 'hidden');
         this.classList.add('hidden');
@@ -377,10 +378,13 @@ export function updateWatermark() {
   if (!isLayerVisible('watermark-layer')) return;
   if (!state.activeColor || state.activeColor === 'transparent') return;
 
-  var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
+  var thicknessEl = document.getElementById('wm-thickness');
+  var rotationEl = document.getElementById('wm-rotation');
+  var spacingEl = document.getElementById('wm-spacing');
+  var thickness = thicknessEl ? parseFloat(thicknessEl.value) : state.activeThickness;
   var color = state.activeColor;
-  var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
-  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 40;
+  var rotation = rotationEl ? parseFloat(rotationEl.value) : 45;
+  var spacing = spacingEl ? parseFloat(spacingEl.value) : 40;
 
   var patternId = 'watermark-pattern';
   var defs = dom.svg.querySelector('defs');
