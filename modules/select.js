@@ -26,6 +26,7 @@ let textInteractMode = 'resize'; // 'resize' | 'rotate'
 let origRotation = 0;     // original rotation angle when starting rotation
 let rotationCenter = null; // { cx, cy }
 let lineEditMode = 'move';  // 'move' | 'change-end'
+let _tempUngrouped = false;
 let selectedLineEndpoint = 'end'; // 'start' | 'end'
 let rotationTooltip = null;
 let _lastClickTime = 0;
@@ -289,6 +290,14 @@ function onMouseDown(e) {
     _lastClickTime = now;
     _lastClickId = id;
     if (isDblClick) {
+      if (annotGroup.dataset && annotGroup.dataset.type === 'group') {
+        var actualAnnot = findActualAnnotation(target);
+        if (actualAnnot) {
+          selectElement(actualAnnot.id, false);
+          _tempUngrouped = true;
+          return;
+        }
+      }
       if (data && data.type === 'text') {
         setTimeout(() => startEditing(id), 0);
         return;
@@ -398,16 +407,16 @@ function onKeyDown(e) {
 }
 
 function findAnnotationParent(target) {
-  let el = target;
+  var el = target;
   while (el && el !== dom.svg) {
     if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) {
       var groupParent = el.parentElement;
-      if (groupParent && groupParent.dataset && groupParent.dataset.type === 'group') return groupParent;
+      if (!_tempUngrouped && groupParent && groupParent.dataset && groupParent.dataset.type === 'group') return groupParent;
       return el;
     }
     if (el.dataset && el.dataset.type === 'text') {
       var gp = el.parentElement;
-      if (gp && gp.dataset && gp.dataset.type === 'group') return gp;
+      if (!_tempUngrouped && gp && gp.dataset && gp.dataset.type === 'group') return gp;
       return el;
     }
     if (el.dataset && el.dataset.type === 'group') return el;
@@ -416,11 +425,25 @@ function findAnnotationParent(target) {
   return null;
 }
 
+function findActualAnnotation(target) {
+  var el = target;
+  while (el && el !== dom.svg) {
+    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle' || el.dataset.type === 'text')) return el;
+    el = el.parentElement;
+  }
+  return null;
+}
+
 // ── Selection ───────────────────────────────────────────────────
+
+export function clearTempUngroup() {
+  _tempUngrouped = false;
+}
 
 export function selectElement(id, addToSelection) {
   var groupData = state.elements.find(function(el) { return el.id === id && el.type === 'group'; });
   if (groupData) {
+    _tempUngrouped = false;
     if (addToSelection) {
       var allSelected = true;
       for (var gg = 0; gg < groupData.childIds.length; gg++) {
@@ -564,6 +587,7 @@ function updateGroupButton() {
 }
 
 export function clearSelection() {
+  _tempUngrouped = false;
   state.selectedId = null;
   state.selectedIds = [];
   dom.handleLayer.innerHTML = '';

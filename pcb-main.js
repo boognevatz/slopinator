@@ -4,7 +4,7 @@ import { initPalette } from './modules/palette.js';
 import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToOne } from './modules/transform.js';
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
-import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement } from './modules/select.js';
+import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup } from './modules/select.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
@@ -187,7 +187,7 @@ function init() {
             var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
             if (selData && selData.parentId) {
               var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-              if (groupData) { selectElement(groupData.id, false); break; }
+              if (groupData) { clearTempUngroup(); selectElement(groupData.id, false); break; }
             }
             clearSelection();
           }
