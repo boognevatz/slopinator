@@ -3,9 +3,8 @@ import { bindGridControls, toggleGrid } from './grid.js';
 
 var SYSTEM_LAYERS = {
   'image-layer': { name: 'Image', index: 0 },
-  'annotation-layer': { name: 'Annotations', index: 1 },
-  'watermark-layer': { name: 'Watermark', index: 3 },
-  'grid-layer': { name: 'Grid', index: 4 },
+  'watermark-layer': { name: 'Watermark', index: 2 },
+  'grid-layer': { name: 'Grid', index: 3 },
 };
 
 // Ordered list: image → annotation → [user layers] → watermark → grid
@@ -17,12 +16,17 @@ var _selectedRow = null;
 export function initLayers() {
   initLayerOrder();
 
+  // Create initial "Annotations" user layer (reuses existing #annotation-layer <g>)
+  userLayerCounter = 1;
+  layerOrder.splice(1, 0, { id: 'annotation-layer', name: 'Annotations', system: false });
+  dom.annotationLayer = document.getElementById('annotation-layer');
+
   // Watermark hidden by default
   var wmLayer = document.getElementById('watermark-layer');
   if (wmLayer) wmLayer.setAttribute('visibility', 'hidden');
 
   renderLayerList();
-  selectLayer(layerOrder[0].id);
+  selectLayer('annotation-layer');
 
   // Toggle right panel
   var rightPanel = document.getElementById('right-panel');
@@ -45,7 +49,6 @@ export function initLayers() {
 function initLayerOrder() {
   layerOrder = [
     { id: 'image-layer', name: 'Image', system: true },
-    { id: 'annotation-layer', name: 'Annotations', system: true },
     // user layers inserted here
     { id: 'watermark-layer', name: 'Watermark', system: true },
     { id: 'grid-layer', name: 'Grid', system: true },
@@ -149,37 +152,39 @@ function getLayerData(el) {
 
 function selectLayer(id) {
   layerOrder.forEach(function(l) { l._selected = l.id === id; });
-  renderLayerList();
   var entry = layerOrder.find(function(l) { return l.id === id; });
+  if (entry && !entry.system) {
+    var g = document.getElementById(id);
+    if (g) dom.annotationLayer = g;
+  }
+  renderLayerList();
   if (entry) showLayerProps(entry);
 }
 
 function addLayer() {
   var selected = layerOrder.find(function(l) { return l._selected; });
-  var insertIndex = 2; // default: bottom of user zone (after annotation)
+  var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'watermark-layer'; });
+  var insertIndex = watermarkIdx;
 
   if (selected) {
     var selIdx = layerOrder.indexOf(selected);
-    // System layers below user zone (image, annotation): insert at bottom of user zone
-    if (selIdx < 2) insertIndex = 2;
-    // System layers above user zone (watermark, grid): insert at top of user zone
-    else if (selIdx >= 3 && selected.system) insertIndex = 3;
-    // User layer: insert above selected (higher z = later in array)
-    else insertIndex = selIdx + 1;
+    if (!selected.system) {
+      insertIndex = Math.min(watermarkIdx, selIdx + 1);
+    }
   }
+
+  if (insertIndex < 1) insertIndex = 1;
+  if (insertIndex > watermarkIdx) insertIndex = watermarkIdx;
 
   userLayerCounter++;
   var id = 'user-layer-' + userLayerCounter;
   var name = 'Layer ' + userLayerCounter;
 
-  // Create SVG <g> element right before watermark-layer in DOM
   var watermarkG = document.getElementById('watermark-layer');
   var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('id', id);
   if (watermarkG && watermarkG.parentNode) {
     watermarkG.parentNode.insertBefore(g, watermarkG);
-  } else {
-    document.getElementById('annotation-layer').after(g);
   }
 
   layerOrder.splice(insertIndex, 0, { id: id, name: name, system: false });
@@ -189,7 +194,7 @@ function addLayer() {
 function moveLayerUp() {
   var selected = layerOrder.find(function(l) { return l._selected; });
   if (!selected) return;
-  if (selected.system) { showToast('Cannot reorder system layers.'); return; }
+  if (selected.system) { showLayerNotification('Cannot reorder system layers.'); return; }
   var idx = layerOrder.indexOf(selected);
   var next = layerOrder[idx + 1];
   if (!next || next.system) return;
@@ -204,7 +209,7 @@ function moveLayerUp() {
 function moveLayerDown() {
   var selected = layerOrder.find(function(l) { return l._selected; });
   if (!selected) return;
-  if (selected.system) { showToast('Cannot reorder system layers.'); return; }
+  if (selected.system) { showLayerNotification('Cannot reorder system layers.'); return; }
   var idx = layerOrder.indexOf(selected);
   var prev = layerOrder[idx - 1];
   if (!prev || prev.system) return;
@@ -220,32 +225,64 @@ function removeLayer() {
   var selected = layerOrder.find(function(l) { return l._selected; });
   if (!selected) return;
   if (selected.system) {
-    showToast('System layers cannot be removed.');
+    showLayerNotification('System layers cannot be removed.');
     return;
   }
 
-  // Remove SVG <g>
+  var userLayers = layerOrder.filter(function(l) { return !l.system; });
+
+  if (userLayers.length === 1) {
+    if (selected.name === 'Annotations') {
+      showLayerNotification('Cannot remove the last layer named "Annotations".');
+      return;
+    }
+    // Last user layer (not named Annotations): replace with fresh Annotations layer
+    var g = document.getElementById(selected.id);
+    if (g) g.remove();
+    var idx = layerOrder.indexOf(selected);
+    layerOrder.splice(idx, 1);
+    var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'watermark-layer'; });
+    var newG = document.getElementById('annotation-layer');
+    if (!newG) {
+      newG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      newG.setAttribute('id', 'annotation-layer');
+    }
+    var watermarkG = document.getElementById('watermark-layer');
+    if (watermarkG && watermarkG.parentNode) {
+      watermarkG.parentNode.insertBefore(newG, watermarkG);
+    }
+    layerOrder.splice(watermarkIdx, 0, { id: 'annotation-layer', name: 'Annotations', system: false });
+    userLayerCounter = 1;
+    selectLayer('annotation-layer');
+    return;
+  }
+
   var g = document.getElementById(selected.id);
   if (g) g.remove();
 
   var idx = layerOrder.indexOf(selected);
   layerOrder.splice(idx, 1);
 
-  // Select the next layer at the same index
   if (layerOrder.length === 0) return;
   var next = layerOrder[Math.min(idx, layerOrder.length - 1)];
   selectLayer(next.id);
 }
 
-function showToast(msg) {
-  var existing = document.getElementById('layer-toast');
+function showLayerNotification(msg) {
+  var existing = document.getElementById('layer-notification');
   if (existing) existing.remove();
   var div = document.createElement('div');
-  div.id = 'layer-toast';
+  div.id = 'layer-notification';
   div.textContent = msg;
-  div.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#c44;color:#fff;padding:8px 16px;border-radius:4px;font-size:12px;z-index:9999;';
-  document.body.appendChild(div);
-  setTimeout(function() { div.remove(); }, 2500);
+  div.style.cssText = 'position:absolute;top:0;left:0;right:0;background:rgba(var(--color-accent-rgb),0.9);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;z-index:30;font-size:13px;';
+  var closeBtn = document.createElement('button');
+  closeBtn.textContent = '\u00D7';
+  closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;line-height:1;padding:0 4px;cursor:pointer;margin-left:10px;';
+  closeBtn.addEventListener('click', function() { div.remove(); });
+  div.appendChild(closeBtn);
+  var container = document.getElementById('editor-container');
+  if (container) container.appendChild(div);
+  setTimeout(function() { if (div.parentNode) div.remove(); }, 4000);
 }
 
 function showLayerProps(entry) {

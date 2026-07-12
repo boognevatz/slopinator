@@ -184,7 +184,11 @@ export function updateImageTransform() {
   transforms.push(`translate(${-w / 2}, ${-h / 2})`);
 
   dom.imageEl.setAttribute('transform', transforms.join(' '));
-  dom.annotationLayer.setAttribute('transform', transforms.join(' '));
+  // Apply transform to all annotation/user layers
+  var allGs = dom.svg.querySelectorAll('g[id^="user-layer-"], g[id="annotation-layer"]');
+  for (var i = 0; i < allGs.length; i++) {
+    allGs[i].setAttribute('transform', transforms.join(' '));
+  }
   dom.watermarkLayer.setAttribute('transform', transforms.join(' '));
   if (dom.gridLayer) dom.gridLayer.setAttribute('transform', transforms.join(' '));
   dom.handleLayer.setAttribute('transform', transforms.join(' '));
