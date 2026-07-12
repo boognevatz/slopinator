@@ -460,7 +460,7 @@ export function selectElement(id, addToSelection) {
         if (state.selectedIds.length === 0) { clearSelection(); return; }
         state.selectedId = state.selectedIds[state.selectedIds.length - 1];
         var rem = state.elements.find(function(el) { return el.id === state.selectedId; });
-        if (rem) { drawHandles(rem); document.getElementById('btn-delete').disabled = false; document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: rem.id, data: rem } })); }
+        if (rem) { drawHandles(rem); document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: rem.id, data: rem } })); }
         return;
       }
       for (var gg3 = 0; gg3 < groupData.childIds.length; gg3++) {
@@ -475,7 +475,7 @@ export function selectElement(id, addToSelection) {
     state.selectedId = groupData.childIds[groupData.childIds.length - 1];
     var primChild = state.elements.find(function(el) { return el.id === state.selectedId; });
     if (primChild) drawHandles(primChild);
-    document.getElementById('btn-delete').disabled = false;
+    document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
     document.getElementById('element-id-input').value = groupData.id;
     document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
     var groupBtn = document.getElementById('btn-group');
@@ -501,7 +501,7 @@ export function selectElement(id, addToSelection) {
       var remaining = state.elements.find(function(el) { return el.id === state.selectedId; });
       if (remaining) {
         drawHandles(remaining);
-        document.getElementById('btn-delete').disabled = false;
+        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
         var inp = document.getElementById('element-id-input');
         if (inp) inp.value = remaining.id;
         document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remaining.id, data: remaining } }));
@@ -562,7 +562,7 @@ export function selectElement(id, addToSelection) {
   }
 
   drawHandles(data);
-  document.getElementById('btn-delete').disabled = false;
+  document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
   refreshPalette();
 
   // Sync element ID display
@@ -592,6 +592,7 @@ export function clearSelection() {
   state.selectedIds = [];
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
+  document.getElementById('btn-duplicate').disabled = true;
   updateGroupButton();
   var idInput = document.getElementById('element-id-input');
   if (idInput) idInput.value = '';
@@ -1400,6 +1401,159 @@ export function deleteSelected() {
         else if (r.data.type === 'text') addTextSVGAtIndex(r.data, r.idx);
         else if (r.data.type === 'freehand') addFreehandSVGAtIndex(r.data, r.idx);
         else if (r.data.type === 'rectangle') addRectangleSVGAtIndex(r.data, r.idx);
+      }
+    },
+  });
+}
+
+// ── Duplicate ────────────────────────────────────────────────────
+
+function nextDuplicateId(id) {
+  var m = id.match(/-(\d+)$/);
+  var candidate;
+  if (m) {
+    var num = parseInt(m[1]) + 1;
+    candidate = id.slice(0, m.index) + '-' + num;
+  } else {
+    candidate = id + '-1';
+  }
+  while (state.elements.some(function(el) { return el.id === candidate; })) {
+    var m2 = candidate.match(/-(\d+)$/);
+    if (m2) candidate = candidate.slice(0, m2.index) + '-' + (parseInt(m2[1]) + 1);
+    else candidate = candidate + '-1';
+  }
+  return candidate;
+}
+
+export function duplicateSelected() {
+  if (state.selectedIds.length === 0) return;
+  var ids = state.selectedIds.slice();
+
+  // Check if selection represents a full group
+  var parentGroup = state.elements.find(function(el) {
+    if (el.type !== 'group') return false;
+    if (el.childIds.length !== ids.length) return false;
+    return ids.every(function(id) { return el.childIds.indexOf(id) !== -1; });
+  });
+
+  if (parentGroup) {
+    var newGroupId = nextDuplicateId(parentGroup.id);
+    var newChildIds = [];
+    var dupes = [];
+    var origChildIds = parentGroup.childIds;
+
+    for (var gi = 0; gi < origChildIds.length; gi++) {
+      var oldId = origChildIds[gi];
+      var orig = state.elements.find(function(el) { return el.id === oldId; });
+      if (!orig) continue;
+      var copy = JSON.parse(JSON.stringify(orig));
+      var newId = nextDuplicateId(oldId);
+      copy.id = newId;
+      copy.parentId = newGroupId;
+      newChildIds.push(newId);
+      state.elements.push(copy);
+      if (copy.type === 'line') addLineSVGAtIndex(copy, -1);
+      else if (copy.type === 'text') addTextSVGAtIndex(copy, -1);
+      else if (copy.type === 'freehand') addFreehandSVGAtIndex(copy, -1);
+      else if (copy.type === 'rectangle') addRectangleSVGAtIndex(copy, -1);
+      dupes.push(copy);
+    }
+    if (dupes.length === 0) return;
+
+    var newGroup = { id: newGroupId, type: 'group', childIds: newChildIds };
+    state.elements.push(newGroup);
+
+    var g = svgEl('g', { id: newGroupId, 'data-type': 'group' });
+    for (var gi2 = 0; gi2 < newChildIds.length; gi2++) {
+      var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(newChildIds[gi2]));
+      if (childSvg) g.appendChild(childSvg);
+    }
+    dom.annotationLayer.appendChild(g);
+
+    selectElement(newGroupId, false);
+
+    pushAction({
+      description: 'Duplicate group (' + newChildIds.length + ' elements)',
+      doFn: function() {
+        for (var ri = 0; ri < dupes.length; ri++) {
+          var d = dupes[ri];
+          if (!state.elements.find(function(e) { return e.id === d.id; })) {
+            state.elements.push(d);
+            if (d.type === 'line') addLineSVGAtIndex(d, -1);
+            else if (d.type === 'text') addTextSVGAtIndex(d, -1);
+            else if (d.type === 'freehand') addFreehandSVGAtIndex(d, -1);
+            else if (d.type === 'rectangle') addRectangleSVGAtIndex(d, -1);
+          }
+        }
+        if (!state.elements.find(function(e) { return e.id === newGroupId; })) {
+          state.elements.push(newGroup);
+        }
+        var dg = dom.annotationLayer.querySelector('#' + CSS.escape(newGroupId));
+        if (!dg) {
+          dg = svgEl('g', { id: newGroupId, 'data-type': 'group' });
+          dom.annotationLayer.appendChild(dg);
+        }
+        for (var dj = 0; dj < newChildIds.length; dj++) {
+          var ds = dom.annotationLayer.querySelector('#' + CSS.escape(newChildIds[dj]));
+          if (ds) dg.appendChild(ds);
+        }
+      },
+      undoFn: function() {
+        for (var ri = 0; ri < dupes.length; ri++) {
+          var d = dupes[ri];
+          var di2 = state.elements.findIndex(function(e) { return e.id === d.id; });
+          if (di2 !== -1) state.elements.splice(di2, 1);
+          var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(d.id));
+          if (svgChild) svgChild.remove();
+        }
+        var dgIdx = state.elements.findIndex(function(e) { return e.id === newGroupId; });
+        if (dgIdx !== -1) state.elements.splice(dgIdx, 1);
+        var dgEl = dom.annotationLayer.querySelector('#' + CSS.escape(newGroupId));
+        if (dgEl) dgEl.remove();
+      },
+    });
+    return;
+  }
+
+  // Fallback: duplicate individual elements
+  var dupes = [];
+  for (var di = 0; di < ids.length; di++) {
+    var orig = state.elements.find(function(el) { return el.id === ids[di]; });
+    if (!orig) continue;
+    var copy = JSON.parse(JSON.stringify(orig));
+    copy.id = nextDuplicateId(orig.id);
+    if (copy.parentId) copy.parentId = undefined;
+    state.elements.push(copy);
+    if (copy.type === 'line') addLineSVGAtIndex(copy, -1);
+    else if (copy.type === 'text') addTextSVGAtIndex(copy, -1);
+    else if (copy.type === 'freehand') addFreehandSVGAtIndex(copy, -1);
+    else if (copy.type === 'rectangle') addRectangleSVGAtIndex(copy, -1);
+    dupes.push(copy);
+  }
+  if (dupes.length === 0) return;
+  selectElement(dupes[dupes.length - 1].id, false);
+  var desc = 'Duplicate ' + dupes.length + ' element' + (dupes.length > 1 ? 's' : '');
+  pushAction({
+    description: desc,
+    doFn: function() {
+      for (var ri = 0; ri < dupes.length; ri++) {
+        var d = dupes[ri];
+        if (!state.elements.find(function(e) { return e.id === d.id; })) {
+          state.elements.push(d);
+          if (d.type === 'line') addLineSVGAtIndex(d, -1);
+          else if (d.type === 'text') addTextSVGAtIndex(d, -1);
+          else if (d.type === 'freehand') addFreehandSVGAtIndex(d, -1);
+          else if (d.type === 'rectangle') addRectangleSVGAtIndex(d, -1);
+        }
+      }
+    },
+    undoFn: function() {
+      for (var ri = 0; ri < dupes.length; ri++) {
+        var d = dupes[ri];
+        var di2 = state.elements.findIndex(function(e) { return e.id === d.id; });
+        if (di2 !== -1) state.elements.splice(di2, 1);
+        var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(d.id));
+        if (svgChild) svgChild.remove();
       }
     },
   });
