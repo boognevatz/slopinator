@@ -654,6 +654,24 @@ body {
   display: flex;
 }
 
+/* ── Grid controls ──────────────────────────────────── */
+
+#btn-grid.active {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: #fff;
+}
+
+#btn-snap.active {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: #fff;
+}
+
+#grid-layer {
+  pointer-events: none;
+}
+
 /* ── Export tabs ────────────────────────────────────── */
 
 .export-tab.active {

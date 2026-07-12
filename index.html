@@ -178,6 +178,23 @@
         </div>
       </div>
 
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="grid">Grid ▾</button>
+        <div class="toolbar-group separator" data-group-content="grid">
+          <button id="btn-grid" title="Toggle Grid (G)">▦ Grid</button>
+          <button id="btn-snap" title="Toggle Snap to Grid">⧖ Snap</button>
+          <span class="toolbar-label">Size:</span>
+          <input type="range" id="grid-cell-size" min="5" max="200" value="40" style="width:60px;">
+          <span class="toolbar-label" id="grid-cell-size-val" style="min-width:1.5em;">40</span>
+          <span class="toolbar-label">W:</span>
+          <input type="range" id="grid-line-width" min="0.5" max="5" step="0.5" value="1" style="width:50px;">
+          <span class="toolbar-label" id="grid-line-width-val" style="min-width:1.5em;">1</span>
+          <span class="toolbar-label">Opacity:</span>
+          <input type="range" id="grid-opacity" min="0" max="100" value="30" style="width:60px;">
+          <span class="toolbar-label" id="grid-opacity-val" style="min-width:2em;">30%</span>
+        </div>
+      </div>
+
       <div class="toolbar-group separator" style="margin-left: auto;">
         <span class="toolbar-label" id="dpi-display" title="Click to edit DPI" style="cursor:pointer;">300 DPI</span>
         <div class="dropdown" id="resize-dropdown">
@@ -367,6 +384,7 @@
       <g id="image-layer"></g>
       <g id="annotation-layer"></g>
       <g id="watermark-layer"></g>
+      <g id="grid-layer"></g>
       <g id="handle-layer"></g>
     </svg>
     <div id="empty-state">
@@ -393,6 +411,10 @@
       <div class="layer-entry" data-layer="annotation-layer">
         <span class="layer-eye">👁</span>
         <span class="layer-name">Annotations</span>
+      </div>
+      <div class="layer-entry" data-layer="grid-layer">
+        <span class="layer-eye">👁</span>
+        <span class="layer-name">Grid</span>
       </div>
       <div class="layer-entry" data-layer="image-layer">
         <span class="layer-eye">👁</span>

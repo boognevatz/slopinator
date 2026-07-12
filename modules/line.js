@@ -2,6 +2,7 @@
 
 import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
+import { snapToGrid } from './grid.js';
 import { pushAction } from './history.js';
 
 let isDrawing = false;
@@ -225,7 +226,7 @@ function onMouseDown(e) {
       target.classList.contains('handle')) return;
 
   isDrawing = true;
-  startPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  startPt = snapToGrid(screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY));
 
   previewLine = svgEl('line', {
     x1: startPt.x,
@@ -255,7 +256,7 @@ function onMouseUp(e) {
   document.removeEventListener('pointermove', onMouseMove);
   document.removeEventListener('pointerup', onMouseUp);
 
-  const endPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const endPt = snapToGrid(screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY));
 
   // Remove preview
   if (previewLine && previewLine.parentNode) {
@@ -378,7 +379,7 @@ function getExtendHitRadius() {
 function addExtensionPoint(e) {
   if (!pendingPolyline) return;
 
-  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const pt = snapToGrid(screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY));
   const pts = pendingPolyline.points;
   const anchorPt = pts[activeExtendIdx];
 
@@ -485,7 +486,7 @@ function startVertexDrag(idx, e) {
 
 function onVertexDragMove(e) {
   if (!isDraggingVertex || !pendingPolyline) return;
-  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const pt = snapToGrid(screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY));
   const pts = pendingPolyline.points;
 
   pts[dragVertexIdx] = { x: pt.x, y: pt.y };

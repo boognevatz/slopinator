@@ -15,6 +15,7 @@ import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initPerspective } from './modules/perspective.js';
 import { initColorCorrection } from './modules/colorcorrection.js';
 import { initLayers } from './modules/layers.js';
+import { initGrid, toggleGrid } from './modules/grid.js';
 
 import { dom } from './modules/editor.js';
 
@@ -59,6 +60,7 @@ function init() {
   initPerspective();
   initColorCorrection();
   initLayers();
+  initGrid();
   initFileIO();
 
   // ── Mobile dropdown toggle ────────────────────────────────
@@ -181,6 +183,10 @@ function init() {
           break;
         case 'm':
           switchTool('measure');
+          break;
+        case 'g':
+          e.preventDefault();
+          toggleGrid(!state.grid.visible);
           break;
         case 'delete':
         case 'backspace':

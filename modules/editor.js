@@ -34,6 +34,13 @@ export const state = {
   activeLineEndpoint: 'end',
   activeFreehandEpsilon: 0,
   activeCornerRadius: 0,
+  grid: {
+    visible: false,
+    cellSize: 40,
+    lineOpacity: 0.3,
+    lineWidth: 1,
+    snapToGrid: false,
+  },
   activeFontSize: 64,
   palette: [...DEFAULT_PALETTE],
 
@@ -49,6 +56,7 @@ export const dom = {
   imageLayer: null,
   annotationLayer: null,
   watermarkLayer: null,
+  gridLayer: null,
   handleLayer: null,
   imageEl: null,
   emptyState: null,
@@ -178,6 +186,7 @@ export function updateImageTransform() {
   dom.imageEl.setAttribute('transform', transforms.join(' '));
   dom.annotationLayer.setAttribute('transform', transforms.join(' '));
   dom.watermarkLayer.setAttribute('transform', transforms.join(' '));
+  if (dom.gridLayer) dom.gridLayer.setAttribute('transform', transforms.join(' '));
   dom.handleLayer.setAttribute('transform', transforms.join(' '));
 
   updateLabels();
