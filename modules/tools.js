@@ -105,19 +105,24 @@ export function switchTool(tool) {
   }
 }
 
+function setGroupVisible(id, visible) {
+  var el = document.getElementById(id);
+  if (el) el.hidden = !visible;
+}
+
 function updateToolSettingsVisibility(tool, selectedType = null) {
   const visible = new Set(TOOL_SETTINGS[tool] || []);
 
-  document.getElementById('color-group').hidden = !visible.has('color');
-  document.getElementById('thickness-group').hidden = !visible.has('thickness');
-  document.getElementById('line-style-group').hidden = !visible.has('line-style');
-  document.getElementById('line-mode-group').hidden = !visible.has('line-mode');
-  document.getElementById('font-size-group').hidden = !visible.has('font-size');
-  document.getElementById('delete-group').hidden = !visible.has('delete');
-  document.getElementById('freehand-epsilon-group').hidden = !visible.has('freehand-epsilon');
-  document.getElementById('rectangle-group').hidden = !visible.has('rectangle');
-  document.getElementById('crop-group').hidden = !visible.has('crop');
-  document.getElementById('perspective-group').hidden = !visible.has('perspective');
-  document.getElementById('color-correction-group').hidden = !visible.has('color-correction');
-  document.getElementById('element-id-group').hidden = !visible.has('element-id');
+  setGroupVisible('color-group', visible.has('color'));
+  setGroupVisible('thickness-group', visible.has('thickness'));
+  setGroupVisible('line-style-group', visible.has('line-style'));
+  setGroupVisible('line-mode-group', visible.has('line-mode'));
+  setGroupVisible('font-size-group', visible.has('font-size'));
+  setGroupVisible('delete-group', visible.has('delete'));
+  setGroupVisible('freehand-epsilon-group', visible.has('freehand-epsilon'));
+  setGroupVisible('rectangle-group', visible.has('rectangle'));
+  setGroupVisible('crop-group', visible.has('crop'));
+  setGroupVisible('perspective-group', visible.has('perspective'));
+  setGroupVisible('color-correction-group', visible.has('color-correction'));
+  setGroupVisible('element-id-group', visible.has('element-id'));
 }

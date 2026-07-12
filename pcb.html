@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PCB Annotator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="toolbar">
+    <div class="toolbar-row">
+      <div class="toolbar-group">
+        <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp,.svg" hidden>
+        <div class="dropdown" id="file-dropdown">
+          <button id="btn-file-dropdown-btn" title="File" style="font-weight:bold;">File ▾</button>
+          <div class="dropdown-menu" id="file-menu" hidden style="min-width:200px;">
+            <div style="display:flex;flex-direction:column;gap:2px;padding:4px 0;white-space:nowrap;">
+              <button id="btn-open" class="file-menu-item">📂 Open</button>
+              <div class="file-menu-item" style="display:flex;align-items:center;gap:4px;padding:2px 8px;font-size:12px;">
+                <span style="color:#ccc;">New</span>
+                <input type="number" id="new-width" value="640" min="1" onfocus="this.select()" style="width:50px;font-size:11px;padding:1px 2px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
+                <span style="color:#888;">x</span>
+                <input type="number" id="new-height" value="480" min="1" onfocus="this.select()" style="width:50px;font-size:11px;padding:1px 2px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
+                <button id="btn-new-create" style="padding:1px 6px;font-size:11px;">Create</button>
+              </div>
+              <button id="btn-save-svg" class="file-menu-item" disabled>💾 Save SVG</button>
+              <div style="border-top:1px solid #444;margin:4px 8px;"></div>
+              <div class="nested-dropdown" id="export-nested">
+                <div class="file-menu-item" id="btn-export-nested-btn" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:12px;color:#ccc;cursor:pointer;">Export <span style="font-size:10px;">▸</span></div>
+                <div class="nested-menu" id="export-menu" hidden>
+                  <div style="display:flex;flex-direction:column;gap:6px;padding:8px;min-width:280px;">
+                    <div style="display:flex;border-bottom:1px solid #444;margin-bottom:4px;">
+                      <button id="export-tab-jpg" class="export-tab active" data-format="jpg" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">JPG</button>
+                      <button id="export-tab-pdf" class="export-tab" data-format="pdf" style="flex:1;background:none;border:none;color:#888;padding:4px 8px;cursor:pointer;font-size:12px;border-bottom:2px solid transparent;">PDF</button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <span style="font-size:12px;color:#ccc;">File:</span>
+                      <input type="text" id="export-filename" class="small-input" value="pcb-annotation" style="width:240px;">
+                    </div>
+                    <div id="export-jpg-options">
+                      <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:12px;color:#ccc;">Size:</span>
+                        <select id="export-size-select" class="small-input" style="flex:1;">
+                          <option value="320">320px</option>
+                          <option value="640" selected>640px</option>
+                          <option value="1920">1920px</option>
+                          <option value="original">Original</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div id="export-pdf-options" hidden>
+                      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 0;">
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="width:44px;"></div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-top" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div style="width:44px;"></div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-left" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div id="pdf-page-box" style="position:relative;display:flex;flex-direction:column;">
+                            <canvas id="pdf-page-canvas"></canvas>
+                            <select id="export-pdf-size-select" style="position:absolute;right:0;top:50%;transform:translateY(-50%);background:#3c3c3c;border:1px solid #555;border-right:none;color:#ccc;font-size:11px;text-align:center;text-align-last:center;cursor:pointer;outline:none;padding:2px 4px;border-radius:3px 0 0 3px;">
+                              <option value="A4-portrait" selected>A4 Portrait</option>
+                              <option value="A4-landscape">A4 Landscape</option>
+                              <option value="fit">Fit to image</option>
+                            </select>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-right" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                          <div style="width:44px;"></div>
+                          <div style="display:flex;align-items:center;gap:1px;">
+                            <input type="number" id="export-margin-bottom" class="small-input" value="0" min="0" step="0.5" style="width:52px;text-align:right;font-size:11px;" onfocus="this.select()">
+                            <span class="margin-unit-label" style="font-size:10px;color:#888;width:14px;">mm</span>
+                          </div>
+                          <div style="width:44px;"></div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:4px;margin-top:2px;">
+                          <span style="font-size:10px;color:#888;">Unit:</span>
+                          <select id="margin-unit-select" style="font-size:10px;width:52px;padding:1px 2px;">
+                            <option value="mm" selected>mm</option>
+                            <option value="cm">cm</option>
+                            <option value="pt">pt</option>
+                            <option value="in">in</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                        <span style="font-size:12px;color:#ccc;">Size:</span>
+                        <select id="export-pdf-res-select" class="small-input" style="flex:1;">
+                          <option value="320">320px</option>
+                          <option value="640">640px</option>
+                          <option value="1920">1920px</option>
+                          <option value="original" selected>Original</option>
+                        </select>
+                      </div>
+                    </div>
+                    <button id="btn-export-do" style="width:100%;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Export</button>
+                    <button id="btn-test-pdf" style="width:100%;margin-top:4px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (red rect)</button>
+                    <button id="btn-test-pdf-img" style="width:100%;margin-top:2px;background:#555;border:1px solid #777;color:#ccc;padding:4px 8px;border-radius:3px;cursor:pointer;font-size:11px;">Test PDF (image embed)</button>
+                  </div>
+                </div>
+              </div>
+              <div style="border-top:1px solid #444;margin:4px 8px;"></div>
+              <button id="btn-settings" class="file-menu-item">⚙ Preferences</button>
+              <button id="btn-about" class="file-menu-item">ℹ About</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="tools">Tools ▾</button>
+        <div class="toolbar-group separator" data-group-content="tools">
+          <button id="btn-select" class="tool-btn active" title="Select (V)" data-tool="select">✋</button>
+          <button id="btn-line" class="tool-btn" title="Line (L)" data-tool="line">Line</button>
+          <button id="btn-text" class="tool-btn" title="Text (T)" data-tool="text">Text</button>
+          <button id="btn-freehand" class="tool-btn" title="Freehand (F)" data-tool="freehand">Freehand</button>
+          <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
+        </div>
+      </div>
+
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="undo">Undo ▾</button>
+        <div class="toolbar-group separator" data-group-content="undo">
+          <button id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩ Undo</button>
+          <button id="btn-redo" title="Redo (Ctrl+Y)" disabled>↪ Redo</button>
+        </div>
+      </div>
+
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="rotate">Rotate ▾</button>
+        <div class="toolbar-group separator" data-group-content="rotate">
+          <button id="btn-rotate-ccw" title="Rotate 90° CCW" disabled>⟲ CCW</button>
+          <button id="btn-rotate-cw" title="Rotate 90° CW" disabled>⟳ CW</button>
+          <button id="btn-flip-h" title="Flip Horizontal" disabled>↔ Flip H</button>
+          <button id="btn-flip-v" title="Flip Vertical" disabled>↕ Flip V</button>
+        </div>
+      </div>
+
+      <div class="mobile-group-wrap">
+        <button class="mobile-group-btn" data-group="zoom">Zoom ▾</button>
+        <div class="toolbar-group separator" data-group-content="zoom">
+          <button id="btn-zoom-in" title="Zoom In (+)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button id="btn-zoom-out" title="Zoom Out (-)" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+          </button>
+          <button id="btn-zoom-fit" title="Zoom Fit" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+          </button>
+          <button id="btn-zoom-11" title="1:1 (Actual Pixels)" disabled>1:1</button>
+          <span class="toolbar-label" id="zoom-label" style="min-width: 140px; text-align: center;">100%</span>
+        </div>
+      </div>
+
+      <div class="toolbar-group separator" style="margin-left: auto;">
+        <span class="toolbar-label" id="dpi-display" title="Click to edit DPI" style="cursor:pointer;">300 DPI</span>
+        <div class="dropdown" id="resize-dropdown">
+          <span class="toolbar-label" id="image-size-label" style="cursor: pointer;"></span>
+          <div class="dropdown-menu dropdown-menu-right" id="resize-menu" hidden>
+            <div style="display: flex; flex-direction: column; gap: 6px; padding: 6px 10px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="toolbar-label">DPI:</span>
+                <input type="number" id="dpi-input" value="300" min="1" max="9999" class="small-input" style="width:60px;">
+              </div>
+              <div style="border-top:1px solid #444;margin:2px 0;"></div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="toolbar-label">W:</span>
+                <input type="number" id="resize-width-input" class="small-input crop-size-input" min="1">
+                <span class="toolbar-label">×</span>
+                <span class="toolbar-label">H:</span>
+                <input type="number" id="resize-height-input" class="small-input crop-size-input" min="1">
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="free"> Free</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="aspect" checked> Keep aspect</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="4:3"> 4:3</label>
+                <label class="crop-ratio-option"><input type="radio" name="resize-ratio" value="16:9"> 16:9</label>
+              </div>
+              <button id="btn-resize-apply" style="width:100%;">Apply</button>
+            </div>
+          </div>
+        </div>
+        <button id="btn-layers" title="Toggle Layers Panel" style="margin-left:8px;">Layers <span id="layers-indicator">▸</span></button>
+      </div>
+    </div>
+
+    <div class="toolbar-row">
+      <div class="toolbar-group separator" id="color-group" hidden>
+        <span class="toolbar-label">Color:</span>
+        <div class="color-indicator" id="color-indicator">
+          <div class="bg-click-area" id="bg-click-area">
+            <div class="bg-square" id="bg-square"></div>
+          </div>
+          <div class="fg-click-area" id="fg-click-area">
+            <div class="fg-square" id="fg-square"></div>
+          </div>
+          <div class="color-dropdown" id="color-dropdown" hidden>
+            <div class="color-dropdown-swatches" id="color-dropdown-swatches"></div>
+            <div class="color-dropdown-custom">
+              <span class="toolbar-label">Custom:</span>
+              <input type="color" id="color-dropdown-picker" value="#ff0000">
+            </div>
+            <div class="color-dropdown-opacity">
+              <span class="toolbar-label">Opacity:</span>
+              <input type="range" id="color-opacity-slider" min="0" max="255" value="255">
+              <span class="toolbar-label" id="color-opacity-value">255</span>
+            </div>
+          </div>
+        </div>
+        <input type="color" id="color-picker-hidden" hidden>
+      </div>
+
+      <div class="toolbar-group separator" id="thickness-group" hidden>
+        <span class="toolbar-label">Thickness:</span>
+        <input type="range" id="thickness-slider" min="0" max="12" step="0.5" value="2">
+        <span class="toolbar-label" id="thickness-value">2</span>
+      </div>
+
+      <div class="toolbar-group separator" id="freehand-epsilon-group" hidden>
+        <span class="toolbar-label">Smoothing:</span>
+        <input type="range" id="freehand-epsilon-slider" min="0" max="30" step="0.5" value="0">
+        <span class="toolbar-label" id="freehand-epsilon-value">0</span>
+      </div>
+
+      <div class="toolbar-group separator" id="line-style-group" hidden>
+        <span class="toolbar-label">Style:</span>
+        <button id="btn-line-style-normal" class="line-style-btn" data-line-style="normal">Normal</button>
+        <button id="btn-line-style-arrows" class="line-style-btn" data-line-style="arrows">Arrows</button>
+        <button id="btn-line-style-circle" class="line-style-btn" data-line-style="circle">Circle</button>
+        <span class="toolbar-label">Size:</span>
+        <input type="number" id="line-marker-size-input" min="2" max="200" value="30" class="small-input">
+      </div>
+
+      <div class="toolbar-group separator" id="line-mode-group" hidden>
+        <span class="toolbar-label">Mode:</span>
+        <button id="btn-line-mode-move" class="line-mode-btn active" data-line-mode="move">Move</button>
+        <button id="btn-line-mode-change-end" class="line-mode-btn" data-line-mode="change-end">Change End</button>
+        <button id="btn-line-delete-node" class="line-mode-btn" title="Delete node (Del)">🗑</button>
+        <button id="btn-line-cut" class="line-mode-btn" title="Cut edge (polygon to polyline)" disabled>✂</button>
+      </div>
+
+      <div class="toolbar-group separator" id="font-size-group" hidden>
+        <span class="toolbar-label">Font size:</span>
+        <input type="number" id="font-size-input" min="8" max="999" value="32" class="small-input">
+      </div>
+
+      <div class="toolbar-group separator" id="delete-group" hidden>
+        <button id="btn-delete" title="Delete selected (Del)" disabled>🗑 Delete</button>
+      </div>
+
+      <div class="toolbar-group separator" id="element-id-group" hidden>
+        <span class="toolbar-label">ID:</span>
+        <div style="display:flex;align-items:center;gap:3px;">
+          <input type="text" id="element-id-input" class="small-input" style="width:120px;font-family:monospace;font-size:11px;" spellcheck="false">
+          <button id="btn-id-save" style="padding:0 4px;font-size:11px;line-height:1.6;display:none;">💾</button>
+        </div>
+      </div>
+
+      <div class="toolbar-group separator" id="rectangle-group" hidden>
+        <span class="toolbar-label">Corner radius:</span>
+        <input type="number" id="corner-radius-input" min="0" max="999" value="0" class="small-input">
+      </div>
+
+    </div>
+  </div>
+
+  <div id="main-area">
+    <div id="editor-container">
+    <div id="about-popup" hidden style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000;">
+      <div style="background:#2d2d2d;border:1px solid #555;border-radius:6px;padding:24px 32px;min-width:260px;position:relative;color:#ccc;font-size:14px;">
+        <button id="btn-about-close" style="position:absolute;top:6px;right:10px;background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0;line-height:1;">×</button>
+        <h2 style="margin:0 0 12px 0;font-size:16px;color:#eee;">About</h2>
+        <p style="margin:0;font-size:13px;"><strong>PCB Annotator</strong></p>
+        <p style="margin:4px 0 0 0;font-size:12px;color:#999;">Version <span id="about-version">0.1</span></p>
+      </div>
+    </div>
+    <div id="settings-popup" hidden style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000;">
+      <div style="background:#2d2d2d;border:1px solid #555;border-radius:6px;padding:24px 32px;min-width:360px;max-width:90vw;position:relative;color:#ccc;font-size:14px;resize:both;overflow:auto;">
+        <button id="btn-settings-close" style="position:absolute;top:6px;right:10px;background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0;line-height:1;">×</button>
+        <h2 style="margin:0 0 16px 0;font-size:16px;color:#eee;">Preferences</h2>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Saved Data (localStorage)</div>
+          <div style="max-height:200px;overflow-y:auto;border:1px solid #444;border-radius:3px;">
+            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="background:#3a3a3a;">
+                  <th style="text-align:left;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Key</th>
+                  <th style="text-align:right;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Size</th>
+                </tr>
+              </thead>
+              <tbody id="settings-storage-tbody"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;">
+            <span style="color:#888;" id="settings-total-items">0 items</span>
+            <span style="color:#aaa;">Total: <strong id="settings-total-usage">0 B</strong></span>
+          </div>
+          <textarea id="settings-key-value" readonly style="width:100%;margin-top:6px;padding:4px;background:#1e1e1e;color:#ccc;border:1px solid #444;border-radius:3px;font-size:11px;font-family:monospace;resize:both;box-sizing:border-box;" rows="10" placeholder="Click a key to view its value"></textarea>
+        </div>
+        <div style="border-top:1px solid #444;margin:10px 0 8px 0;padding-top:8px;">
+          <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Coordinate Origin</div>
+          <div style="display:flex;gap:12px;">
+            <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="top-left" checked> Top-Left (0,0)</label>
+            <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="bottom-left"> Bottom-Left (0,0)</label>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button id="btn-settings-save" style="font-size:12px;padding:4px 16px;background:var(--color-accent);border:1px solid var(--color-accent);color:#fff;border-radius:3px;cursor:pointer;">Save</button>
+          <button id="btn-settings-clear" style="font-size:12px;padding:4px 12px;" disabled>Clear Saved Data</button>
+        </div>
+      </div>
+    </div>
+    <div id="resize-notification" class="notification-strip" hidden>
+      <span>Image is very large. Resize to:</span>
+      <button data-width="320">320px</button>
+      <button data-width="640">640px</button>
+      <button data-width="1920">1920px</button>
+      <button data-width="original">Keep Original</button>
+      <button id="btn-close-notification" class="close-btn" title="Dismiss">×</button>
+    </div>
+    <svg id="editor-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+      <defs></defs>
+      <g id="image-layer"></g>
+      <g id="annotation-layer"></g>
+      <g id="watermark-layer"></g>
+      <g id="grid-layer"></g>
+      <g id="handle-layer"></g>
+    </svg>
+    <div id="empty-state">
+      <p>Open a PCB image to start annotating</p>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+        <button id="btn-open-empty">Open File</button>
+        <span style="color:#666;">or</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="font-size:12px;color:#aaa;">New</span>
+          <input type="number" id="new-width-empty" value="640" min="1" onfocus="this.select()" style="width:55px;font-size:12px;padding:2px 4px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
+          <span style="color:#888;">x</span>
+          <input type="number" id="new-height-empty" value="480" min="1" onfocus="this.select()" style="width:55px;font-size:12px;padding:2px 4px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
+          <button id="btn-new-create-empty" style="padding:4px 10px;font-size:12px;">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+    <div id="right-panel" hidden>
+      <div id="layer-list">
+        <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layers</div>
+        <div id="layer-entries"></div>
+        <div style="display:flex;border-top:1px solid var(--color-border);">
+          <button id="btn-layer-add" style="flex:1;border:none;border-radius:0;padding:4px;font-size:14px;cursor:pointer;">+</button>
+          <button id="btn-layer-remove" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">−</button>
+          <button id="btn-layer-up" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">^</button>
+          <button id="btn-layer-down" style="flex:1;border:none;border-left:1px solid var(--color-border);border-radius:0;padding:4px;font-size:14px;cursor:pointer;">v</button>
+        </div>
+      </div>
+      <div id="layer-props">
+        <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layer Properties</div>
+        <div id="layer-props-body">
+          <div style="padding:12px;font-size:11px;color:#666;text-align:center;">Select a layer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="pcb-main.js"></script>
+</body>
+</html>
