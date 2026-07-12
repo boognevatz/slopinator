@@ -267,17 +267,17 @@
         <button id="btn-delete" title="Delete selected (Del)" disabled>🗑 Delete</button>
       </div>
 
-<div class="toolbar-group separator" id="element-id-group" hidden>
+      <div class="toolbar-group separator" id="rectangle-group" hidden>
+        <span class="toolbar-label">Corner radius:</span>
+        <input type="number" id="corner-radius-input" min="0" max="999" value="0" class="small-input">
+      </div>
+
+      <div class="toolbar-group separator" id="element-id-group" hidden>
         <span class="toolbar-label">ID:</span>
         <div style="display:flex;align-items:center;gap:3px;">
           <input type="text" id="element-id-input" class="small-input" style="width:120px;font-family:monospace;font-size:11px;" spellcheck="false">
           <button id="btn-id-save" style="padding:0 4px;font-size:11px;line-height:1.6;display:none;">💾</button>
         </div>
-      </div>
-
-      <div class="toolbar-group separator" id="rectangle-group" hidden>
-        <span class="toolbar-label">Corner radius:</span>
-        <input type="number" id="corner-radius-input" min="0" max="999" value="0" class="small-input">
       </div>
 
       <div class="toolbar-group separator" id="crop-group" hidden>

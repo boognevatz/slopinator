@@ -14,10 +14,10 @@ import { activateMeasure, deactivateMeasure } from './measure.js';
 const toolButtons = {};
 const TOOL_SETTINGS = {
   select: ['delete', 'color', 'thickness', 'element-id'],
-  line: ['color', 'thickness', 'line-style', 'line-mode'],
-  text: ['color', 'thickness', 'font-size'],
-  freehand: ['color', 'thickness', 'freehand-epsilon'],
-  rectangle: ['color', 'thickness', 'rectangle'],
+  line: ['color', 'thickness', 'line-style', 'line-mode', 'element-id'],
+  text: ['color', 'thickness', 'font-size', 'element-id'],
+  freehand: ['color', 'thickness', 'freehand-epsilon', 'element-id'],
+  rectangle: ['color', 'thickness', 'rectangle', 'element-id'],
   crop: ['crop'],
   perspective: ['perspective'],
   color: ['color-correction'],
