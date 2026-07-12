@@ -2,35 +2,153 @@ import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { selectElement } from './select.js';
-import { switchTool } from './tools.js';
 
 let isDrawing = false;
 let startPt = null;
 let previewRect = null;
 let currentBgFill = 'none';
 
+let activeCorner = -1;
+let isResizing = false;
+let isMoving = false;
+let resizeAnchor = null;
+let resizeStart = null;
+let resizeOrig = null;
+let moveStart = null;
+let moveOrig = null;
+
+var CORNERS = ['tl', 'tr', 'br', 'bl'];
+
 export function initRectangle() {}
 
 export function activateRectangle() {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onMouseDown);
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('palette-bgcolor-changed', onPaletteBgChange);
+  if (state.selectedId) {
+    var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+    if (data && data.type === 'rectangle') {
+      drawRectToolCircleHandles(data, activeCorner);
+    }
+  }
 }
 
 export function deactivateRectangle() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
+  document.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('palette-bgcolor-changed', onPaletteBgChange);
+  dom.handleLayer.innerHTML = '';
   cancelDraw();
+  cancelResizeMove();
+}
+
+function onPaletteBgChange() {
+  if (state.selectedId) {
+    var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+    if (data && data.type === 'rectangle') {
+      drawRectToolCircleHandles(data, activeCorner);
+    }
+  }
+}
+
+function cancelResizeMove() {
+  isResizing = false;
+  isMoving = false;
+  resizeAnchor = null;
+  resizeStart = null;
+  resizeOrig = null;
+  moveStart = null;
+  moveOrig = null;
+  document.removeEventListener('pointermove', onResizeMove);
+  document.removeEventListener('pointerup', onResizeEnd);
+  document.removeEventListener('pointermove', onMoveMove);
+  document.removeEventListener('pointerup', onMoveEnd);
+}
+
+function onKeyDown(e) {
+  if (isDrawing || isResizing || isMoving) return;
+  var tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (!state.selectedId) return;
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data || data.type !== 'rectangle') return;
+
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (activeCorner < 0) activeCorner = 0;
+    else if (e.shiftKey) activeCorner = activeCorner <= 0 ? 3 : activeCorner - 1;
+    else activeCorner = activeCorner >= 3 ? 0 : activeCorner + 1;
+    drawRectToolCircleHandles(data, activeCorner);
+    return;
+  }
+
+  if (activeCorner < 0) return;
+
+  var dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  var dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+  if (!dx && !dy) return;
+  e.preventDefault();
+
+  var cornerPts = [
+    { x: data.x, y: data.y },
+    { x: data.x + data.width, y: data.y },
+    { x: data.x + data.width, y: data.y + data.height },
+    { x: data.x, y: data.y + data.height },
+  ];
+  var anchors = [
+    { x: data.x + data.width, y: data.y + data.height },
+    { x: data.x,              y: data.y + data.height },
+    { x: data.x,              y: data.y },
+    { x: data.x + data.width, y: data.y },
+  ];
+  var pt = { x: cornerPts[activeCorner].x + dx, y: cornerPts[activeCorner].y + dy };
+  var ax = anchors[activeCorner].x;
+  var ay = anchors[activeCorner].y;
+  data.x = Math.min(ax, pt.x);
+  data.y = Math.min(ay, pt.y);
+  data.width = Math.max(5, Math.abs(pt.x - ax));
+  data.height = Math.max(5, Math.abs(pt.y - ay));
+  updateRectangleElement(data);
+  drawRectToolCircleHandles(data, activeCorner);
 }
 
 function onMouseDown(e) {
   if (e.button !== 0) return;
   if (!state.hasImage) return;
 
-  const target = e.target;
-  if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle, polyline, .rect-fill, .rect-stroke')) return;
+  var target = e.target;
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+
+  var handleEl = target.closest('.handle-extend');
+  if (handleEl) {
+    e.preventDefault();
+    var idx = parseInt(handleEl.dataset.index);
+    startResizeRect(idx, pt);
+    return;
+  }
+
+  var rectBody = target.closest('.rect-fill, .rect-stroke');
+  if (rectBody) {
+    e.preventDefault();
+    var parentG = rectBody.closest('g[data-type="rectangle"]');
+    if (parentG) {
+      var id = parentG.id;
+      selectElement(id);
+      var data = state.elements.find(function(el) { return el.id === id; });
+      if (data) {
+        drawRectToolCircleHandles(data, activeCorner);
+        startMoveRect(id, pt);
+      }
+    }
+    return;
+  }
+
+  if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle, polyline')) return;
 
   isDrawing = true;
-  startPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  startPt = pt;
 
   currentBgFill = state.bgColor === 'transparent' ? 'none' : state.bgColor;
   previewRect = svgEl('rect', {
@@ -50,11 +168,11 @@ function onMouseDown(e) {
 
 function onMouseMove(e) {
   if (!isDrawing) return;
-  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const x = Math.min(startPt.x, pt.x);
-  const y = Math.min(startPt.y, pt.y);
-  const w = Math.abs(pt.x - startPt.x);
-  const h = Math.abs(pt.y - startPt.y);
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var x = Math.min(startPt.x, pt.x);
+  var y = Math.min(startPt.y, pt.y);
+  var w = Math.abs(pt.x - startPt.x);
+  var h = Math.abs(pt.y - startPt.y);
   previewRect.setAttribute('x', x);
   previewRect.setAttribute('y', y);
   previewRect.setAttribute('width', w);
@@ -72,19 +190,19 @@ function onMouseUp(e) {
   previewRect = null;
   isDrawing = false;
 
-  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const x = Math.min(startPt.x, pt.x);
-  const y = Math.min(startPt.y, pt.y);
-  const w = Math.abs(pt.x - startPt.x);
-  const h = Math.abs(pt.y - startPt.y);
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var x = Math.min(startPt.x, pt.x);
+  var y = Math.min(startPt.y, pt.y);
+  var w = Math.abs(pt.x - startPt.x);
+  var h = Math.abs(pt.y - startPt.y);
 
   if (w < 5 && h < 5) return;
 
-  const id = generateId();
-  const data = {
+  var id = generateId();
+  var data = {
     id,
     type: 'rectangle',
-    x, y, width: w, height: h,
+    x: x, y: y, width: w, height: h,
     rx: state.activeCornerRadius,
     rotation: 0,
     stroke: state.activeColor,
@@ -97,18 +215,147 @@ function onMouseUp(e) {
 
   pushAction({
     description: 'Draw rectangle',
-    doFn: () => {
+    doFn: function() {
       addRectangleElement(data);
       state.elements.push(data);
     },
-    undoFn: () => {
+    undoFn: function() {
       removeRectangleElement(id);
-      state.elements = state.elements.filter(el => el.id !== id);
+      state.elements = state.elements.filter(function(el) { return el.id !== id; });
     },
   });
 
-  switchTool('select');
   selectElement(id);
+  activeCorner = -1;
+  drawRectToolCircleHandles(data, activeCorner);
+}
+
+function startResizeRect(idx, pt) {
+  activeCorner = idx;
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data || data.type !== 'rectangle') return;
+
+  var anchorMap = {
+    tl: { x: data.x + data.width, y: data.y + data.height },
+    tr: { x: data.x,               y: data.y + data.height },
+    bl: { x: data.x + data.width, y: data.y },
+    br: { x: data.x,               y: data.y },
+  };
+  var corner = CORNERS[idx];
+  resizeAnchor = anchorMap[corner];
+  resizeStart = { x: pt.x, y: pt.y };
+  resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height };
+
+  drawRectToolCircleHandles(data, activeCorner);
+  isResizing = true;
+  document.addEventListener('pointermove', onResizeMove);
+  document.addEventListener('pointerup', onResizeEnd);
+}
+
+function onResizeMove(e) {
+  if (!isResizing) return;
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data || data.type !== 'rectangle') return;
+
+  var ax = resizeAnchor.x;
+  var ay = resizeAnchor.y;
+  var nx = Math.min(ax, pt.x);
+  var ny = Math.min(ay, pt.y);
+  var nw = Math.abs(pt.x - ax);
+  var nh = Math.abs(pt.y - ay);
+
+  if (nw < 5) nw = 5;
+  if (nh < 5) nh = 5;
+
+  data.x = nx;
+  data.y = ny;
+  data.width = nw;
+  data.height = nh;
+
+  updateRectangleElement(data);
+  drawRectToolCircleHandles(data, activeCorner);
+}
+
+function onResizeEnd(e) {
+  document.removeEventListener('pointermove', onResizeMove);
+  document.removeEventListener('pointerup', onResizeEnd);
+  if (!isResizing) return;
+  isResizing = false;
+
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data) return;
+
+  var orig = resizeOrig;
+  var final = { x: data.x, y: data.y, width: data.width, height: data.height };
+  var cornerIdx = activeCorner;
+
+  if (orig.x !== final.x || orig.y !== final.y || orig.width !== final.width || orig.height !== final.height) {
+    pushAction({
+      description: 'Resize rectangle',
+      doFn: function() {
+        data.x = final.x; data.y = final.y; data.width = final.width; data.height = final.height;
+        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+      },
+      undoFn: function() {
+        data.x = orig.x; data.y = orig.y; data.width = orig.width; data.height = orig.height;
+        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+      },
+    });
+  }
+
+  drawRectToolCircleHandles(data, activeCorner);
+}
+
+function startMoveRect(id, pt) {
+  var data = state.elements.find(function(el) { return el.id === id; });
+  if (!data) return;
+  moveStart = { x: pt.x, y: pt.y };
+  moveOrig = { x: data.x, y: data.y };
+  isMoving = true;
+  document.addEventListener('pointermove', onMoveMove);
+  document.addEventListener('pointerup', onMoveEnd);
+}
+
+function onMoveMove(e) {
+  if (!isMoving) return;
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data || data.type !== 'rectangle') return;
+  data.x = moveOrig.x + (pt.x - moveStart.x);
+  data.y = moveOrig.y + (pt.y - moveStart.y);
+  updateRectangleElement(data);
+  drawRectToolCircleHandles(data, activeCorner);
+}
+
+function onMoveEnd(e) {
+  document.removeEventListener('pointermove', onMoveMove);
+  document.removeEventListener('pointerup', onMoveEnd);
+  if (!isMoving) return;
+  isMoving = false;
+
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data) return;
+
+  var orig = moveOrig;
+  var final = { x: data.x, y: data.y };
+  var cornerIdx = activeCorner;
+
+  if (orig.x !== final.x || orig.y !== final.y) {
+    pushAction({
+      description: 'Move rectangle',
+      doFn: function() {
+        data.x = final.x; data.y = final.y;
+        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+      },
+      undoFn: function() {
+        data.x = orig.x; data.y = orig.y;
+        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+      },
+    });
+  }
+
+  drawRectToolCircleHandles(data, activeCorner);
 }
 
 function cancelDraw() {
@@ -122,19 +369,19 @@ function cancelDraw() {
 }
 
 export function addRectangleElement(data) {
-  const group = svgEl('g', {
+  var group = svgEl('g', {
     id: data.id,
     'data-type': 'rectangle',
   });
 
-  const fillRect = svgEl('rect', {
+  var fillRect = svgEl('rect', {
     x: data.x, y: data.y, width: data.width, height: data.height,
     rx: data.rx || 0,
     fill: data.fill || 'transparent',
     class: 'rect-fill',
   });
 
-  const strokeRect = svgEl('rect', {
+  var strokeRect = svgEl('rect', {
     x: data.x, y: data.y, width: data.width, height: data.height,
     rx: data.rx || 0,
     fill: 'none',
@@ -147,20 +394,20 @@ export function addRectangleElement(data) {
   group.appendChild(strokeRect);
 
   if (data.rotation) {
-    const cx = data.x + data.width / 2;
-    const cy = data.y + data.height / 2;
-    group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+    var cx = data.x + data.width / 2;
+    var cy = data.y + data.height / 2;
+    group.setAttribute('transform', 'rotate(' + data.rotation + ', ' + cx + ', ' + cy + ')');
   }
 
   dom.annotationLayer.appendChild(group);
 }
 
 export function updateRectangleElement(data) {
-  const group = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+  var group = dom.annotationLayer.querySelector('#' + CSS.escape(data.id));
   if (!group) return;
 
-  const fillRect = group.querySelector('.rect-fill');
-  const strokeRect = group.querySelector('.rect-stroke');
+  var fillRect = group.querySelector('.rect-fill');
+  var strokeRect = group.querySelector('.rect-stroke');
 
   if (fillRect) {
     fillRect.setAttribute('x', data.x);
@@ -181,15 +428,36 @@ export function updateRectangleElement(data) {
   }
 
   if (data.rotation) {
-    const cx = data.x + data.width / 2;
-    const cy = data.y + data.height / 2;
-    group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+    var cx = data.x + data.width / 2;
+    var cy = data.y + data.height / 2;
+    group.setAttribute('transform', 'rotate(' + data.rotation + ', ' + cx + ', ' + cy + ')');
   } else {
     group.removeAttribute('transform');
   }
 }
 
 function removeRectangleElement(id) {
-  const el = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
+  var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
   if (el) el.remove();
+}
+
+function drawRectToolCircleHandles(data, activeIdx) {
+  dom.handleLayer.innerHTML = '';
+  var viewBox = dom.svg.viewBox.baseVal;
+  var svgRect = dom.svg.getBoundingClientRect();
+  var scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
+  var visR = Math.max(6, 10 * scale);
+  var hitR = Math.max(10, 16 * scale);
+  var pts = [
+    { x: data.x, y: data.y },
+    { x: data.x + data.width, y: data.y },
+    { x: data.x + data.width, y: data.y + data.height },
+    { x: data.x, y: data.y + data.height },
+  ];
+  for (var i = 0; i < pts.length; i++) {
+    var x = pts[i].x, y = pts[i].y;
+    var isActive = i === activeIdx;
+    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: hitR, class: 'handle-extend', fill: 'transparent', stroke: 'none', 'data-index': i, 'data-corner': CORNERS[i] }));
+    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: visR, class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'), 'pointer-events': 'none' }));
+  }
 }
