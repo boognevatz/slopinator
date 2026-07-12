@@ -1,4 +1,12 @@
 import { dom, state } from './editor.js';
+import { bindGridControls } from './grid.js';
+
+var SYSTEM_LAYERS = {
+  'watermark-layer': 'Watermark',
+  'annotation-layer': 'Annotations',
+  'grid-layer': 'Grid',
+  'image-layer': 'Image',
+};
 
 export function initLayers() {
   // Toggle right panel
@@ -15,6 +23,7 @@ export function initLayers() {
   if (wmLayer) wmLayer.setAttribute('visibility', 'hidden');
   if (wmEye) wmEye.classList.add('hidden');
 
+  // Eye toggle
   document.querySelectorAll('.layer-eye').forEach(function(el) {
     el.addEventListener('click', function(e) {
       e.stopPropagation();
@@ -30,6 +39,22 @@ export function initLayers() {
         layer.setAttribute('visibility', 'hidden');
         this.classList.add('hidden');
       }
+      if (entry.classList.contains('selected')) {
+        showLayerProps(entry);
+      }
+    });
+  });
+
+  // Layer header click → show props in bottom panel
+  document.querySelectorAll('#right-panel .layer-header').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var entry = this.closest('.layer-entry');
+      if (entry.classList.contains('selected')) return;
+      document.querySelectorAll('#right-panel .layer-entry').forEach(function(e) {
+        e.classList.remove('selected');
+      });
+      entry.classList.add('selected');
+      showLayerProps(entry);
     });
   });
 
@@ -49,6 +74,60 @@ export function initLayers() {
 
   // Re-render watermark when foreground color changes
   document.addEventListener('palette-color-changed', updateWatermark);
+}
+
+function showLayerProps(entry) {
+  var layerId = entry.getAttribute('data-layer');
+  var layer = document.getElementById(layerId);
+  if (!layer) return;
+
+  var name = entry.querySelector('.layer-name').textContent;
+  var isHidden = layer.getAttribute('visibility') === 'hidden';
+  var isSystem = !!SYSTEM_LAYERS[layerId];
+
+  var body = document.getElementById('layer-props-body');
+
+  if (layerId === 'grid-layer') {
+    var vis = isHidden ? 'Off' : 'On';
+    body.innerHTML =
+      '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + name + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + vis + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">System layer:</span><span class="layer-prop-value">Yes</span></div>' +
+      '<div style="border-top:1px solid var(--color-border);margin:6px 0 4px 0;"></div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;">' +
+        '<div style="display:flex;align-items:center;gap:6px;">' +
+          '<button id="btn-grid" class="active" style="flex:1;font-size:11px;padding:3px 6px;">Grid</button>' +
+          '<button id="btn-snap" style="flex:1;font-size:11px;padding:3px 6px;">Snap</button>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Size</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="grid-cell-size" min="5" max="200" value="' + state.grid.cellSize + '" style="flex:1;min-width:0;">' +
+            '<span id="grid-cell-size-val" style="font-size:11px;color:var(--color-text);width:1.5em;text-align:right;flex-shrink:0;">' + state.grid.cellSize + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Line width</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="grid-line-width" min="0.5" max="5" step="0.5" value="' + state.grid.lineWidth + '" style="flex:1;min-width:0;">' +
+            '<span id="grid-line-width-val" style="font-size:11px;color:var(--color-text);width:1.5em;text-align:right;flex-shrink:0;">' + state.grid.lineWidth + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Opacity</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="grid-opacity" min="0" max="100" value="' + (state.grid.lineOpacity * 100) + '" style="flex:1;min-width:0;">' +
+            '<span id="grid-opacity-val" style="font-size:11px;color:var(--color-text);width:2em;text-align:right;flex-shrink:0;">' + (state.grid.lineOpacity * 100) + '%</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    bindGridControls();
+  } else {
+    body.innerHTML =
+      '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + name + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + (isHidden ? 'Off' : 'On') + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">System layer:</span><span class="layer-prop-value">' + (isSystem ? 'Yes' : 'No') + '</span></div>';
+  }
 }
 
 export function isLayerVisible(layerId) {

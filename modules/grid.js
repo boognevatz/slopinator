@@ -11,38 +11,11 @@ export function initGrid() {
   const gridEye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
   if (gridEye) gridEye.classList.add('hidden');
 
-  document.getElementById('btn-grid').addEventListener('click', () => {
-    toggleGrid(!state.grid.visible);
-  });
-
-  document.getElementById('btn-snap').addEventListener('click', () => {
-    toggleSnapToGrid(!state.grid.snapToGrid);
-  });
-
-  document.getElementById('grid-cell-size').addEventListener('input', function () {
-    state.grid.cellSize = parseInt(this.value);
-    document.getElementById('grid-cell-size-val').textContent = this.value;
-    if (state.grid.visible) updateGrid();
-  });
-
-  document.getElementById('grid-line-width').addEventListener('input', function () {
-    state.grid.lineWidth = parseFloat(this.value);
-    document.getElementById('grid-line-width-val').textContent = this.value;
-    if (state.grid.visible) updateGrid();
-  });
-
-  document.getElementById('grid-opacity').addEventListener('input', function () {
-    state.grid.lineOpacity = parseInt(this.value) / 100;
-    document.getElementById('grid-opacity-val').textContent = this.value + '%';
-    if (state.grid.visible) updateGrid();
-  });
+  bindGridControls();
 
   document.addEventListener('palette-color-changed', () => {
     if (state.grid.visible) updateGrid();
   });
-
-  updateGridButtonState();
-  updateSnapButtonState();
 
   // Sync state when layers panel eye toggles grid layer
   const eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
@@ -54,6 +27,60 @@ export function initGrid() {
       if (state.grid.visible) updateGrid();
     });
   }
+}
+
+export function bindGridControls() {
+  var btnGrid = document.getElementById('btn-grid');
+  var btnSnap = document.getElementById('btn-snap');
+  var cellSize = document.getElementById('grid-cell-size');
+  var cellSizeVal = document.getElementById('grid-cell-size-val');
+  var lineWidth = document.getElementById('grid-line-width');
+  var lineWidthVal = document.getElementById('grid-line-width-val');
+  var opacity = document.getElementById('grid-opacity');
+  var opacityVal = document.getElementById('grid-opacity-val');
+
+  if (btnGrid) {
+    btnGrid.replaceWith(btnGrid.cloneNode(true));
+    document.getElementById('btn-grid').addEventListener('click', () => {
+      toggleGrid(!state.grid.visible);
+    });
+  }
+  if (btnSnap) {
+    btnSnap.replaceWith(btnSnap.cloneNode(true));
+    document.getElementById('btn-snap').addEventListener('click', () => {
+      toggleSnapToGrid(!state.grid.snapToGrid);
+    });
+  }
+  if (cellSize) {
+    cellSize.replaceWith(cellSize.cloneNode(true));
+    document.getElementById('grid-cell-size').addEventListener('input', function () {
+      state.grid.cellSize = parseInt(this.value);
+      var val = document.getElementById('grid-cell-size-val');
+      if (val) val.textContent = this.value;
+      if (state.grid.visible) updateGrid();
+    });
+  }
+  if (lineWidth) {
+    lineWidth.replaceWith(lineWidth.cloneNode(true));
+    document.getElementById('grid-line-width').addEventListener('input', function () {
+      state.grid.lineWidth = parseFloat(this.value);
+      var val = document.getElementById('grid-line-width-val');
+      if (val) val.textContent = this.value;
+      if (state.grid.visible) updateGrid();
+    });
+  }
+  if (opacity) {
+    opacity.replaceWith(opacity.cloneNode(true));
+    document.getElementById('grid-opacity').addEventListener('input', function () {
+      state.grid.lineOpacity = parseInt(this.value) / 100;
+      var val = document.getElementById('grid-opacity-val');
+      if (val) val.textContent = this.value + '%';
+      if (state.grid.visible) updateGrid();
+    });
+  }
+
+  updateGridButtonState();
+  updateSnapButtonState();
 }
 
 export function toggleGrid(visible) {

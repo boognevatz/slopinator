@@ -170,23 +170,6 @@
         </div>
       </div>
 
-      <div class="mobile-group-wrap">
-        <button class="mobile-group-btn" data-group="grid">Grid ▾</button>
-        <div class="toolbar-group separator" data-group-content="grid">
-          <button id="btn-grid" title="Toggle Grid (G)">▦ Grid</button>
-          <button id="btn-snap" title="Toggle Snap to Grid">⧖ Snap</button>
-          <span class="toolbar-label">Size:</span>
-          <input type="range" id="grid-cell-size" min="5" max="200" value="40" style="width:60px;">
-          <span class="toolbar-label" id="grid-cell-size-val" style="min-width:1.5em;">40</span>
-          <span class="toolbar-label">W:</span>
-          <input type="range" id="grid-line-width" min="0.5" max="5" step="0.5" value="1" style="width:50px;">
-          <span class="toolbar-label" id="grid-line-width-val" style="min-width:1.5em;">1</span>
-          <span class="toolbar-label">Opacity:</span>
-          <input type="range" id="grid-opacity" min="0" max="100" value="30" style="width:60px;">
-          <span class="toolbar-label" id="grid-opacity-val" style="min-width:2em;">30%</span>
-        </div>
-      </div>
-
       <div class="toolbar-group separator" style="margin-left: auto;">
         <span class="toolbar-label" id="dpi-display" title="Click to edit DPI" style="cursor:pointer;">300 DPI</span>
         <div class="dropdown" id="resize-dropdown">
@@ -431,22 +414,38 @@
     </div>
   </div>
     <div id="right-panel" hidden>
-      <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layers</div>
-      <div class="layer-entry" data-layer="watermark-layer">
-        <span class="layer-eye">👁</span>
-        <span class="layer-name">Watermark</span>
+      <div id="layer-list">
+        <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layers</div>
+        <div class="layer-entry" data-layer="watermark-layer">
+          <div class="layer-header">
+            <span class="layer-eye">👁</span>
+            <span class="layer-name">Watermark</span>
+          </div>
+        </div>
+        <div class="layer-entry" data-layer="annotation-layer">
+          <div class="layer-header">
+            <span class="layer-eye">👁</span>
+            <span class="layer-name">Annotations</span>
+          </div>
+        </div>
+        <div class="layer-entry" data-layer="grid-layer">
+          <div class="layer-header">
+            <span class="layer-eye">👁</span>
+            <span class="layer-name">Grid</span>
+          </div>
+        </div>
+        <div class="layer-entry" data-layer="image-layer">
+          <div class="layer-header">
+            <span class="layer-eye">👁</span>
+            <span class="layer-name">Image</span>
+          </div>
+        </div>
       </div>
-      <div class="layer-entry" data-layer="annotation-layer">
-        <span class="layer-eye">👁</span>
-        <span class="layer-name">Annotations</span>
-      </div>
-      <div class="layer-entry" data-layer="grid-layer">
-        <span class="layer-eye">👁</span>
-        <span class="layer-name">Grid</span>
-      </div>
-      <div class="layer-entry" data-layer="image-layer">
-        <span class="layer-eye">👁</span>
-        <span class="layer-name">Image</span>
+      <div id="layer-props">
+        <div style="padding:8px;font-size:12px;color:#aaa;border-bottom:1px solid #444;font-weight:bold;">Layer Properties</div>
+        <div id="layer-props-body">
+          <div style="padding:12px;font-size:11px;color:#666;text-align:center;">Select a layer</div>
+        </div>
       </div>
     </div>
   </div>
