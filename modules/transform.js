@@ -3,16 +3,17 @@
 import { state, updateViewBox, updateImageTransform } from './editor.js';
 import { pushAction } from './history.js';
 
-export function rotateCW() {
+export function rotateCW(angle) {
+  angle = angle || 90;
   const oldRotation = state.image.rotation;
-  const newRotation = (oldRotation + 90) % 360;
+  const newRotation = (oldRotation + angle) % 360;
   state.image.rotation = newRotation;
   state.image.fitScale = null;
   updateViewBox();
   updateImageTransform();
 
   pushAction({
-    description: 'Rotate CW',
+    description: 'Rotate ' + angle + '° CW',
     doFn: () => {
       state.image.rotation = newRotation;
       state.image.fitScale = null;
@@ -28,16 +29,17 @@ export function rotateCW() {
   });
 }
 
-export function rotateCCW() {
+export function rotateCCW(angle) {
+  angle = angle || 90;
   const oldRotation = state.image.rotation;
-  const newRotation = (oldRotation + 270) % 360;
+  const newRotation = (oldRotation + (360 - angle)) % 360;
   state.image.rotation = newRotation;
   state.image.fitScale = null;
   updateViewBox();
   updateImageTransform();
 
   pushAction({
-    description: 'Rotate CCW',
+    description: 'Rotate ' + angle + '° CCW',
     doFn: () => {
       state.image.rotation = newRotation;
       state.image.fitScale = null;

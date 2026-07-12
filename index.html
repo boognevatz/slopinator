@@ -144,11 +144,17 @@
         </div>
       </div>
 
-      <div class="mobile-group-wrap">
+      <div class="mobile-group-wrap always-dropdown">
         <button class="mobile-group-btn" data-group="rotate">Rotate ▾</button>
-        <div class="toolbar-group separator" data-group-content="rotate">
-          <button id="btn-rotate-ccw" title="Rotate 90° CCW" disabled>⟲ CCW</button>
-          <button id="btn-rotate-cw" title="Rotate 90° CW" disabled>⟳ CW</button>
+        <div class="toolbar-group separator rotate-group-content" data-group-content="rotate">
+          <div class="rotate-row">
+            <input type="number" class="rotate-angle" id="rotate-angle-cw" value="90" min="1" max="360">
+            <button id="btn-rotate-cw" title="Rotate CW" disabled>↻ CW</button>
+          </div>
+          <div class="rotate-row">
+            <input type="number" class="rotate-angle" id="rotate-angle-ccw" value="90" min="1" max="360">
+            <button id="btn-rotate-ccw" title="Rotate CCW" disabled>↺ CCW</button>
+          </div>
           <button id="btn-flip-h" title="Flip Horizontal" disabled>↔ Flip H</button>
           <button id="btn-flip-v" title="Flip Vertical" disabled>↕ Flip V</button>
         </div>

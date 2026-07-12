@@ -434,6 +434,52 @@ button.tool-btn.active {
   display: flex !important;
 }
 
+.mobile-group-wrap.always-dropdown .mobile-group-btn {
+  display: block;
+}
+.mobile-group-wrap.always-dropdown [data-group-content] {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--color-bg-medium);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  z-index: 200;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+  min-width: max-content;
+}
+.mobile-group-wrap.always-dropdown [data-group-content].open {
+  display: flex !important;
+}
+
+.rotate-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rotate-angle {
+  width: 48px;
+  padding: 3px 4px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 3px;
+  background: var(--color-bg-light);
+  color: var(--color-text);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.rotate-angle:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 @media (max-width: 768px) {
   .mobile-group-btn {
     display: block;

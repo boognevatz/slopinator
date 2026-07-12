@@ -91,8 +91,14 @@ function init() {
 
   // ── Toolbar button wiring ───────────────────────────────────
 
-  document.getElementById('btn-rotate-cw').addEventListener('click', rotateCW);
-  document.getElementById('btn-rotate-ccw').addEventListener('click', rotateCCW);
+  document.getElementById('btn-rotate-cw').addEventListener('click', function() {
+    var a = parseInt(document.getElementById('rotate-angle-cw').value) || 90;
+    rotateCW(a);
+  });
+  document.getElementById('btn-rotate-ccw').addEventListener('click', function() {
+    var a = parseInt(document.getElementById('rotate-angle-ccw').value) || 90;
+    rotateCCW(a);
+  });
   document.getElementById('btn-flip-h').addEventListener('click', flipH);
   document.getElementById('btn-flip-v').addEventListener('click', flipV);
 
