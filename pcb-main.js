@@ -38,6 +38,7 @@ showFileDate();
 
 function init() {
   initEditor();
+  state.defaultTool = 'select';
 
   setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
 

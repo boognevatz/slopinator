@@ -777,9 +777,9 @@ export function openSVGProject(svgText) {
       height: parseFloat(r.getAttribute('height')),
       rx: parseFloat(r.getAttribute('rx')) || 0,
       rotation,
-      stroke: r.getAttribute('stroke') || '#ff0000',
+      stroke: r.getAttribute('stroke') || 'none',
       strokeWidth: parseFloat(r.getAttribute('stroke-width')) || 2,
-      fill: 'transparent',
+      fill: r.getAttribute('fill') || 'transparent',
     });
   });
 
@@ -851,7 +851,7 @@ export function openSVGProject(svgText) {
 
   clearHistory();
   refreshPalette();
-  switchTool('text');
+  switchTool(state.defaultTool || 'text');
   updateWatermark();
 }
 
@@ -929,7 +929,7 @@ export function generateSVGString() {
       return `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
     }
     if (el.type === 'rectangle') {
-      var s = `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+      var s = `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
       if (el.rotation) {
         s += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
       }
@@ -1029,7 +1029,7 @@ export function exportJPG(widthOption) {
       } else if (el.type === 'freehand') {
         svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
       } else if (el.type === 'rectangle') {
-        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
         if (el.rotation) {
           svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
         }
@@ -1154,7 +1154,7 @@ export function exportPDF(widthOption, pageSize) {
       } else if (el.type === 'freehand') {
         svgStr += `<polyline data-type="freehand" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
       } else if (el.type === 'rectangle') {
-        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="transparent"`;
+        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
         if (el.rotation) {
           svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
         }
