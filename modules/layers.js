@@ -150,7 +150,7 @@ function getLayerData(el) {
   return layerOrder.find(function(l) { return l.id === id; });
 }
 
-function selectLayer(id) {
+export function selectLayer(id) {
   layerOrder.forEach(function(l) { l._selected = l.id === id; });
   var entry = layerOrder.find(function(l) { return l.id === id; });
   if (entry && !entry.system) {

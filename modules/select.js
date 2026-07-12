@@ -5,6 +5,7 @@ import { svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
 import { refreshPalette } from './palette.js';
+import { selectLayer } from './layers.js';
 import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle, legacyStyleToDecorations } from './line.js';
 import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
 import { updateRectangleElement } from './rectangle.js';
@@ -398,6 +399,23 @@ export function selectElement(id) {
 
   const data = state.elements.find(el => el.id === id);
   if (!data) return;
+
+  // Switch to the layer this element belongs to
+  var svgEl = dom.svg.querySelector('#' + CSS.escape(id));
+  if (svgEl) {
+    var parent = svgEl.parentElement;
+    while (parent && parent !== dom.svg) {
+      if (parent.id && (parent.id === 'annotation-layer' || parent.id.startsWith('user-layer-'))) {
+        var currentLayerEl = document.querySelector('.layer-entry.selected');
+        var currentLayerId = currentLayerEl ? currentLayerEl.dataset.layer : null;
+        if (parent.id !== currentLayerId) {
+          selectLayer(parent.id);
+        }
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }
 
   // Update active color/thickness from selected element
   if (data.type === 'line') {
