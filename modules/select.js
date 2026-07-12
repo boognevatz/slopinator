@@ -400,8 +400,17 @@ function onKeyDown(e) {
 function findAnnotationParent(target) {
   let el = target;
   while (el && el !== dom.svg) {
-    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) return el;
-    if (el.dataset && el.dataset.type === 'text') return el;
+    if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) {
+      var groupParent = el.parentElement;
+      if (groupParent && groupParent.dataset && groupParent.dataset.type === 'group') return groupParent;
+      return el;
+    }
+    if (el.dataset && el.dataset.type === 'text') {
+      var gp = el.parentElement;
+      if (gp && gp.dataset && gp.dataset.type === 'group') return gp;
+      return el;
+    }
+    if (el.dataset && el.dataset.type === 'group') return el;
     el = el.parentElement;
   }
   return null;
@@ -410,6 +419,47 @@ function findAnnotationParent(target) {
 // ── Selection ───────────────────────────────────────────────────
 
 export function selectElement(id, addToSelection) {
+  var groupData = state.elements.find(function(el) { return el.id === id && el.type === 'group'; });
+  if (groupData) {
+    if (addToSelection) {
+      var allSelected = true;
+      for (var gg = 0; gg < groupData.childIds.length; gg++) {
+        if (state.selectedIds.indexOf(groupData.childIds[gg]) === -1) {
+          allSelected = false;
+          break;
+        }
+      }
+      if (allSelected) {
+        for (var gg2 = 0; gg2 < groupData.childIds.length; gg2++) {
+          var idx = state.selectedIds.indexOf(groupData.childIds[gg2]);
+          if (idx !== -1) state.selectedIds.splice(idx, 1);
+        }
+        if (state.selectedIds.length === 0) { clearSelection(); return; }
+        state.selectedId = state.selectedIds[state.selectedIds.length - 1];
+        var rem = state.elements.find(function(el) { return el.id === state.selectedId; });
+        if (rem) { drawHandles(rem); document.getElementById('btn-delete').disabled = false; document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: rem.id, data: rem } })); }
+        return;
+      }
+      for (var gg3 = 0; gg3 < groupData.childIds.length; gg3++) {
+        if (state.selectedIds.indexOf(groupData.childIds[gg3]) === -1) {
+          state.selectedIds.push(groupData.childIds[gg3]);
+        }
+      }
+    } else {
+      clearSelection();
+      state.selectedIds = groupData.childIds.slice();
+    }
+    state.selectedId = groupData.childIds[groupData.childIds.length - 1];
+    var primChild = state.elements.find(function(el) { return el.id === state.selectedId; });
+    if (primChild) drawHandles(primChild);
+    document.getElementById('btn-delete').disabled = false;
+    document.getElementById('element-id-input').value = groupData.id;
+    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
+    var groupBtn = document.getElementById('btn-group');
+    if (groupBtn) groupBtn.disabled = true;
+    return;
+  }
+
   if (!addToSelection) {
     clearSelection();
   }
@@ -496,8 +546,21 @@ export function selectElement(id, addToSelection) {
   var idInput = document.getElementById('element-id-input');
   if (idInput) idInput.value = data.id;
 
+  updateGroupButton();
+
   // Dispatch event so palette highlights update
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data } }));
+}
+
+function updateGroupButton() {
+  var btn = document.getElementById('btn-group');
+  if (!btn) return;
+  if (state.selectedIds.length < 2) { btn.disabled = true; return; }
+  for (var gi = 0; gi < state.selectedIds.length; gi++) {
+    var el = state.elements.find(function(e) { return e.id === state.selectedIds[gi]; });
+    if (el && el.parentId) { btn.disabled = true; return; }
+  }
+  btn.disabled = false;
 }
 
 export function clearSelection() {
@@ -505,13 +568,14 @@ export function clearSelection() {
   state.selectedIds = [];
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
+  updateGroupButton();
   var idInput = document.getElementById('element-id-input');
   if (idInput) idInput.value = '';
   textInteractMode = 'resize';
   hideRotationTooltip();
 }
 
-function drawHandles(_data) {
+export function drawHandles(_data) {
   dom.handleLayer.innerHTML = '';
 
   for (var _i = 0; _i < state.selectedIds.length; _i++) {
@@ -1276,6 +1340,21 @@ export function deleteSelected() {
     if (el) el.remove();
   }
 
+  // Clean up empty groups
+  for (var gi = state.elements.length - 1; gi >= 0; gi--) {
+    var el = state.elements[gi];
+    if (el.type === 'group') {
+      el.childIds = el.childIds.filter(function(cid) {
+        return state.elements.some(function(e) { return e.id === cid; });
+      });
+      if (el.childIds.length === 0) {
+        var gEl = dom.annotationLayer.querySelector('#' + CSS.escape(el.id));
+        if (gEl) gEl.remove();
+        state.elements.splice(gi, 1);
+      }
+    }
+  }
+
   clearSelection();
 
   pushAction({
@@ -1682,4 +1761,5 @@ export function refreshSelection() {
     state.activeCornerRadius = data.rx || 0;
   }
   drawHandles(data);
+  updateGroupButton();
 }

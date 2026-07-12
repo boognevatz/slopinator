@@ -18,6 +18,7 @@ import { initLayers } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
+import { groupSelected } from './modules/group.js';
 
 import { dom } from './modules/editor.js';
 
@@ -122,6 +123,7 @@ function init() {
   });
 
   document.getElementById('btn-delete').addEventListener('click', deleteSelected);
+  document.getElementById('btn-group').addEventListener('click', groupSelected);
 
   document.getElementById('btn-switch-pcb').addEventListener('click', () => { location.href = 'pcb.html'; });
 
@@ -148,6 +150,13 @@ function init() {
       e.preventDefault();
       redo();
       refreshSelection();
+      return;
+    }
+
+    // Ctrl+G — Group selected
+    if (e.ctrlKey && e.key === 'g') {
+      e.preventDefault();
+      groupSelected();
       return;
     }
 
