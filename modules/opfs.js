@@ -106,6 +106,10 @@ export function initAutosave() {
     _dirty = true;
   });
 
+  document.addEventListener('delete-autosave', function() {
+    deleteAutosave();
+  });
+
   _intervalId = setInterval(function() {
     if (_dirty && state.autosaveEnabled) {
       saveAutosave();

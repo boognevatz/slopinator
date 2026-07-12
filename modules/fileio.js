@@ -582,7 +582,32 @@ export function openSVGProject(svgText) {
   // Parse image
   const imgEl = svgRoot.querySelector('image[data-type="background"]');
   if (!imgEl) {
-    alert('No background image found in SVG project.');
+    var existingDlg = document.getElementById('no-image-dialog');
+    if (existingDlg) existingDlg.remove();
+    var dlg = document.createElement('div');
+    dlg.id = 'no-image-dialog';
+    dlg.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;padding:20px 24px;min-width:300px;color:var(--color-text);font-size:14px;';
+    box.innerHTML = '<p style="margin:0 0 12px 0;"><strong>No background image found in SVG project.</strong></p><p style="margin:0 0 16px 0;font-size:13px;color:var(--color-text-muted);">The file might be corrupted or was saved without an image.</p>';
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+    var btnOk = document.createElement('button');
+    btnOk.textContent = 'OK';
+    btnOk.style.cssText = 'padding:4px 14px;font-size:12px;';
+    var btnDelete = document.createElement('button');
+    btnDelete.textContent = 'Delete broken autosaved project file';
+    btnDelete.style.cssText = 'padding:4px 14px;font-size:12px;background:#c0392b;color:#fff;border-color:#c0392b;';
+    btnDelete.addEventListener('click', function() {
+      document.dispatchEvent(new CustomEvent('delete-autosave'));
+      dlg.remove();
+    });
+    btnOk.addEventListener('click', function() { dlg.remove(); });
+    btnRow.appendChild(btnDelete);
+    btnRow.appendChild(btnOk);
+    box.appendChild(btnRow);
+    dlg.appendChild(box);
+    document.body.appendChild(dlg);
     return;
   }
 
