@@ -279,8 +279,8 @@ function showLayerProps(entry) {
         '<div style="display:flex;flex-direction:column;gap:1px;">' +
           '<span style="font-size:11px;color:var(--color-text-muted);">Spacing</span>' +
           '<div style="display:flex;align-items:center;gap:4px;">' +
-            '<input type="range" id="wm-spacing" min="10" max="400" step="10" value="40" style="flex:1;min-width:0;">' +
-            '<span id="wm-spacing-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">40</span>' +
+            '<input type="range" id="wm-spacing" min="10" max="400" step="10" value="100" style="flex:1;min-width:0;">' +
+            '<span id="wm-spacing-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">100</span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -384,7 +384,7 @@ export function updateWatermark() {
   var thickness = thicknessEl ? parseFloat(thicknessEl.value) : state.activeThickness;
   var color = state.activeColor;
   var rotation = rotationEl ? parseFloat(rotationEl.value) : 45;
-  var spacing = spacingEl ? parseFloat(spacingEl.value) : 40;
+  var spacing = spacingEl ? parseFloat(spacingEl.value) : 100;
 
   var patternId = 'watermark-pattern';
   var defs = dom.svg.querySelector('defs');

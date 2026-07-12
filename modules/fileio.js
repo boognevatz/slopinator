@@ -1214,7 +1214,7 @@ function buildWatermarkDefs() {
   var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
   var color = state.activeColor;
   var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
-  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 40;
+  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 100;
   return '<defs>\n<pattern id="watermark-pattern" width="' + spacing + '" height="' + spacing + '" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M ' + spacing + ' 0 L 0 0 0 ' + spacing + '" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
