@@ -1,3 +1,24 @@
+:root {
+  --color-accent: #0078d4;
+  --color-accent-rgb: 0, 120, 212;
+  --color-accent-light: #4fc3f7;
+  --color-bg-dark: #1e1e1e;
+  --color-bg-medium: #2d2d2d;
+  --color-bg-light: #3c3c3c;
+  --color-bg-hover: #3a3a3a;
+  --color-bg-editor: #181818;
+  --color-bg-btn-hover: #505050;
+  --color-bg-btn-active: #606060;
+  --color-border: #444;
+  --color-border-light: #555;
+  --color-text: #e0e0e0;
+  --color-text-muted: #aaa;
+  --color-text-dim: #888;
+  --color-text-secondary: #999;
+  --color-text-crop: #c8c8c8;
+  --color-fg-border: #ccc;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -19,15 +40,15 @@ html, body {
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 13px;
-  background: #1e1e1e;
-  color: #e0e0e0;
+  background: var(--color-bg-dark);
+  color: var(--color-text);
 }
 
 /* ── Toolbar ─────────────────────────────────────────── */
 
 #toolbar {
-  background: #2d2d2d;
-  border-bottom: 1px solid #444;
+  background: var(--color-bg-medium);
+  border-bottom: 1px solid var(--color-border);
   padding: 4px 8px;
   display: flex;
   flex-direction: column;
@@ -56,21 +77,21 @@ html, body {
 .toolbar-group.separator {
   margin-left: 8px;
   padding-left: 8px;
-  border-left: 1px solid #555;
+  border-left: 1px solid var(--color-border-light);
 }
 
 .toolbar-label {
   font-size: 12px;
-  color: #aaa;
+  color: var(--color-text-muted);
   margin-right: 2px;
 }
 
 /* Buttons */
 
 button {
-  background: #3c3c3c;
-  color: #e0e0e0;
-  border: 1px solid #555;
+  background: var(--color-bg-light);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-light);
   border-radius: 3px;
   padding: 4px 8px;
   font-size: 12px;
@@ -79,11 +100,11 @@ button {
 }
 
 button:hover:not(:disabled) {
-  background: #505050;
+  background: var(--color-bg-btn-hover);
 }
 
 button:active:not(:disabled) {
-  background: #606060;
+  background: var(--color-bg-btn-active);
 }
 
 button:disabled {
@@ -92,8 +113,8 @@ button:disabled {
 }
 
 button.tool-btn.active {
-  background: #0078d4;
-  border-color: #0078d4;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
@@ -108,8 +129,8 @@ button.tool-btn.active {
   position: absolute;
   top: 100%;
   left: 0;
-  background: #3c3c3c;
-  border: 1px solid #555;
+  background: var(--color-bg-light);
+  border: 1px solid var(--color-border-light);
   border-radius: 3px;
   z-index: 100;
   min-width: 140px;
@@ -131,7 +152,7 @@ button.tool-btn.active {
 }
 
 .dropdown-menu button:hover {
-  background: #0078d4;
+  background: var(--color-accent);
 }
 
 /* ── Foreground/Background Color Indicator ───────────── */
@@ -166,12 +187,12 @@ button.tool-btn.active {
 .fg-square, .bg-square {
   width: 100%;
   height: 100%;
-  border: 2px solid #888;
+  border: 2px solid var(--color-text-dim);
   border-radius: 2px;
 }
 
 .fg-square {
-  border-color: #ccc;
+  border-color: var(--color-fg-border);
 }
 
 /* ── Color Dropdown ─────────────────────────────────── */
@@ -181,8 +202,8 @@ button.tool-btn.active {
   top: 100%;
   left: 0;
   margin-top: 4px;
-  background: #2d2d2d;
-  border: 1px solid #555;
+  background: var(--color-bg-medium);
+  border: 1px solid var(--color-border-light);
   border-radius: 4px;
   padding: 6px;
   z-index: 100;
@@ -207,27 +228,27 @@ button.tool-btn.active {
 }
 
 .color-dropdown .swatch:hover {
-  border-color: #aaa;
+  border-color: var(--color-text-muted);
 }
 
 .color-dropdown .swatch.active {
   border-color: #fff;
-  box-shadow: 0 0 0 1px #0078d4;
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .color-dropdown .swatch.active.swatch-light {
-  border-color: #888;
-  box-shadow: 0 0 0 1px #888;
+  border-color: var(--color-text-dim);
+  box-shadow: 0 0 0 1px var(--color-text-dim);
 }
 
 .color-dropdown .swatch.chessboard,
 .fg-square.chessboard,
 .bg-square.chessboard {
   background-image:
-    linear-gradient(45deg, #888 25%, transparent 25%),
-    linear-gradient(-45deg, #888 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #888 75%),
-    linear-gradient(-45deg, transparent 75%, #888 75%);
+    linear-gradient(45deg, var(--color-text-dim) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-text-dim) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-text-dim) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-text-dim) 75%);
   background-size: 8px 8px;
   background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
 }
@@ -239,14 +260,14 @@ button.tool-btn.active {
   align-items: center;
   gap: 4px;
   padding-top: 4px;
-  border-top: 1px solid #444;
+  border-top: 1px solid var(--color-border);
   margin-top: 4px;
 }
 
 .color-dropdown-opacity input[type="range"] {
   flex: 1;
   height: 4px;
-  accent-color: #0078d4;
+  accent-color: var(--color-accent);
   cursor: pointer;
 }
 
@@ -260,14 +281,14 @@ button.tool-btn.active {
   align-items: center;
   gap: 4px;
   padding-top: 4px;
-  border-top: 1px solid #444;
+  border-top: 1px solid var(--color-border);
 }
 
 .color-dropdown-custom input[type="color"] {
   width: 28px;
   height: 22px;
   padding: 0;
-  border: 1px solid #555;
+  border: 1px solid var(--color-border-light);
   border-radius: 2px;
   background: none;
   cursor: pointer;
@@ -291,14 +312,14 @@ button.tool-btn.active {
 }
 
 .line-style-btn.active {
-  background: #0078d4;
-  border-color: #0078d4;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
 .line-mode-btn.active {
-  background: #0078d4;
-  border-color: #0078d4;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
@@ -306,9 +327,9 @@ button.tool-btn.active {
 
 .small-input {
   width: 54px;
-  background: #3c3c3c;
-  color: #e0e0e0;
-  border: 1px solid #555;
+  background: var(--color-bg-light);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-light);
   border-radius: 3px;
   padding: 3px 5px;
   font-size: 12px;
@@ -322,7 +343,7 @@ button.tool-btn.active {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #c8c8c8;
+  color: var(--color-text-crop);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -360,7 +381,7 @@ button.tool-btn.active {
   cursor: pointer;
 }
 #right-panel .layer-entry:hover {
-  background: #3a3a3a;
+  background: var(--color-bg-hover);
 }
 
 /* ── Editor Container ────────────────────────────────── */
@@ -388,8 +409,8 @@ button.tool-btn.active {
     position: absolute;
     top: 100%;
     left: 0;
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--color-bg-medium);
+    border: 1px solid var(--color-border);
     border-radius: 4px;
     padding: 6px 8px;
     z-index: 200;
@@ -415,7 +436,7 @@ button.tool-btn.active {
   flex: 1;
   position: relative;
   overflow: auto;
-  background: #181818;
+  background: var(--color-bg-editor);
 }
 
 /* Make toolbar + editor fill viewport vertically */
@@ -440,7 +461,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 120, 212, 0.9);
+  background: rgba(var(--color-accent-rgb), 0.9);
   color: white;
   display: flex;
   align-items: center;
@@ -480,7 +501,7 @@ body {
 
 #empty-state {
   text-align: center;
-  color: #888;
+  color: var(--color-text-dim);
   z-index: 5;
 }
 
@@ -521,7 +542,7 @@ body {
 /* Selection handles */
 #editor-svg .selection-box {
   fill: none;
-  stroke: #0078d4;
+  stroke: var(--color-accent);
   stroke-width: 1;
   stroke-dasharray: 4 3;
   pointer-events: none;
@@ -530,7 +551,7 @@ body {
 
 #editor-svg .handle {
   fill: #fff;
-  stroke: #0078d4;
+  stroke: var(--color-accent);
   stroke-width: 1;
   cursor: pointer;
   vector-effect: non-scaling-stroke;
@@ -554,7 +575,7 @@ body {
 
 #editor-svg .handle-endpoint {
   fill: #fff;
-  stroke: #4fc3f7;
+  stroke: var(--color-accent-light);
 }
 
 #editor-svg .handle-endpoint.unselected {
@@ -562,8 +583,8 @@ body {
 }
 
 #editor-svg .handle-endpoint.active {
-  fill: #4fc3f7;
-  stroke: #4fc3f7;
+  fill: var(--color-accent-light);
+  stroke: var(--color-accent-light);
 }
 
 #editor-svg .handle-move {
@@ -576,7 +597,7 @@ body {
 
 #editor-svg .handle-resize-corner {
   fill: rgba(255, 255, 255, 0.7);
-  stroke: #0078d4;
+  stroke: var(--color-accent);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
@@ -622,9 +643,9 @@ body {
   padding: 0;
   margin: 0;
   overflow: hidden;
-  caret-color: #0078d4;
+  caret-color: var(--color-accent);
   /* Thin highlight so user knows they're editing */
-  box-shadow: 0 0 0 1px rgba(0, 120, 212, 0.5);
+  box-shadow: 0 0 0 1px rgba(var(--color-accent-rgb), 0.5);
 }
 
 /* ── Layers Panel ───────────────────────────────────── */
@@ -657,16 +678,16 @@ body {
 
 #settings-storage-tbody td {
   padding: 3px 8px;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid var(--color-bg-hover);
   font-family: monospace;
   font-size: 11px;
 }
 #settings-storage-tbody td:last-child {
   text-align: right;
-  color: #999;
+  color: var(--color-text-secondary);
 }
 #settings-storage-tbody tr:hover {
-  background: #3a3a3a;
+  background: var(--color-bg-hover);
 }
 
 /* ── About Popup ───────────────────────────────────── */
@@ -680,14 +701,14 @@ body {
 /* ── Grid controls ──────────────────────────────────── */
 
 #btn-grid.active {
-  background: #0078d4;
-  border-color: #0078d4;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
 #btn-snap.active {
-  background: #0078d4;
-  border-color: #0078d4;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
 }
 
@@ -699,5 +720,5 @@ body {
 
 .export-tab.active {
   color: #fff !important;
-  border-bottom-color: #0078d4 !important;
+  border-bottom-color: var(--color-accent) !important;
 }

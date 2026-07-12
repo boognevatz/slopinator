@@ -144,7 +144,7 @@ function renderLocalStorageInfo() {
     tr.dataset.key = item.raw;
     tr.addEventListener('click', () => {
       if (_selectedRow) _selectedRow.style.background = '';
-      tr.style.background = '#0078d4';
+      tr.style.setProperty('background', 'var(--color-accent)');
       _selectedRow = tr;
       const val = localStorage.getItem(item.raw);
       valueArea.value = val || '';
