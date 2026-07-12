@@ -6,7 +6,7 @@ import { initPalette } from './modules/palette.js';
 import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToOne } from './modules/transform.js';
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
-import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected, moveInGroup } from './modules/select.js';
+import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected, moveInGroup, cycleGroupSelection } from './modules/select.js';
 import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
@@ -139,6 +139,16 @@ function init() {
     // Don't capture when focus is on an input
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    // Tab / Shift+Tab — cycle through group children
+    if (e.key === 'Tab' && state.selectedId) {
+      var _sel = state.elements.find(function(el) { return el.id === state.selectedId; });
+      if (_sel && _sel.parentId) {
+        e.preventDefault();
+        cycleGroupSelection(e.shiftKey ? -1 : 1);
+        return;
+      }
+    }
 
     // Ctrl+Z — Undo
     if (e.ctrlKey && !e.shiftKey && e.key === 'z') {

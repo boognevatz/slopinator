@@ -590,6 +590,18 @@ function updateGroupButton() {
   btn.disabled = false;
 }
 
+export function cycleGroupSelection(direction) {
+  if (!state.selectedId) return;
+  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!selData || !selData.parentId) return;
+  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
+  if (!groupData || !groupData.childIds.length) return;
+  var idx = groupData.childIds.indexOf(state.selectedId);
+  if (idx === -1) return;
+  var newIdx = (idx + direction + groupData.childIds.length) % groupData.childIds.length;
+  selectElement(groupData.childIds[newIdx], false);
+}
+
 export function clearSelection() {
   _tempUngrouped = false;
   state.selectedId = null;
