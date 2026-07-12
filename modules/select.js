@@ -221,11 +221,13 @@ function syncLineToolbarFromSelection(data) {
 export function activateSelect() {
   dom.svg.style.cursor = 'default';
   dom.svg.addEventListener('pointerdown', onMouseDown);
+  document.addEventListener('keydown', onKeyDown);
 }
 
 export function deactivateSelect() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
+  document.removeEventListener('keydown', onKeyDown);
   if (isPanning) {
     document.removeEventListener('pointermove', onPanMove);
     document.removeEventListener('pointerup', onPanEnd);
@@ -333,6 +335,49 @@ function onPanEnd() {
   isPanning = false;
   panStart = null;
   dom.svg.style.cursor = 'default';
+}
+
+function onKeyDown(e) {
+  if (!state.selectedId) return;
+  if (isEditing()) return;
+  var dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  var dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+  if (!dx && !dy) return;
+  e.preventDefault();
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!data) return;
+
+  if (data.type === 'line') {
+    if (data.points) {
+      data.points = data.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+      data.x1 = data.points[0].x;
+      data.y1 = data.points[0].y;
+      data.x2 = data.points[data.points.length - 1].x;
+      data.y2 = data.points[data.points.length - 1].y;
+    } else {
+      data.x1 += dx;
+      data.y1 += dy;
+      data.x2 += dx;
+      data.y2 += dy;
+    }
+    updateLineSVG(data);
+  } else if (data.type === 'text') {
+    data.x += dx;
+    data.y += dy;
+    updateTextSVG(data);
+  } else if (data.type === 'freehand') {
+    data.points = data.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+    if (data.rawPoints) {
+      data.rawPoints = data.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+    }
+    updateFreehandElement(data);
+  } else if (data.type === 'rectangle') {
+    data.x += dx;
+    data.y += dy;
+    updateRectangleElement(data);
+  }
+
+  drawHandles(data);
 }
 
 function findAnnotationParent(target) {
