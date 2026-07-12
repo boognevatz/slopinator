@@ -6,7 +6,7 @@ import { initPalette } from './modules/palette.js';
 import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToOne } from './modules/transform.js';
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
-import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected } from './modules/select.js';
+import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected, moveInGroup } from './modules/select.js';
 import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
@@ -125,6 +125,8 @@ function init() {
   document.getElementById('btn-delete').addEventListener('click', deleteSelected);
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSelected);
   document.getElementById('btn-group').addEventListener('click', groupSelected);
+  document.getElementById('btn-move-up').addEventListener('click', function() { moveInGroup(1); });
+  document.getElementById('btn-move-down').addEventListener('click', function() { moveInGroup(-1); });
 
   document.getElementById('btn-switch-pcb').addEventListener('click', () => { location.href = 'pcb.html'; });
 

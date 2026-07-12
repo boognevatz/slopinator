@@ -482,6 +482,7 @@ export function selectElement(id, addToSelection) {
     document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
     var groupBtn = document.getElementById('btn-group');
     if (groupBtn) groupBtn.disabled = true;
+    updateMoveButtons();
     return;
   }
 
@@ -572,6 +573,7 @@ export function selectElement(id, addToSelection) {
   if (idInput) idInput.value = data.id;
 
   updateGroupButton();
+  updateMoveButtons();
 
   // Dispatch event so palette highlights update
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data } }));
@@ -596,6 +598,7 @@ export function clearSelection() {
   document.getElementById('btn-delete').disabled = true;
   document.getElementById('btn-duplicate').disabled = true;
   updateGroupButton();
+  updateMoveButtons();
   var idInput = document.getElementById('element-id-input');
   if (idInput) idInput.value = '';
   textInteractMode = 'resize';
@@ -1561,6 +1564,87 @@ export function duplicateSelected() {
   });
 }
 
+// ── Move in Group ─────────────────────────────────────────────────
+
+export function moveInGroup(direction) {
+  if (!state.selectedId) return;
+  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!selData || !selData.parentId) return;
+  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
+  if (!groupData) return;
+  var idx = groupData.childIds.indexOf(state.selectedId);
+  if (idx === -1) return;
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= groupData.childIds.length) return;
+  groupData.childIds[idx] = groupData.childIds[newIdx];
+  groupData.childIds[newIdx] = state.selectedId;
+  var parentG = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
+  if (parentG) {
+    var childEl = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+    var refEl = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[idx]));
+    if (childEl && refEl) {
+      if (direction === -1) parentG.insertBefore(childEl, refEl);
+      else parentG.insertBefore(childEl, refEl.nextSibling);
+    }
+  }
+  updateMoveButtons();
+  pushAction({
+    description: 'Move ' + (direction === -1 ? 'up' : 'down') + ' in group',
+    doFn: function() {
+      var ci = groupData.childIds.indexOf(state.selectedId);
+      if (ci === -1) return;
+      var ni = ci + direction;
+      if (ni < 0 || ni >= groupData.childIds.length) return;
+      groupData.childIds[ci] = groupData.childIds[ni];
+      groupData.childIds[ni] = state.selectedId;
+      var pg = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
+      if (pg) {
+        var ce = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+        var re = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[ci]));
+        if (ce && re) {
+          if (direction === -1) pg.insertBefore(ce, re);
+          else pg.insertBefore(ce, re.nextSibling);
+        }
+      }
+    },
+    undoFn: function() {
+      var ci = groupData.childIds.indexOf(state.selectedId);
+      if (ci === -1) return;
+      var revDir = direction === -1 ? 1 : -1;
+      var ni = ci + revDir;
+      if (ni < 0 || ni >= groupData.childIds.length) return;
+      groupData.childIds[ci] = groupData.childIds[ni];
+      groupData.childIds[ni] = state.selectedId;
+      var pg = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
+      if (pg) {
+        var ce = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+        var re = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[ci]));
+        if (ce && re) {
+          if (revDir === -1) pg.insertBefore(ce, re);
+          else pg.insertBefore(ce, re.nextSibling);
+        }
+      }
+    },
+  });
+}
+
+export function updateMoveButtons() {
+  var upBtn = document.getElementById('btn-move-up');
+  var downBtn = document.getElementById('btn-move-down');
+  if (!upBtn || !downBtn) return;
+  upBtn.disabled = true;
+  downBtn.disabled = true;
+  if (!state.selectedId) return;
+  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!selData || !selData.parentId) return;
+  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
+  if (!groupData) return;
+  var idx = groupData.childIds.indexOf(state.selectedId);
+  if (idx === -1) return;
+  if (idx < groupData.childIds.length - 1) upBtn.disabled = false;
+  if (idx > 0) downBtn.disabled = false;
+}
+
 function addLineSVGAtIndex(data, _idx) {
   // Re-import to avoid circular dep issues at module level
   const { addLineElement } = _lineModule;
@@ -1942,4 +2026,5 @@ export function refreshSelection() {
   }
   drawHandles(data);
   updateGroupButton();
+  updateMoveButtons();
 }
