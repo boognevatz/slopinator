@@ -146,6 +146,12 @@ export function initSelect() {
           var child = state.elements.find(function(e) { return e.id === data.childIds[ci]; });
           if (child) child.parentId = sanitized;
         }
+      } else if (data.parentId) {
+        var parentGroup = state.elements.find(function(e) { return e.id === data.parentId && e.type === 'group'; });
+        if (parentGroup) {
+          var pci = parentGroup.childIds.indexOf(oldId);
+          if (pci !== -1) parentGroup.childIds[pci] = sanitized;
+        }
       }
       var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(oldId));
       if (svgEl) svgEl.id = sanitized;
