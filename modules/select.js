@@ -31,6 +31,7 @@ let selectedLineEndpoint = 'end'; // 'start' | 'end'
 let rotationTooltip = null;
 let _lastClickTime = 0;
 let _lastClickId = null;
+let _renameTargetId = null;
 
 // Pan state
 let isPanning = false;
@@ -123,25 +124,35 @@ export function initSelect() {
   var idSaveBtn = document.getElementById('btn-id-save');
   if (idInput) {
     function saveId() {
-      if (!state.selectedId) return;
+      var targetId = _renameTargetId || state.selectedId;
+      if (!targetId) return;
       var raw = idInput.value.trim();
       var sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, '');
       if (!sanitized) {
-        idInput.value = state.selectedId;
+        idInput.value = targetId;
         return;
       }
-      var dup = state.elements.find(function (e) { return e.id === sanitized; });
-      if (dup && dup.id !== state.selectedId) {
-        idInput.value = state.selectedId;
-        return;
-      }
-      var data = state.elements.find(function (e) { return e.id === state.selectedId; });
+      var data = state.elements.find(function (e) { return e.id === targetId; });
       if (!data) return;
+      var dup = state.elements.find(function (e) { return e.id === sanitized; });
+      if (dup && dup !== data) {
+        idInput.value = targetId;
+        return;
+      }
       var oldId = data.id;
       data.id = sanitized;
+      if (data.type === 'group') {
+        for (var ci = 0; ci < data.childIds.length; ci++) {
+          var child = state.elements.find(function(e) { return e.id === data.childIds[ci]; });
+          if (child) child.parentId = sanitized;
+        }
+      }
       var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(oldId));
       if (svgEl) svgEl.id = sanitized;
-      state.selectedId = sanitized;
+      if (state.selectedId === oldId) {
+        state.selectedId = sanitized;
+      }
+      _renameTargetId = sanitized;
       idInput.value = sanitized;
       if (idSaveBtn) idSaveBtn.style.display = 'none';
       idInput.blur();
@@ -479,6 +490,7 @@ export function selectElement(id, addToSelection) {
     if (primChild) drawHandles(primChild);
     document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
     document.getElementById('element-id-input').value = groupData.id;
+    _renameTargetId = groupData.id;
     document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
     var groupBtn = document.getElementById('btn-group');
     if (groupBtn) groupBtn.disabled = true;
@@ -507,7 +519,7 @@ export function selectElement(id, addToSelection) {
         drawHandles(remaining);
         document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
         var inp = document.getElementById('element-id-input');
-        if (inp) inp.value = remaining.id;
+        if (inp) { inp.value = remaining.id; _renameTargetId = remaining.id; }
         document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remaining.id, data: remaining } }));
       }
       return;
@@ -571,7 +583,7 @@ export function selectElement(id, addToSelection) {
 
   // Sync element ID display
   var idInput = document.getElementById('element-id-input');
-  if (idInput) idInput.value = data.id;
+  if (idInput) { idInput.value = data.id; _renameTargetId = data.id; }
 
   updateGroupButton();
   updateUngroupButton();
@@ -631,7 +643,7 @@ export function clearSelection() {
   updateUngroupButton();
   updateMoveButtons();
   var idInput = document.getElementById('element-id-input');
-  if (idInput) idInput.value = '';
+  if (idInput) { idInput.value = ''; _renameTargetId = null; }
   textInteractMode = 'resize';
   hideRotationTooltip();
 }
