@@ -1,6 +1,8 @@
 import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
+import { selectElement } from './select.js';
+import { switchTool } from './tools.js';
 
 let isDrawing = false;
 let startPt = null;
@@ -104,6 +106,9 @@ function onMouseUp(e) {
       state.elements = state.elements.filter(el => el.id !== id);
     },
   });
+
+  switchTool('select');
+  selectElement(id);
 }
 
 function cancelDraw() {

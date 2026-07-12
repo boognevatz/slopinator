@@ -112,6 +112,8 @@ function init() {
 
   document.getElementById('btn-delete').addEventListener('click', deleteSelected);
 
+  document.getElementById('btn-switch-pcb').addEventListener('click', () => { location.href = 'pcb.html'; });
+
   // ── Keyboard shortcuts ──────────────────────────────────────
 
   document.addEventListener('keydown', (e) => {

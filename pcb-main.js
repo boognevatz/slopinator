@@ -96,6 +96,8 @@ function init() {
 
   document.getElementById('btn-delete').addEventListener('click', deleteSelected);
 
+  document.getElementById('btn-switch-slopinator').addEventListener('click', () => { location.href = 'index.html'; });
+
   document.addEventListener('keydown', (e) => {
     if (isEditing()) return;
 
