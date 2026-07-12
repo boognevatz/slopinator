@@ -23,7 +23,6 @@ export function syncGridEye() {
 }
 
 export function bindGridControls() {
-  var btnGrid = document.getElementById('btn-grid');
   var btnSnap = document.getElementById('btn-snap');
   var cellSize = document.getElementById('grid-cell-size');
   var cellSizeVal = document.getElementById('grid-cell-size-val');
@@ -32,12 +31,6 @@ export function bindGridControls() {
   var opacity = document.getElementById('grid-opacity');
   var opacityVal = document.getElementById('grid-opacity-val');
 
-  if (btnGrid) {
-    btnGrid.replaceWith(btnGrid.cloneNode(true));
-    document.getElementById('btn-grid').addEventListener('click', () => {
-      toggleGrid(!state.grid.visible);
-    });
-  }
   if (btnSnap) {
     btnSnap.replaceWith(btnSnap.cloneNode(true));
     document.getElementById('btn-snap').addEventListener('click', () => {
@@ -72,7 +65,6 @@ export function bindGridControls() {
     });
   }
 
-  updateGridButtonState();
   updateSnapButtonState();
 }
 
@@ -89,8 +81,6 @@ export function toggleGrid(visible) {
     const oldPattern = document.getElementById('grid-pattern');
     if (oldPattern) oldPattern.remove();
   }
-
-  updateGridButtonState();
 
   const eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
   if (eye) eye.classList.toggle('hidden', !visible);
@@ -163,11 +153,6 @@ export function updateGrid() {
     opacity: opacity,
   });
   layer.appendChild(rect);
-}
-
-export function updateGridButtonState() {
-  const btn = document.getElementById('btn-grid');
-  if (btn) btn.classList.toggle('active', state.grid.visible);
 }
 
 function updateSnapButtonState() {

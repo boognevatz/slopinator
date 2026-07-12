@@ -1,5 +1,5 @@
 import { dom, state } from './editor.js';
-import { bindGridControls, updateGrid, updateGridButtonState } from './grid.js';
+import { bindGridControls, toggleGrid } from './grid.js';
 
 var SYSTEM_LAYERS = {
   'image-layer': { name: 'Image', index: 0 },
@@ -113,6 +113,11 @@ function renderLayerList() {
       e.stopPropagation();
       var entryData = getLayerData(this);
       if (!entryData) return;
+      if (entryData.id === 'grid-layer') {
+        toggleGrid(!state.grid.visible);
+        if (entryData._selected) showLayerProps(entryData);
+        return;
+      }
       var el = document.getElementById(entryData.id);
       if (!el) return;
       var hidden = el.getAttribute('visibility') === 'hidden';
@@ -122,11 +127,6 @@ function renderLayerList() {
       } else {
         el.setAttribute('visibility', 'hidden');
         this.classList.add('hidden');
-      }
-      if (entryData.id === 'grid-layer') {
-        state.grid.visible = !hidden;
-        updateGridButtonState();
-        if (state.grid.visible) updateGrid();
       }
       if (entryData._selected) showLayerProps(entryData);
     });
@@ -292,7 +292,6 @@ function showLayerProps(entry) {
       '<div style="border-top:1px solid var(--color-border);margin:6px 0 4px 0;"></div>' +
       '<div style="display:flex;flex-direction:column;gap:4px;">' +
         '<div style="display:flex;align-items:center;gap:6px;">' +
-          '<button id="btn-grid" class="active" style="flex:1;font-size:11px;padding:3px 6px;">Grid</button>' +
           '<button id="btn-snap" style="flex:1;font-size:11px;padding:3px 6px;">Snap</button>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:1px;">' +
