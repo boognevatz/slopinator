@@ -539,7 +539,7 @@ function resizeImage(newWidth, newHeight) {
 
 // ── Open SVG Project ────────────────────────────────────────────
 
-function openSVGProject(svgText) {
+export function openSVGProject(svgText) {
   // Check if it's our annotator project file
   if (!svgText.includes('data-annotator-version')) {
     // Treat as a plain image — embed as data URI
@@ -788,22 +788,19 @@ function openSVGProject(svgText) {
 
 // ── Save SVG ────────────────────────────────────────────────────
 
-export function saveSVG() {
-  if (!state.hasImage) return;
+export function generateSVGString() {
+  if (!state.hasImage) return null;
 
   const dims = getViewBoxDims();
 
-  // Build SVG string manually for clean output
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
   svg += `viewBox="0 0 ${dims.width} ${dims.height}" `;
   svg += `width="${dims.width}" height="${dims.height}" `;
   svg += `data-annotator-version="0.1">\n`;
 
-  // Metadata comments
   svg += `<!-- annotator-palette: ${state.palette.join(',')} -->\n`;
   svg += `<!-- annotator-origin: ${state.originCoordinate} -->\n`;
 
-  // Image
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
   if (isLayerVisible('image-layer')) {
@@ -812,7 +809,6 @@ export function saveSVG() {
     svg += `transform="${imgTransform}" />\n`;
   }
 
-  // Annotations
   if (isLayerVisible('annotation-layer')) {
     svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
     for (const el of state.elements) {
@@ -842,7 +838,6 @@ export function saveSVG() {
         svg += `<text id="${el.id}" data-type="text" class="annotation-text" `;
         svg += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
         if (el.rotation) {
-          // Need to calculate cx, cy - we can approximate it or get it from DOM
           const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
           if (textEl) {
             const transform = textEl.getAttribute('transform');
@@ -865,7 +860,6 @@ export function saveSVG() {
     svg += `</g>\n`;
   }
 
-  // Watermark
   if (isLayerVisible('watermark-layer')) {
     svg += buildWatermarkDefs();
     svg += `<g id="watermark-layer" transform="${imgTransform}">\n`;
@@ -874,7 +868,12 @@ export function saveSVG() {
   }
 
   svg += `</svg>`;
+  return svg;
+}
 
+export function saveSVG() {
+  const svg = generateSVGString();
+  if (!svg) return;
   downloadString(svg, 'annotation.svg', 'image/svg+xml');
 }
 

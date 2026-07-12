@@ -24,6 +24,7 @@
                 <button id="btn-new-create" style="padding:1px 6px;font-size:11px;">Create</button>
               </div>
               <button id="btn-save-svg" class="file-menu-item" disabled>💾 Save SVG</button>
+              <button id="btn-save-internal" class="file-menu-item" disabled>💾 Save SVG internally</button>
               <div style="border-top:1px solid #444;margin:4px 8px;"></div>
               <div class="nested-dropdown" id="export-nested">
                 <div class="file-menu-item" id="btn-export-nested-btn" style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:12px;color:#ccc;cursor:pointer;">Export <span style="font-size:10px;">▸</span></div>
@@ -318,17 +319,24 @@
           </div>
           <textarea id="settings-key-value" readonly style="width:100%;margin-top:6px;padding:4px;background:#1e1e1e;color:#ccc;border:1px solid #444;border-radius:3px;font-size:11px;font-family:monospace;resize:both;box-sizing:border-box;" rows="10" placeholder="Click a key to view its value"></textarea>
         </div>
-        <div style="border-top:1px solid #444;margin:10px 0 8px 0;padding-top:8px;">
-          <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Coordinate Origin</div>
-          <div style="display:flex;gap:12px;">
-            <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="top-left" checked> Top-Left (0,0)</label>
-            <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="bottom-left"> Bottom-Left (0,0)</label>
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;margin-top:4px;">
-          <button id="btn-settings-save" style="font-size:12px;padding:4px 16px;background:var(--color-accent);border:1px solid var(--color-accent);color:#fff;border-radius:3px;cursor:pointer;">Save</button>
-          <button id="btn-settings-clear" style="font-size:12px;padding:4px 12px;" disabled>Clear Saved Data</button>
-        </div>
+    <div style="border-top:1px solid #444;margin:10px 0 8px 0;padding-top:8px;">
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Coordinate Origin</div>
+      <div style="display:flex;gap:12px;">
+        <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="top-left" checked> Top-Left (0,0)</label>
+        <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="origin-coord" value="bottom-left"> Bottom-Left (0,0)</label>
+      </div>
+    </div>
+    <div style="border-top:1px solid #444;margin:10px 0 8px 0;padding-top:8px;">
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Autosave</div>
+      <label style="font-size:12px;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" id="setting-autosave-enabled" checked> Auto-save to browser storage every 5 minutes
+      </label>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:4px;">
+      <button id="btn-settings-cancel" style="font-size:12px;padding:4px 12px;">Cancel</button>
+      <button id="btn-settings-clear" style="font-size:12px;padding:4px 12px;" disabled>Clear Saved Data</button>
+      <button id="btn-settings-save" style="font-size:12px;padding:4px 16px;background:var(--color-accent);border:1px solid var(--color-accent);color:#fff;border-radius:3px;cursor:pointer;">Save</button>
+    </div>
       </div>
     </div>
     <div id="resize-notification" class="notification-strip" hidden>

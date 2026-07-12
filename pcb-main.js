@@ -12,6 +12,7 @@ import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initLayers } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
+import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
 
 import { dom } from './modules/editor.js';
 
@@ -53,6 +54,10 @@ function init() {
   initGrid();
   initSettings();
   initFileIO();
+
+  initAutosave();
+  loadAutosave();
+  document.getElementById('btn-save-internal').addEventListener('click', function() { saveAutosave(true); });
 
   document.querySelectorAll('.mobile-group-btn').forEach(btn => {
     btn.addEventListener('click', () => {

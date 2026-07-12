@@ -7,6 +7,7 @@ const LS_PREFIX = 'annotator.';
 export function initSettings() {
   document.getElementById('btn-settings').addEventListener('click', openSettings);
   document.getElementById('btn-settings-close').addEventListener('click', closeSettings);
+  document.getElementById('btn-settings-cancel').addEventListener('click', closeSettings);
   document.getElementById('btn-settings-clear').addEventListener('click', clearAllData);
   document.getElementById('settings-popup').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeSettings();
@@ -21,6 +22,11 @@ export function initSettings() {
       state.originCoordinate = this.value;
       document.dispatchEvent(new CustomEvent('origin-changed'));
     });
+  });
+
+  var autosaveCb = document.getElementById('setting-autosave-enabled');
+  autosaveCb.addEventListener('change', function () {
+    state.autosaveEnabled = this.checked;
   });
 }
 
@@ -60,6 +66,7 @@ export function saveColorPreferences() {
   savePreference('palette', state.palette);
   savePreference('activeThickness', state.activeThickness);
   savePreference('originCoordinate', state.originCoordinate);
+  savePreference('autosaveEnabled', state.autosaveEnabled);
 }
 
 export function loadColorPreferences() {
@@ -83,11 +90,15 @@ export function loadColorPreferences() {
 
   const origin = loadPreference('originCoordinate');
   if (origin) state.originCoordinate = origin;
+
+  var autosave = loadPreference('autosaveEnabled');
+  if (autosave != null) state.autosaveEnabled = autosave;
 }
 
 function openSettings() {
   document.getElementById('settings-popup').hidden = false;
   syncOriginRadios();
+  document.getElementById('setting-autosave-enabled').checked = state.autosaveEnabled;
   renderLocalStorageInfo();
 }
 
