@@ -1,7 +1,7 @@
 import { state, dom } from './editor.js';
 import { svgEl, generateId } from './utils.js';
 import { pushAction } from './history.js';
-import { drawHandles, selectElement } from './select.js';
+import { drawHandles, selectElement, clearSelection, updateUngroupButton } from './select.js';
 
 export function groupSelected() {
   var ids = state.selectedIds.slice();
@@ -75,6 +75,81 @@ export function groupSelected() {
       for (var ui = 0; ui < ids.length; ui++) {
         var ue = state.elements.find(function(e) { return e.id === ids[ui]; });
         if (ue) ue.parentId = undefined;
+      }
+    },
+  });
+}
+
+export function ungroupSelected() {
+  var ids = state.selectedIds.slice();
+  if (ids.length < 2) return;
+  var parentId = null;
+  for (var i = 0; i < ids.length; i++) {
+    var el = state.elements.find(function(e) { return e.id === ids[i]; });
+    if (!el || !el.parentId) return;
+    if (i === 0) parentId = el.parentId;
+    else if (el.parentId !== parentId) return;
+  }
+  var groupData = state.elements.find(function(e) { return e.id === parentId && e.type === 'group'; });
+  if (!groupData) return;
+  if (groupData.childIds.length !== ids.length) return;
+
+  var gEl = dom.annotationLayer.querySelector('#' + CSS.escape(parentId));
+  if (gEl) {
+    while (gEl.children.length > 0) dom.annotationLayer.appendChild(gEl.children[0]);
+    gEl.remove();
+  }
+
+  for (var ui = 0; ui < ids.length; ui++) {
+    var ue = state.elements.find(function(e) { return e.id === ids[ui]; });
+    if (ue) ue.parentId = undefined;
+  }
+
+  var gIdx = state.elements.findIndex(function(e) { return e.id === parentId; });
+  if (gIdx !== -1) state.elements.splice(gIdx, 1);
+
+  clearSelection();
+  for (var si = 0; si < ids.length; si++) {
+    state.selectedIds.push(ids[si]);
+  }
+  state.selectedId = ids[0];
+
+  var primary = state.elements.find(function(el) { return el.id === ids[0]; });
+  if (primary) drawHandles(primary);
+
+  updateUngroupButton();
+
+  pushAction({
+    description: 'Ungroup ' + ids.length + ' elements',
+    doFn: function() {
+      var dgEl = dom.annotationLayer.querySelector('#' + CSS.escape(parentId));
+      if (dgEl) {
+        while (dgEl.children.length > 0) dom.annotationLayer.appendChild(dgEl.children[0]);
+        dgEl.remove();
+      }
+      for (var uj = 0; uj < ids.length; uj++) {
+        var uej = state.elements.find(function(e) { return e.id === ids[uj]; });
+        if (uej) uej.parentId = undefined;
+      }
+      var dgj = state.elements.findIndex(function(e) { return e.id === parentId; });
+      if (dgj !== -1) state.elements.splice(dgj, 1);
+    },
+    undoFn: function() {
+      for (var ri = 0; ri < ids.length; ri++) {
+        var re = state.elements.find(function(e) { return e.id === ids[ri]; });
+        if (re) re.parentId = parentId;
+      }
+      if (!state.elements.find(function(e) { return e.id === parentId; })) {
+        state.elements.push({ id: parentId, type: 'group', childIds: ids.slice() });
+      }
+      var rg = dom.annotationLayer.querySelector('#' + CSS.escape(parentId));
+      if (!rg) {
+        rg = svgEl('g', { id: parentId, 'data-type': 'group' });
+        dom.annotationLayer.appendChild(rg);
+      }
+      for (var rj = 0; rj < ids.length; rj++) {
+        var rs = dom.annotationLayer.querySelector('#' + CSS.escape(ids[rj]));
+        if (rs) rg.appendChild(rs);
       }
     },
   });

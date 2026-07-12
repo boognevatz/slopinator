@@ -13,7 +13,7 @@ import { initLayers } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
-import { groupSelected } from './modules/group.js';
+import { groupSelected, ungroupSelected } from './modules/group.js';
 
 import { dom } from './modules/editor.js';
 
@@ -110,6 +110,7 @@ function init() {
   document.getElementById('btn-delete').addEventListener('click', deleteSelected);
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSelected);
   document.getElementById('btn-group').addEventListener('click', groupSelected);
+  document.getElementById('btn-ungroup').addEventListener('click', ungroupSelected);
   document.getElementById('btn-move-up').addEventListener('click', function() { moveInGroup(1); });
   document.getElementById('btn-move-down').addEventListener('click', function() { moveInGroup(-1); });
 

@@ -482,6 +482,7 @@ export function selectElement(id, addToSelection) {
     document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
     var groupBtn = document.getElementById('btn-group');
     if (groupBtn) groupBtn.disabled = true;
+    updateUngroupButton();
     updateMoveButtons();
     return;
   }
@@ -573,6 +574,7 @@ export function selectElement(id, addToSelection) {
   if (idInput) idInput.value = data.id;
 
   updateGroupButton();
+  updateUngroupButton();
   updateMoveButtons();
 
   // Dispatch event so palette highlights update
@@ -587,6 +589,22 @@ function updateGroupButton() {
     var el = state.elements.find(function(e) { return e.id === state.selectedIds[gi]; });
     if (el && el.parentId) { btn.disabled = true; return; }
   }
+  btn.disabled = false;
+}
+
+export function updateUngroupButton() {
+  var btn = document.getElementById('btn-ungroup');
+  if (!btn) return;
+  if (state.selectedIds.length < 2) { btn.disabled = true; return; }
+  var pid = null;
+  for (var ui = 0; ui < state.selectedIds.length; ui++) {
+    var el = state.elements.find(function(e) { return e.id === state.selectedIds[ui]; });
+    if (!el || !el.parentId) { btn.disabled = true; return; }
+    if (ui === 0) pid = el.parentId;
+    else if (el.parentId !== pid) { btn.disabled = true; return; }
+  }
+  var gd = state.elements.find(function(e) { return e.id === pid && e.type === 'group'; });
+  if (!gd || gd.childIds.length !== state.selectedIds.length) { btn.disabled = true; return; }
   btn.disabled = false;
 }
 
@@ -610,6 +628,7 @@ export function clearSelection() {
   document.getElementById('btn-delete').disabled = true;
   document.getElementById('btn-duplicate').disabled = true;
   updateGroupButton();
+  updateUngroupButton();
   updateMoveButtons();
   var idInput = document.getElementById('element-id-input');
   if (idInput) idInput.value = '';
@@ -2038,5 +2057,6 @@ export function refreshSelection() {
   }
   drawHandles(data);
   updateGroupButton();
+  updateUngroupButton();
   updateMoveButtons();
 }
