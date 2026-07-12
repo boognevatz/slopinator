@@ -244,6 +244,7 @@ export function restoreState(parsed) {
   state.hasImage = true;
 
   if (parsed.palette) state.palette = parsed.palette;
+  if (parsed.originCoordinate) state.originCoordinate = parsed.originCoordinate;
   // parsed.thicknessPresets is ignored; slider uses fixed range
 
   // Clear layers

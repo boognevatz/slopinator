@@ -204,21 +204,6 @@ export function initFileIO() {
     if (!exportMenu.hidden) activateTab(currentFormat);
   });
 
-  // Settings nested dropdown toggle
-  const settingsNestedBtn = document.getElementById('btn-settings-nested-btn');
-  const settingsMenu = document.getElementById('settings-menu');
-  settingsNestedBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    settingsMenu.hidden = !settingsMenu.hidden;
-  });
-
-  document.querySelectorAll('input[name="origin-coord"]').forEach(function(r) {
-    r.addEventListener('change', function() {
-      state.originCoordinate = this.value;
-      document.dispatchEvent(new CustomEvent('origin-changed'));
-    });
-  });
-
   fileMenu.addEventListener('click', (e) => {
     e.stopPropagation();
   });
@@ -226,7 +211,6 @@ export function initFileIO() {
   document.addEventListener('click', () => {
     fileMenu.hidden = true;
     exportMenu.hidden = true;
-    settingsMenu.hidden = true;
   });
 
   btnExportDo.addEventListener('click', (e) => {
@@ -619,9 +603,11 @@ function openSVGProject(svgText) {
   // Parse palette from comments
   let palette = null;
   let thicknessPresets = null;
+  let originCoordinate = null;
 
   const commentRegex = /<!--\s*annotator-palette:\s*(.+?)\s*-->/;
-  const thicknessRegex = /<!--\s*annotator-thickness:\s*(.+?)\s*-->/;
+  const thicknessRegex = /<!--\s*annotator-thickness:\s*(.+?)\s*-->/
+  const originRegex = /<!--\s*annotator-origin:\s*(.+?)\s*-->/;
 
   const paletteMatch = svgText.match(commentRegex);
   if (paletteMatch) {
@@ -631,6 +617,11 @@ function openSVGProject(svgText) {
   const thicknessMatch = svgText.match(thicknessRegex);
   if (thicknessMatch) {
     thicknessPresets = thicknessMatch[1].split(',').map(v => parseFloat(v.trim()));
+  }
+
+  const originMatch = svgText.match(originRegex);
+  if (originMatch) {
+    originCoordinate = originMatch[1].trim();
   }
 
   // Parse annotation elements
@@ -770,6 +761,7 @@ function openSVGProject(svgText) {
     flipH,
     flipV,
     palette,
+    originCoordinate,
     thicknessPresets,
     elements,
   });
@@ -807,8 +799,9 @@ export function saveSVG() {
   svg += `width="${dims.width}" height="${dims.height}" `;
   svg += `data-annotator-version="0.1">\n`;
 
-  // Palette comment
+  // Metadata comments
   svg += `<!-- annotator-palette: ${state.palette.join(',')} -->\n`;
+  svg += `<!-- annotator-origin: ${state.originCoordinate} -->\n`;
 
   // Image
   const img = state.image;
