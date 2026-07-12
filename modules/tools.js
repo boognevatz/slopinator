@@ -13,7 +13,7 @@ import { activateMeasure, deactivateMeasure } from './measure.js';
 
 const toolButtons = {};
 const TOOL_SETTINGS = {
-  select: ['delete'],
+  select: ['delete', 'color', 'thickness', 'element-id'],
   line: ['color', 'thickness', 'line-style', 'line-mode'],
   text: ['color', 'thickness', 'font-size'],
   freehand: ['color', 'thickness', 'freehand-epsilon'],
@@ -108,31 +108,10 @@ export function switchTool(tool) {
 function updateToolSettingsVisibility(tool, selectedType = null) {
   const visible = new Set(TOOL_SETTINGS[tool] || []);
 
-  if (tool === 'select' && selectedType === 'line') {
-    visible.add('color');
-    visible.add('thickness');
-  }
-  if (tool === 'select' && selectedType === 'text') {
-    visible.add('color');
-    visible.add('thickness');
-    visible.add('font-size');
-  }
-  if (tool === 'select' && selectedType === 'freehand') {
-    visible.add('color');
-    visible.add('thickness');
-    visible.add('freehand-epsilon');
-  }
-  if (tool === 'select' && selectedType === 'rectangle') {
-    visible.add('color');
-    visible.add('thickness');
-    visible.add('rectangle');
-  }
-
   document.getElementById('color-group').hidden = !visible.has('color');
   document.getElementById('thickness-group').hidden = !visible.has('thickness');
-  const showLineStyle = tool === 'line' || (tool === 'select' && selectedType === 'line');
-  document.getElementById('line-style-group').hidden = !showLineStyle;
-  document.getElementById('line-mode-group').hidden = !((tool === 'select' && selectedType === 'line') || tool === 'line');
+  document.getElementById('line-style-group').hidden = !visible.has('line-style');
+  document.getElementById('line-mode-group').hidden = !visible.has('line-mode');
   document.getElementById('font-size-group').hidden = !visible.has('font-size');
   document.getElementById('delete-group').hidden = !visible.has('delete');
   document.getElementById('freehand-epsilon-group').hidden = !visible.has('freehand-epsilon');
@@ -140,4 +119,5 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   document.getElementById('crop-group').hidden = !visible.has('crop');
   document.getElementById('perspective-group').hidden = !visible.has('perspective');
   document.getElementById('color-correction-group').hidden = !visible.has('color-correction');
+  document.getElementById('element-id-group').hidden = !visible.has('element-id');
 }

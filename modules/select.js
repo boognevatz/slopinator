@@ -451,9 +451,7 @@ export function selectElement(id) {
 
   // Sync element ID display
   var idInput = document.getElementById('element-id-input');
-  var idGroup = document.getElementById('element-id-group');
   if (idInput) idInput.value = data.id;
-  if (idGroup) idGroup.hidden = false;
 
   // Dispatch event so palette highlights update
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data } }));
@@ -463,8 +461,8 @@ export function clearSelection() {
   state.selectedId = null;
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
-  var idGroup = document.getElementById('element-id-group');
-  if (idGroup) idGroup.hidden = true;
+  var idInput = document.getElementById('element-id-input');
+  if (idInput) idInput.value = '';
   textInteractMode = 'resize';
   hideRotationTooltip();
 }
