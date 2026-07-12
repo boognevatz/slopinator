@@ -58,20 +58,6 @@ export function initLayers() {
     });
   });
 
-  // Sliders
-  document.getElementById('wm-thickness').addEventListener('input', function() {
-    document.getElementById('wm-thickness-val').textContent = this.value;
-    updateWatermark();
-  });
-  document.getElementById('wm-rotation').addEventListener('input', function() {
-    document.getElementById('wm-rotation-val').textContent = this.value + '\u00B0';
-    updateWatermark();
-  });
-  document.getElementById('wm-spacing').addEventListener('input', function() {
-    document.getElementById('wm-spacing-val').textContent = this.value;
-    updateWatermark();
-  });
-
   // Re-render watermark when foreground color changes
   document.addEventListener('palette-color-changed', updateWatermark);
 }
@@ -87,7 +73,38 @@ function showLayerProps(entry) {
 
   var body = document.getElementById('layer-props-body');
 
-  if (layerId === 'grid-layer') {
+  if (layerId === 'watermark-layer') {
+    var vis = isHidden ? 'Off' : 'On';
+    body.innerHTML =
+      '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + name + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + vis + '</span></div>' +
+      '<div class="layer-prop"><span class="layer-prop-label">System layer:</span><span class="layer-prop-value">Yes</span></div>' +
+      '<div style="border-top:1px solid var(--color-border);margin:6px 0 4px 0;"></div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;">' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Thickness</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="wm-thickness" min="0.5" max="5" step="0.5" value="' + state.activeThickness + '" style="flex:1;min-width:0;">' +
+            '<span id="wm-thickness-val" style="font-size:11px;color:var(--color-text);width:2em;text-align:right;flex-shrink:0;">' + state.activeThickness + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Rotation</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="wm-rotation" min="0" max="90" step="1" value="45" style="flex:1;min-width:0;">' +
+            '<span id="wm-rotation-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">45\u00B0</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:1px;">' +
+          '<span style="font-size:11px;color:var(--color-text-muted);">Spacing</span>' +
+          '<div style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="range" id="wm-spacing" min="10" max="400" step="10" value="40" style="flex:1;min-width:0;">' +
+            '<span id="wm-spacing-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">40</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    bindWatermarkControls();
+  } else if (layerId === 'grid-layer') {
     var vis = isHidden ? 'Off' : 'On';
     body.innerHTML =
       '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + name + '</span></div>' +
@@ -127,6 +144,34 @@ function showLayerProps(entry) {
       '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + name + '</span></div>' +
       '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + (isHidden ? 'Off' : 'On') + '</span></div>' +
       '<div class="layer-prop"><span class="layer-prop-label">System layer:</span><span class="layer-prop-value">' + (isSystem ? 'Yes' : 'No') + '</span></div>';
+  }
+}
+
+function bindWatermarkControls() {
+  var thickness = document.getElementById('wm-thickness');
+  var rotation = document.getElementById('wm-rotation');
+  var spacing = document.getElementById('wm-spacing');
+
+  if (thickness) {
+    thickness.replaceWith(thickness.cloneNode(true));
+    document.getElementById('wm-thickness').addEventListener('input', function () {
+      document.getElementById('wm-thickness-val').textContent = this.value;
+      updateWatermark();
+    });
+  }
+  if (rotation) {
+    rotation.replaceWith(rotation.cloneNode(true));
+    document.getElementById('wm-rotation').addEventListener('input', function () {
+      document.getElementById('wm-rotation-val').textContent = this.value + '\u00B0';
+      updateWatermark();
+    });
+  }
+  if (spacing) {
+    spacing.replaceWith(spacing.cloneNode(true));
+    document.getElementById('wm-spacing').addEventListener('input', function () {
+      document.getElementById('wm-spacing-val').textContent = this.value;
+      updateWatermark();
+    });
   }
 }
 

@@ -130,7 +130,6 @@
           <button id="btn-rectangle" class="tool-btn" title="Rectangle (R)" data-tool="rectangle">Rectangle</button>
           <button id="btn-perspective" class="tool-btn" title="Perspective" data-tool="perspective">Perspective</button>
           <button id="btn-color" class="tool-btn" title="Color Correction (K)" data-tool="color">Color</button>
-          <button id="btn-watermark" class="tool-btn" title="Watermark" data-tool="watermark">Watermark</button>
           <button id="btn-measure" class="tool-btn" title="Measure" data-tool="measure">📏</button>
         </div>
       </div>
@@ -319,18 +318,6 @@
         <label class="crop-ratio-option"><input type="checkbox" id="color-grayscale"> Gray</label>
         <button id="btn-color-correct" disabled>Correct</button>
         <button id="btn-color-reset" disabled>Reset</button>
-      </div>
-
-      <div class="toolbar-group separator" id="watermark-group" hidden>
-        <span class="toolbar-label">Thickness:</span>
-        <input type="range" id="wm-thickness" min="0.5" max="5" step="0.5" value="1" style="width:60px;">
-        <span class="toolbar-label" id="wm-thickness-val" style="min-width:2em;">1</span>
-        <span class="toolbar-label">Rot:</span>
-        <input type="range" id="wm-rotation" min="0" max="90" step="1" value="45" style="width:60px;">
-        <span class="toolbar-label" id="wm-rotation-val" style="min-width:3em;">45°</span>
-        <span class="toolbar-label">Spacing:</span>
-        <input type="range" id="wm-spacing" min="10" max="400" step="10" value="40" style="width:80px;">
-        <span class="toolbar-label" id="wm-spacing-val" style="min-width:2.5em;">40</span>
       </div>
 
     </div>
