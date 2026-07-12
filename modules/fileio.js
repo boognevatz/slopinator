@@ -6,6 +6,8 @@ import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
 import { addRectangleElement } from './rectangle.js';
 import { clearHistory } from './history.js';
+
+const BASE_TITLE = document.title || 'Slopinator';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
 import { switchTool } from './tools.js';
@@ -132,7 +134,7 @@ export function initFileIO() {
   btnSaveSvg.addEventListener('click', saveSVG);
 
   function createNewImage(w, h) {
-    document.title = 'Slopinator';
+    document.title = BASE_TITLE;
     fileMenu.hidden = true;
     dom.annotationLayer.innerHTML = '';
     dom.handleLayer.innerHTML = '';
@@ -388,7 +390,7 @@ function handleFileOpen(file) {
     exportFilename.focus();
   }
 
-  document.title = 'Slopinator - ' + file.name;
+  document.title = BASE_TITLE + ' - ' + file.name;
 
   if (isSVG) {
     const reader = new FileReader();

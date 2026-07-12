@@ -3,6 +3,7 @@ import { state } from './editor.js';
 
 const AUTOSAVE_FILE = 'autosave.svg';
 const AUTOSAVE_INTERVAL = 5 * 60 * 1000;
+const BASE_TITLE = document.title || 'Slopinator';
 
 let _dirty = false;
 let _intervalId = null;
@@ -91,7 +92,7 @@ export async function loadAutosave() {
     var svgText = await loadFromOPFS();
     if (svgText) {
       openSVGProject(svgText);
-      document.title = 'Slopinator - autosave.svg';
+      document.title = BASE_TITLE + ' - autosave.svg';
       _dirty = false;
     }
   } catch {}
