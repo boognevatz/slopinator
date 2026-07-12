@@ -361,6 +361,8 @@ function onPanEnd() {
 function onKeyDown(e) {
   if (!state.selectedId) return;
   if (isEditing()) return;
+  var tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   var dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
   var dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
   if (!dx && !dy) return;
