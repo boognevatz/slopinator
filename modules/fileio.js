@@ -847,11 +847,9 @@ export function generateSVGString() {
 
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('layer-image')) {
-    svg += `<image data-type="background" href="${img.dataURI}" `;
-    svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-    svg += `transform="${imgTransform}" />\n`;
-  }
+  svg += `<image data-type="background" href="${img.dataURI}" `;
+  svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
+  svg += `transform="${imgTransform}" />\n`;
 
   function serializeElement(el, withinGroup) {
     if (!withinGroup && el.parentId) return '';
@@ -916,20 +914,16 @@ export function generateSVGString() {
     return '';
   }
 
-  if (isLayerVisible('layer-annotation')) {
-    svg += `<g id="layer-annotation" transform="${imgTransform}">\n`;
-    for (const el of state.elements) {
-      svg += serializeElement(el);
-    }
-    svg += `</g>\n`;
+  svg += `<g id="layer-annotation" transform="${imgTransform}">\n`;
+  for (const el of state.elements) {
+    svg += serializeElement(el);
   }
+  svg += `</g>\n`;
 
-  if (isLayerVisible('layer-watermark')) {
-    svg += buildWatermarkDefs();
-    svg += `<g id="layer-watermark" transform="${imgTransform}">\n`;
-    svg += dom.watermarkLayer.innerHTML;
-    svg += `</g>\n`;
-  }
+  svg += buildWatermarkDefs();
+  svg += `<g id="layer-watermark" transform="${imgTransform}">\n`;
+  svg += dom.watermarkLayer.innerHTML;
+  svg += `</g>\n`;
 
   svg += `</svg>`;
   return svg;

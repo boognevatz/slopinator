@@ -6,7 +6,7 @@ import { initPalette } from './modules/palette.js';
 import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToOne } from './modules/transform.js';
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
-import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection } from './modules/select.js';
+import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement } from './modules/select.js';
 import { initCrop, setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
@@ -222,6 +222,11 @@ function init() {
           break;
         case 'escape':
           if (!handlePolylineEscape()) {
+            var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
+            if (selData && selData.parentId) {
+              var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
+              if (groupData) { selectElement(groupData.id, false); break; }
+            }
             clearSelection();
           }
           break;
