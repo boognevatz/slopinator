@@ -1,7 +1,7 @@
 import { state, dom } from './editor.js';
 import { svgEl, generateId } from './utils.js';
 import { pushAction } from './history.js';
-import { drawHandles, selectElement, clearSelection, updateUngroupButton } from './select.js';
+import { drawHandles, selectElement } from './select.js';
 
 export function groupSelected() {
   var ids = state.selectedIds.slice();
@@ -108,16 +108,7 @@ export function ungroupSelected() {
   var gIdx = state.elements.findIndex(function(e) { return e.id === parentId; });
   if (gIdx !== -1) state.elements.splice(gIdx, 1);
 
-  clearSelection();
-  for (var si = 0; si < ids.length; si++) {
-    state.selectedIds.push(ids[si]);
-  }
-  state.selectedId = ids[0];
-
-  var primary = state.elements.find(function(el) { return el.id === ids[0]; });
-  if (primary) drawHandles(primary);
-
-  updateUngroupButton();
+  selectElement(ids[0], false);
 
   pushAction({
     description: 'Ungroup ' + ids.length + ' elements',
