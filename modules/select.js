@@ -14,6 +14,7 @@ let isDragging = false;
 let isResizing = false;
 let dragStart = null;
 let dragOriginal = null;
+let dragOriginals = null;
 let resizeHandle = null; // 'p1' | 'p2' for line endpoints, 'tl'|'tr'|'bl'|'br' for text corners
 let resizeAnchor = null; // { x, y } — the fixed corner during text resize
 let origBbox = null;     // original text bounding box at resize start
@@ -294,7 +295,17 @@ function onMouseDown(e) {
       }
     }
 
-    selectElement(id);
+    if (e.shiftKey) {
+      selectElement(id, true);
+      return;
+    }
+
+    if (state.selectedIds.includes(id) && state.selectedIds.length > 1) {
+      state.selectedId = id;
+      drawHandles(data);
+    } else {
+      selectElement(id, false);
+    }
 
     if (data && data.type === 'line' && lineEditMode === 'change-end') {
       return;
@@ -345,40 +356,45 @@ function onKeyDown(e) {
   var dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
   if (!dx && !dy) return;
   e.preventDefault();
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!data) return;
 
-  if (data.type === 'line') {
-    if (data.points) {
+  for (var si = 0; si < state.selectedIds.length; si++) {
+    var sid = state.selectedIds[si];
+    var data = state.elements.find(function(el) { return el.id === sid; });
+    if (!data) continue;
+
+    if (data.type === 'line') {
+      if (data.points) {
+        data.points = data.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+        data.x1 = data.points[0].x;
+        data.y1 = data.points[0].y;
+        data.x2 = data.points[data.points.length - 1].x;
+        data.y2 = data.points[data.points.length - 1].y;
+      } else {
+        data.x1 += dx;
+        data.y1 += dy;
+        data.x2 += dx;
+        data.y2 += dy;
+      }
+      updateLineSVG(data);
+    } else if (data.type === 'text') {
+      data.x += dx;
+      data.y += dy;
+      updateTextSVG(data);
+    } else if (data.type === 'freehand') {
       data.points = data.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
-      data.x1 = data.points[0].x;
-      data.y1 = data.points[0].y;
-      data.x2 = data.points[data.points.length - 1].x;
-      data.y2 = data.points[data.points.length - 1].y;
-    } else {
-      data.x1 += dx;
-      data.y1 += dy;
-      data.x2 += dx;
-      data.y2 += dy;
+      if (data.rawPoints) {
+        data.rawPoints = data.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+      }
+      updateFreehandElement(data);
+    } else if (data.type === 'rectangle') {
+      data.x += dx;
+      data.y += dy;
+      updateRectangleElement(data);
     }
-    updateLineSVG(data);
-  } else if (data.type === 'text') {
-    data.x += dx;
-    data.y += dy;
-    updateTextSVG(data);
-  } else if (data.type === 'freehand') {
-    data.points = data.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
-    if (data.rawPoints) {
-      data.rawPoints = data.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
-    }
-    updateFreehandElement(data);
-  } else if (data.type === 'rectangle') {
-    data.x += dx;
-    data.y += dy;
-    updateRectangleElement(data);
   }
 
-  drawHandles(data);
+  var primary = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (primary) drawHandles(primary);
 }
 
 function findAnnotationParent(target) {
@@ -393,9 +409,36 @@ function findAnnotationParent(target) {
 
 // ── Selection ───────────────────────────────────────────────────
 
-export function selectElement(id) {
-  clearSelection();
+export function selectElement(id, addToSelection) {
+  if (!addToSelection) {
+    clearSelection();
+  }
+
   state.selectedId = id;
+
+  if (addToSelection) {
+    var selIdx = state.selectedIds.indexOf(id);
+    if (selIdx >= 0) {
+      state.selectedIds.splice(selIdx, 1);
+      if (state.selectedIds.length === 0) {
+        clearSelection();
+        return;
+      }
+      state.selectedId = state.selectedIds[state.selectedIds.length - 1];
+      var remaining = state.elements.find(function(el) { return el.id === state.selectedId; });
+      if (remaining) {
+        drawHandles(remaining);
+        document.getElementById('btn-delete').disabled = false;
+        var inp = document.getElementById('element-id-input');
+        if (inp) inp.value = remaining.id;
+        document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remaining.id, data: remaining } }));
+      }
+      return;
+    }
+    state.selectedIds.push(id);
+  } else {
+    state.selectedIds = [id];
+  }
 
   const data = state.elements.find(el => el.id === id);
   if (!data) return;
@@ -459,6 +502,7 @@ export function selectElement(id) {
 
 export function clearSelection() {
   state.selectedId = null;
+  state.selectedIds = [];
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
   var idInput = document.getElementById('element-id-input');
@@ -467,17 +511,18 @@ export function clearSelection() {
   hideRotationTooltip();
 }
 
-function drawHandles(data) {
+function drawHandles(_data) {
   dom.handleLayer.innerHTML = '';
 
-  if (data.type === 'line') {
-    drawLineHandles(data);
-  } else if (data.type === 'text') {
-    drawTextHandles(data);
-  } else if (data.type === 'freehand') {
-    drawFreehandHandles(data);
-  } else if (data.type === 'rectangle') {
-    drawRectangleHandles(data);
+  for (var _i = 0; _i < state.selectedIds.length; _i++) {
+    var _sid = state.selectedIds[_i];
+    var el = state.elements.find(function(e) { return e.id === _sid; });
+    if (!el) continue;
+
+    if (el.type === 'line') drawLineHandles(el);
+    else if (el.type === 'text') drawTextHandles(el);
+    else if (el.type === 'freehand') drawFreehandHandles(el);
+    else if (el.type === 'rectangle') drawRectangleHandles(el);
   }
 }
 
@@ -732,6 +777,10 @@ function startDrag(id, startPt) {
   isDragging = true;
   dragStart = { x: startPt.x, y: startPt.y, _time: Date.now() };
   dragOriginal = { ...data };
+  dragOriginals = state.selectedIds.map(function(sid) {
+    var el = state.elements.find(function(e) { return e.id === sid; });
+    return el ? { id: sid, x: el.x, y: el.y, x1: el.x1, y1: el.y1, x2: el.x2, y2: el.y2, points: el.points ? el.points.map(function(p) { return { x: p.x, y: p.y }; }) : null, rawPoints: el.rawPoints ? el.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null } : null;
+  }).filter(Boolean);
 
   document.addEventListener('pointermove', onDragMove);
   document.addEventListener('pointerup', onDragEnd);
@@ -742,40 +791,45 @@ function onDragMove(e) {
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const dx = pt.x - dragStart.x;
   const dy = pt.y - dragStart.y;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data) return;
 
-  if (data.type === 'line') {
-    if (data.points) {
-      data.points = dragOriginal.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
-      data.x1 = data.points[0].x;
-      data.y1 = data.points[0].y;
-      data.x2 = data.points[data.points.length - 1].x;
-      data.y2 = data.points[data.points.length - 1].y;
-    } else {
-      data.x1 = dragOriginal.x1 + dx;
-      data.y1 = dragOriginal.y1 + dy;
-      data.x2 = dragOriginal.x2 + dx;
-      data.y2 = dragOriginal.y2 + dy;
+  for (var i = 0; i < dragOriginals.length; i++) {
+    var orig = dragOriginals[i];
+    var el = state.elements.find(function(e) { return e.id === orig.id; });
+    if (!el) continue;
+
+    if (el.type === 'line') {
+      if (el.points) {
+        el.points = orig.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+        el.x1 = el.points[0].x;
+        el.y1 = el.points[0].y;
+        el.x2 = el.points[el.points.length - 1].x;
+        el.y2 = el.points[el.points.length - 1].y;
+      } else {
+        el.x1 = orig.x1 + dx;
+        el.y1 = orig.y1 + dy;
+        el.x2 = orig.x2 + dx;
+        el.y2 = orig.y2 + dy;
+      }
+      updateLineSVG(el);
+    } else if (el.type === 'text') {
+      el.x = orig.x + dx;
+      el.y = orig.y + dy;
+      updateTextSVG(el);
+    } else if (el.type === 'freehand') {
+      el.points = orig.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+      if (el.rawPoints) {
+        el.rawPoints = orig.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+      }
+      updateFreehandElement(el);
+    } else if (el.type === 'rectangle') {
+      el.x = orig.x + dx;
+      el.y = orig.y + dy;
+      updateRectangleElement(el);
     }
-    updateLineSVG(data);
-  } else if (data.type === 'text') {
-    data.x = dragOriginal.x + dx;
-    data.y = dragOriginal.y + dy;
-    updateTextSVG(data);
-  } else if (data.type === 'freehand') {
-    data.points = dragOriginal.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
-    if (data.rawPoints) {
-      data.rawPoints = dragOriginal.rawPoints.map(p => ({ x: p.x + dx, y: p.y + dy }));
-    }
-    updateFreehandElement(data);
-  } else if (data.type === 'rectangle') {
-    data.x = dragOriginal.x + dx;
-    data.y = dragOriginal.y + dy;
-    updateRectangleElement(data);
   }
 
-  drawHandles(data);
+  var primary = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (primary) drawHandles(primary);
 }
 
 function onDragEnd() {
@@ -785,63 +839,104 @@ function onDragEnd() {
   if (!isDragging) return;
   isDragging = false;
 
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data) return;
+  var primaryData = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (!primaryData) { dragOriginal = null; dragOriginals = null; return; }
 
-  const orig = { ...dragOriginal };
-  const final = { ...data };
+  // Single-element special behaviors: long-press text edit, mode-toggle click
+  if (dragOriginals.length === 1) {
+    const orig = { ...dragOriginal };
+    const final = { ...primaryData };
 
-  // Long-press on text: hold >400ms without moving → enter edit mode
-  if (data.type === 'text' && dragStart && dragStart._time) {
-    const elapsed = Date.now() - dragStart._time;
-    if (elapsed >= 400 && orig.x === final.x && orig.y === final.y) {
-      dragOriginal = null;
-      setTimeout(() => startEditing(state.selectedId), 0);
-      return;
+    if (primaryData.type === 'text' && dragStart && dragStart._time) {
+      const elapsed = Date.now() - dragStart._time;
+      if (elapsed >= 400 && orig.x === final.x && orig.y === final.y) {
+        dragOriginal = null; dragOriginals = null;
+        setTimeout(function() { startEditing(state.selectedId); }, 0);
+        return;
+      }
+    }
+
+    if (dragStart && dragStart._dragSource === 'mode-toggle') {
+      let dx, dy;
+      if (primaryData.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
+      else { dx = (final.x || 0) - (orig.x || 0); dy = (final.y || 0) - (orig.y || 0); }
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+        dragOriginal = null; dragOriginals = null;
+        textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
+        refreshSelection();
+        return;
+      }
     }
   }
 
-  // Modal click on mode-toggle: if mouse barely moved, treat as click to toggle mode
-  if (dragStart && dragStart._dragSource === 'mode-toggle') {
-    let dx, dy;
-    if (data.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
-    else { dx = (final.x || 0) - (orig.x || 0); dy = (final.y || 0) - (orig.y || 0); }
-    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-      dragOriginal = null;
-      textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
-      refreshSelection();
-      return;
+  // Build combined action for all moved elements
+  var snapshots = [];
+  var moved = false;
+  for (var i = 0; i < dragOriginals.length; i++) {
+    var orig = dragOriginals[i];
+    var el = state.elements.find(function(e) { return e.id === orig.id; });
+    if (!el) continue;
+    var dx = el.x != null ? el.x - orig.x : 0;
+    var dy = el.y != null ? el.y - orig.y : 0;
+    if (el.type === 'line') {
+      dx = el.x1 - orig.x1;
+      dy = el.y1 - orig.y1;
+    }
+    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) moved = true;
+    snapshots.push({ id: orig.id, orig: { x: orig.x, y: orig.y, x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(function(p) { return { x: p.x, y: p.y }; }) : null, rawPoints: orig.rawPoints ? orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null }, final: null });
+    // Capture final positions
+    var snap = snapshots[snapshots.length - 1];
+    if (el.type === 'line') {
+      snap.final = { x1: el.x1, y1: el.y1, x2: el.x2, y2: el.y2, points: el.points ? el.points.map(function(p) { return { x: p.x, y: p.y }; }) : null };
+    } else if (el.type === 'text') {
+      snap.final = { x: el.x, y: el.y };
+    } else if (el.type === 'freehand') {
+      snap.final = { points: el.points.map(function(p) { return { x: p.x, y: p.y }; }), rawPoints: el.rawPoints ? el.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null };
+    } else if (el.type === 'rectangle') {
+      snap.final = { x: el.x, y: el.y };
     }
   }
 
-  // Only push to history if actually moved
-  if (data.type === 'line' && (orig.x1 !== final.x1 || orig.y1 !== final.y1)) {
+  if (moved) {
     pushAction({
-      description: 'Move line',
-      doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
-      undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
-    });
-  } else if (data.type === 'text' && (orig.x !== final.x || orig.y !== final.y)) {
-    pushAction({
-      description: 'Move text',
-      doFn: () => { data.x = final.x; data.y = final.y; updateTextSVG(data); drawHandles(data); },
-      undoFn: () => { data.x = orig.x; data.y = orig.y; updateTextSVG(data); drawHandles(data); },
-    });
-  } else if (data.type === 'freehand' && (orig.points[0].x !== final.points[0].x || orig.points[0].y !== final.points[0].y)) {
-    pushAction({
-      description: 'Move freehand',
-      doFn: () => { data.points = final.points; data.rawPoints = final.rawPoints; updateFreehandElement(data); drawHandles(data); },
-      undoFn: () => { data.points = orig.points; data.rawPoints = orig.rawPoints; updateFreehandElement(data); drawHandles(data); },
-    });
-  } else if (data.type === 'rectangle' && (orig.x !== final.x || orig.y !== final.y)) {
-    pushAction({
-      description: 'Move rectangle',
-      doFn: () => { data.x = final.x; data.y = final.y; updateRectangleElement(data); drawHandles(data); },
-      undoFn: () => { data.x = orig.x; data.y = orig.y; updateRectangleElement(data); drawHandles(data); },
+      description: 'Move ' + snapshots.length + ' element' + (snapshots.length > 1 ? 's' : ''),
+      doFn: function() {
+        for (var j = 0; j < snapshots.length; j++) {
+          var s = snapshots[j];
+          var e = state.elements.find(function(el2) { return el2.id === s.id; });
+          if (!e) continue;
+          if (e.type === 'line') {
+            e.x1 = s.final.x1; e.y1 = s.final.y1; e.x2 = s.final.x2; e.y2 = s.final.y2;
+            if (s.final.points) e.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; });
+            updateLineSVG(e);
+          } else if (e.type === 'text') { e.x = s.final.x; e.y = s.final.y; updateTextSVG(e); }
+          else if (e.type === 'freehand') { e.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.final.rawPoints) e.rawPoints = s.final.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(e); }
+          else if (e.type === 'rectangle') { e.x = s.final.x; e.y = s.final.y; updateRectangleElement(e); }
+        }
+        var prim = state.elements.find(function(el2) { return el2.id === state.selectedId; });
+        if (prim) drawHandles(prim);
+      },
+      undoFn: function() {
+        for (var j = 0; j < snapshots.length; j++) {
+          var s = snapshots[j];
+          var e = state.elements.find(function(el2) { return el2.id === s.id; });
+          if (!e) continue;
+          if (e.type === 'line') {
+            e.x1 = s.orig.x1; e.y1 = s.orig.y1; e.x2 = s.orig.x2; e.y2 = s.orig.y2;
+            if (s.orig.points) e.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; });
+            updateLineSVG(e);
+          } else if (e.type === 'text') { e.x = s.orig.x; e.y = s.orig.y; updateTextSVG(e); }
+          else if (e.type === 'freehand') { e.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.orig.rawPoints) e.rawPoints = s.orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(e); }
+          else if (e.type === 'rectangle') { e.x = s.orig.x; e.y = s.orig.y; updateRectangleElement(e); }
+        }
+        var prim = state.elements.find(function(el2) { return el2.id === state.selectedId; });
+        if (prim) drawHandles(prim);
+      },
     });
   }
 
   dragOriginal = null;
+  dragOriginals = null;
 }
 
 // ── Resize ──────────────────────────────────────────────────────
@@ -1167,38 +1262,41 @@ function onResizeEnd() {
 // ── Delete ──────────────────────────────────────────────────────
 
 export function deleteSelected() {
-  if (!state.selectedId) return;
-  const id = state.selectedId;
-  const idx = state.elements.findIndex(el => el.id === id);
-  if (idx === -1) return;
+  if (state.selectedIds.length === 0) return;
 
-  const data = { ...state.elements[idx] };
-  state.elements.splice(idx, 1);
-
-  const el = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
-  if (el) el.remove();
+  var ids = state.selectedIds.slice();
+  var removed = [];
+  for (var di = 0; di < ids.length; di++) {
+    var id = ids[di];
+    var idx = state.elements.findIndex(function(el) { return el.id === id; });
+    if (idx === -1) continue;
+    removed.push({ idx: idx, data: { ...state.elements[idx] } });
+    state.elements.splice(idx, 1);
+    var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
+    if (el) el.remove();
+  }
 
   clearSelection();
 
   pushAction({
-    description: 'Delete element',
-    doFn: () => {
-      const i = state.elements.findIndex(e => e.id === id);
-      if (i !== -1) state.elements.splice(i, 1);
-      const svgEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
-      if (svgEl) svgEl.remove();
-      if (state.selectedId === id) clearSelection();
+    description: 'Delete ' + removed.length + ' element' + (removed.length > 1 ? 's' : ''),
+    doFn: function() {
+      for (var i = 0; i < removed.length; i++) {
+        var r = removed[i];
+        var ci = state.elements.findIndex(function(e) { return e.id === r.data.id; });
+        if (ci !== -1) state.elements.splice(ci, 1);
+        var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(r.data.id));
+        if (svgEl) svgEl.remove();
+      }
     },
-    undoFn: () => {
-      state.elements.splice(idx, 0, data);
-      if (data.type === 'line') {
-        addLineSVGAtIndex(data, idx);
-      } else if (data.type === 'text') {
-        addTextSVGAtIndex(data, idx);
-      } else if (data.type === 'freehand') {
-        addFreehandSVGAtIndex(data, idx);
-      } else if (data.type === 'rectangle') {
-        addRectangleSVGAtIndex(data, idx);
+    undoFn: function() {
+      for (var i = 0; i < removed.length; i++) {
+        var r = removed[i];
+        state.elements.splice(r.idx, 0, r.data);
+        if (r.data.type === 'line') addLineSVGAtIndex(r.data, r.idx);
+        else if (r.data.type === 'text') addTextSVGAtIndex(r.data, r.idx);
+        else if (r.data.type === 'freehand') addFreehandSVGAtIndex(r.data, r.idx);
+        else if (r.data.type === 'rectangle') addRectangleSVGAtIndex(r.data, r.idx);
       }
     },
   });

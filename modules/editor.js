@@ -22,6 +22,7 @@ export const state = {
   },
   elements: [],         // { id, type, ...props }
   selectedId: null,
+  selectedIds: [],
   activeTool: 'select', // 'select' | 'line' | 'text'
   activeColor: '#ff0000',
   bgColor: '#ffffff',
