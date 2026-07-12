@@ -2,9 +2,9 @@ import { dom, state } from './editor.js';
 import { bindGridControls, toggleGrid } from './grid.js';
 
 var SYSTEM_LAYERS = {
-  'image-layer': { name: 'Image', index: 0 },
-  'watermark-layer': { name: 'Watermark', index: 2 },
-  'grid-layer': { name: 'Grid', index: 3 },
+  'layer-image': { name: 'Image', index: 0 },
+  'layer-watermark': { name: 'Watermark', index: 2 },
+  'layer-grid': { name: 'Grid', index: 3 },
 };
 
 // Ordered list: image → annotation → [user layers] → watermark → grid
@@ -18,15 +18,15 @@ export function initLayers() {
 
   // Create initial "Annotations" user layer (reuses existing #annotation-layer <g>)
   userLayerCounter = 1;
-  layerOrder.splice(1, 0, { id: 'annotation-layer', name: 'Annotations', system: false });
-  dom.annotationLayer = document.getElementById('annotation-layer');
+  layerOrder.splice(1, 0, { id: 'layer-annotation', name: 'Annotations', system: false });
+  dom.annotationLayer = document.getElementById('layer-annotation');
 
   // Watermark hidden by default
-  var wmLayer = document.getElementById('watermark-layer');
+  var wmLayer = document.getElementById('layer-watermark');
   if (wmLayer) wmLayer.setAttribute('visibility', 'hidden');
 
   renderLayerList();
-  selectLayer('annotation-layer');
+  selectLayer('layer-annotation');
 
   // Toggle right panel
   var rightPanel = document.getElementById('right-panel');
@@ -48,10 +48,10 @@ export function initLayers() {
 
 function initLayerOrder() {
   layerOrder = [
-    { id: 'image-layer', name: 'Image', system: true },
+    { id: 'layer-image', name: 'Image', system: true },
     // user layers inserted here
-    { id: 'watermark-layer', name: 'Watermark', system: true },
-    { id: 'grid-layer', name: 'Grid', system: true },
+    { id: 'layer-watermark', name: 'Watermark', system: true },
+    { id: 'layer-grid', name: 'Grid', system: true },
   ];
 }
 
@@ -116,7 +116,7 @@ function renderLayerList() {
       e.stopPropagation();
       var entryData = getLayerData(this);
       if (!entryData) return;
-      if (entryData.id === 'grid-layer') {
+      if (entryData.id === 'layer-grid') {
         toggleGrid(!state.grid.visible);
         if (entryData._selected) showLayerProps(entryData);
         return;
@@ -127,7 +127,7 @@ function renderLayerList() {
       if (hidden) {
         el.removeAttribute('visibility');
         this.classList.remove('hidden');
-        if (entryData.id === 'watermark-layer') updateWatermark();
+        if (entryData.id === 'layer-watermark') updateWatermark();
       } else {
         el.setAttribute('visibility', 'hidden');
         this.classList.add('hidden');
@@ -163,7 +163,7 @@ export function selectLayer(id) {
 
 function addLayer() {
   var selected = layerOrder.find(function(l) { return l._selected; });
-  var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'watermark-layer'; });
+  var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'layer-watermark'; });
   var insertIndex = watermarkIdx;
 
   if (selected) {
@@ -177,10 +177,10 @@ function addLayer() {
   if (insertIndex > watermarkIdx) insertIndex = watermarkIdx;
 
   userLayerCounter++;
-  var id = 'user-layer-' + userLayerCounter;
+  var id = 'layer-user-' + userLayerCounter;
   var name = 'Layer ' + userLayerCounter;
 
-  var watermarkG = document.getElementById('watermark-layer');
+  var watermarkG = document.getElementById('layer-watermark');
   var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('id', id);
   if (watermarkG && watermarkG.parentNode) {
@@ -241,19 +241,19 @@ function removeLayer() {
     if (g) g.remove();
     var idx = layerOrder.indexOf(selected);
     layerOrder.splice(idx, 1);
-    var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'watermark-layer'; });
-    var newG = document.getElementById('annotation-layer');
+    var watermarkIdx = layerOrder.findIndex(function(l) { return l.id === 'layer-watermark'; });
+    var newG = document.getElementById('layer-annotation');
     if (!newG) {
       newG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      newG.setAttribute('id', 'annotation-layer');
+      newG.setAttribute('id', 'layer-annotation');
     }
-    var watermarkG = document.getElementById('watermark-layer');
+    var watermarkG = document.getElementById('layer-watermark');
     if (watermarkG && watermarkG.parentNode) {
       watermarkG.parentNode.insertBefore(newG, watermarkG);
     }
-    layerOrder.splice(watermarkIdx, 0, { id: 'annotation-layer', name: 'Annotations', system: false });
+    layerOrder.splice(watermarkIdx, 0, { id: 'layer-annotation', name: 'Annotations', system: false });
     userLayerCounter = 1;
-    selectLayer('annotation-layer');
+    selectLayer('layer-annotation');
     return;
   }
 
@@ -292,7 +292,7 @@ function showLayerProps(entry) {
 
   var body = document.getElementById('layer-props-body');
 
-  if (entry.id === 'watermark-layer') {
+  if (entry.id === 'layer-watermark') {
     body.innerHTML =
       '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + entry.name + '</span></div>' +
       '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + (isHidden ? 'Off' : 'On') + '</span></div>' +
@@ -322,7 +322,7 @@ function showLayerProps(entry) {
         '</div>' +
       '</div>';
     bindWatermarkControls();
-  } else if (entry.id === 'grid-layer') {
+  } else if (entry.id === 'layer-grid') {
     body.innerHTML =
       '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + entry.name + '</span></div>' +
       '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + (isHidden ? 'Off' : 'On') + '</span></div>' +
@@ -412,7 +412,7 @@ export function updateWatermark() {
   if (oldPattern) oldPattern.remove();
 
   if (!state.hasImage) return;
-  if (!isLayerVisible('watermark-layer')) return;
+  if (!isLayerVisible('layer-watermark')) return;
   if (!state.activeColor || state.activeColor === 'transparent') return;
 
   var thicknessEl = document.getElementById('wm-thickness');

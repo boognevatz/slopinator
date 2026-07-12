@@ -67,9 +67,9 @@ export const dom = {
 /** Initialize the editor */
 export function initEditor() {
   dom.svg = document.getElementById('editor-svg');
-  dom.imageLayer = document.getElementById('image-layer');
-  dom.annotationLayer = document.getElementById('annotation-layer');
-  dom.watermarkLayer = document.getElementById('watermark-layer');
+  dom.imageLayer = document.getElementById('layer-image');
+  dom.annotationLayer = document.getElementById('layer-annotation');
+  dom.watermarkLayer = document.getElementById('layer-watermark');
   dom.handleLayer = document.getElementById('handle-layer');
   dom.emptyState = document.getElementById('empty-state');
 }
@@ -187,7 +187,7 @@ export function updateImageTransform() {
 
   dom.imageEl.setAttribute('transform', transforms.join(' '));
   // Apply transform to all annotation/user layers
-  var allGs = dom.svg.querySelectorAll('g[id^="user-layer-"], g[id="annotation-layer"]');
+  var allGs = dom.svg.querySelectorAll('g[id^="layer-user-"], g[id="layer-annotation"]');
   for (var i = 0; i < allGs.length; i++) {
     allGs[i].setAttribute('transform', transforms.join(' '));
   }

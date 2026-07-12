@@ -4,7 +4,7 @@ import { dom, state } from './editor.js';
 import { svgEl } from './utils.js';
 
 export function initGrid() {
-  dom.gridLayer = document.getElementById('grid-layer');
+  dom.gridLayer = document.getElementById('layer-grid');
 
   // Grid hidden by default
   dom.gridLayer.setAttribute('visibility', 'hidden');
@@ -18,7 +18,7 @@ export function initGrid() {
 }
 
 export function syncGridEye() {
-  var eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
+  var eye = document.querySelector('.layer-entry[data-layer="layer-grid"] .layer-eye');
   if (eye) eye.classList.toggle('hidden', dom.gridLayer.getAttribute('visibility') === 'hidden');
 }
 
@@ -82,7 +82,7 @@ export function toggleGrid(visible) {
     if (oldPattern) oldPattern.remove();
   }
 
-  const eye = document.querySelector('.layer-entry[data-layer="grid-layer"] .layer-eye');
+  const eye = document.querySelector('.layer-entry[data-layer="layer-grid"] .layer-eye');
   if (eye) eye.classList.toggle('hidden', !visible);
 }
 

@@ -847,7 +847,7 @@ export function generateSVGString() {
 
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('image-layer')) {
+  if (isLayerVisible('layer-image')) {
     svg += `<image data-type="background" href="${img.dataURI}" `;
     svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
     svg += `transform="${imgTransform}" />\n`;
@@ -916,17 +916,17 @@ export function generateSVGString() {
     return '';
   }
 
-  if (isLayerVisible('annotation-layer')) {
-    svg += `<g id="annotation-layer" transform="${imgTransform}">\n`;
+  if (isLayerVisible('layer-annotation')) {
+    svg += `<g id="layer-annotation" transform="${imgTransform}">\n`;
     for (const el of state.elements) {
       svg += serializeElement(el);
     }
     svg += `</g>\n`;
   }
 
-  if (isLayerVisible('watermark-layer')) {
+  if (isLayerVisible('layer-watermark')) {
     svg += buildWatermarkDefs();
-    svg += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svg += `<g id="layer-watermark" transform="${imgTransform}">\n`;
     svg += dom.watermarkLayer.innerHTML;
     svg += `</g>\n`;
   }
@@ -965,14 +965,14 @@ export function exportJPG(widthOption) {
   // Image
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('image-layer')) {
+  if (isLayerVisible('layer-image')) {
     svgStr += `<image href="${img.dataURI}" `;
     svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
     svgStr += `transform="${imgTransform}" />\n`;
   }
 
   // Annotations
-  if (isLayerVisible('annotation-layer')) {
+  if (isLayerVisible('layer-annotation')) {
     svgStr += `<g transform="${imgTransform}">\n`;
     for (const el of state.elements) {
       if (el.type === 'line') {
@@ -1021,9 +1021,9 @@ export function exportJPG(widthOption) {
   }
 
   // Watermark
-  if (isLayerVisible('watermark-layer')) {
+  if (isLayerVisible('layer-watermark')) {
     svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
-    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svgStr += `<g id="layer-watermark" transform="${imgTransform}">\n`;
     svgStr += dom.watermarkLayer.innerHTML;
     svgStr += `</g>\n`;
   }
@@ -1094,12 +1094,12 @@ export function exportPDF(widthOption, pageSize) {
   svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('image-layer')) {
+  if (isLayerVisible('layer-image')) {
     svgStr += `<image href="${img.dataURI}" `;
     svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
     svgStr += `transform="${imgTransform}" />\n`;
   }
-  if (isLayerVisible('annotation-layer')) {
+  if (isLayerVisible('layer-annotation')) {
     svgStr += `<g transform="${imgTransform}">\n`;
     for (const el of state.elements) {
       if (el.type === 'line') {
@@ -1144,9 +1144,9 @@ export function exportPDF(widthOption, pageSize) {
     }
     svgStr += `</g>\n`;
   }
-  if (isLayerVisible('watermark-layer')) {
+  if (isLayerVisible('layer-watermark')) {
     svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
-    svgStr += `<g id="watermark-layer" transform="${imgTransform}">\n`;
+    svgStr += `<g id="layer-watermark" transform="${imgTransform}">\n`;
     svgStr += dom.watermarkLayer.innerHTML;
     svgStr += `</g>\n`;
   }
@@ -1272,7 +1272,7 @@ async function deflateRgb(imageData) {
 }
 
 function buildWatermarkDefs() {
-  if (!isLayerVisible('watermark-layer')) return '';
+  if (!isLayerVisible('layer-watermark')) return '';
   if (!state.activeColor || state.activeColor === 'transparent') return '';
   var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
   var color = state.activeColor;

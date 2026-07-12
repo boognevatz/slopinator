@@ -498,7 +498,7 @@ export function selectElement(id, addToSelection) {
   if (svgEl) {
     var parent = svgEl.parentElement;
     while (parent && parent !== dom.svg) {
-      if (parent.id && (parent.id === 'annotation-layer' || parent.id.startsWith('user-layer-'))) {
+      if (parent.id && (parent.id === 'layer-annotation' || parent.id.startsWith('layer-user-'))) {
         var currentLayerEl = document.querySelector('.layer-entry.selected');
         var currentLayerId = currentLayerEl ? currentLayerEl.dataset.layer : null;
         if (parent.id !== currentLayerId) {
