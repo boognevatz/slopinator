@@ -16,6 +16,7 @@ import { initPerspective } from './modules/perspective.js';
 import { initColorCorrection } from './modules/colorcorrection.js';
 import { initLayers } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
+import { initSettings, loadColorPreferences } from './modules/settings.js';
 
 import { dom } from './modules/editor.js';
 
@@ -49,6 +50,7 @@ function init() {
   // History: update undo/redo button states on change
   initHistory(updateUndoRedoButtons);
 
+  loadColorPreferences();
   initPalette();
   initLine();
   initText();
@@ -61,6 +63,7 @@ function init() {
   initColorCorrection();
   initLayers();
   initGrid();
+  initSettings();
   initFileIO();
 
   // ── Mobile dropdown toggle ────────────────────────────────

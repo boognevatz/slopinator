@@ -646,6 +646,29 @@ body {
   opacity: 0.3;
 }
 
+/* ── Settings popup ─────────────────────────────────── */
+
+#settings-popup {
+  display: none;
+}
+#settings-popup:not([hidden]) {
+  display: flex;
+}
+
+#settings-storage-tbody td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #3a3a3a;
+  font-family: monospace;
+  font-size: 11px;
+}
+#settings-storage-tbody td:last-child {
+  text-align: right;
+  color: #999;
+}
+#settings-storage-tbody tr:hover {
+  background: #3a3a3a;
+}
+
 /* ── About Popup ───────────────────────────────────── */
 #about-popup {
   display: none;

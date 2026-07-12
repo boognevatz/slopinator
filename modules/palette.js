@@ -1,4 +1,5 @@
 import { state } from './editor.js';
+import { saveColorPreferences } from './settings.js';
 
 let colorPickerTarget = null;
 let activeTarget = 'foreground';
@@ -195,6 +196,7 @@ function applyColor(color) {
       setSquareColor('bg-square', 'transparent');
       document.dispatchEvent(new CustomEvent('palette-bgcolor-changed', { detail: { color: 'transparent' } }));
     }
+    saveColorPreferences();
     return;
   }
   const hex = getBaseHex(color);
@@ -209,6 +211,7 @@ function applyColor(color) {
     document.dispatchEvent(new CustomEvent('palette-bgcolor-changed', { detail: { color: state.bgColor } }));
   }
   syncOpacitySlider();
+  saveColorPreferences();
 }
 
 function highlightActiveSwatch() {
@@ -250,6 +253,7 @@ function setupOpacitySlider() {
       }
     }
     highlightActiveSwatch();
+    saveColorPreferences();
   });
 }
 
@@ -297,6 +301,7 @@ function renderThickness() {
     state.activeThickness = val;
     valueDisplay.textContent = val;
     document.dispatchEvent(new CustomEvent('palette-thickness-changed', { detail: { thickness: val } }));
+    saveColorPreferences();
   };
 
   slider.addEventListener('input', update);
