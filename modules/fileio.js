@@ -132,20 +132,24 @@ export function initFileIO() {
   btnSaveSvg.addEventListener('click', saveSVG);
 
   function createNewImage(w, h) {
-    var c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = '#ffffff';
+    document.title = 'Slopinator';
+    fileMenu.hidden = true;
+    dom.annotationLayer.innerHTML = '';
+    dom.handleLayer.innerHTML = '';
+    state.elements = [];
+    state.selectedId = null;
+    clearHistory();
+
+    // Create a blank white image
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, w, h);
-    var dataURI = c.toDataURL('image/png');
-    var img = new Image();
-    img.onload = function() {
-      loadImage(dataURI, w, h);
-      clearHistory();
-      switchTool('text');
-      updateWatermark();
-    };
-    img.src = dataURI;
+    const dataURI = canvas.toDataURL('image/png');
+    loadImage(dataURI, w, h);
+    switchTool('text');
   }
 
   document.getElementById('btn-new-create').addEventListener('click', (e) => {
@@ -383,6 +387,8 @@ function handleFileOpen(file) {
     }
     exportFilename.focus();
   }
+
+  document.title = 'Slopinator - ' + file.name;
 
   if (isSVG) {
     const reader = new FileReader();

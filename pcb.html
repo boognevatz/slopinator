@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PCB Annotator</title>
+  <title>PCBslopify</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
             <div style="display:flex;flex-direction:column;gap:2px;padding:4px 0;white-space:nowrap;">
               <button id="btn-open" class="file-menu-item">📂 Open</button>
               <div class="file-menu-item" style="display:flex;align-items:center;gap:4px;padding:2px 8px;font-size:12px;">
-                <span style="color:#ccc;">New</span>
+                <span style="color:#ccc;">🗋</span>
                 <input type="number" id="new-width" value="640" min="1" onfocus="this.select()" style="width:50px;font-size:11px;padding:1px 2px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
                 <span style="color:#888;">x</span>
                 <input type="number" id="new-height" value="480" min="1" onfocus="this.select()" style="width:50px;font-size:11px;padding:1px 2px;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:2px;">
@@ -292,7 +292,7 @@
       <div style="background:#2d2d2d;border:1px solid #555;border-radius:6px;padding:24px 32px;min-width:260px;position:relative;color:#ccc;font-size:14px;">
         <button id="btn-about-close" style="position:absolute;top:6px;right:10px;background:none;border:none;color:#888;font-size:18px;cursor:pointer;padding:0;line-height:1;">×</button>
         <h2 style="margin:0 0 12px 0;font-size:16px;color:#eee;">About</h2>
-        <p style="margin:0;font-size:13px;"><strong>PCB Annotator</strong></p>
+        <p style="margin:0;font-size:13px;"><strong>PCBslopify</strong></p>
         <p style="margin:4px 0 0 0;font-size:12px;color:#999;">Version <span id="about-version">0.1</span></p>
       </div>
     </div>

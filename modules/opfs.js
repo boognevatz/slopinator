@@ -91,6 +91,7 @@ export async function loadAutosave() {
     var svgText = await loadFromOPFS();
     if (svgText) {
       openSVGProject(svgText);
+      document.title = 'Slopinator - autosave.svg';
       _dirty = false;
     }
   } catch {}
