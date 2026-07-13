@@ -519,6 +519,14 @@ button.tool-btn.active {
   .btn-label {
     display: none;
   }
+  .toolbar-sep {
+    display: none;
+  }
+  .toolbar-group.separator {
+    border-left: none;
+    margin-left: 0;
+    padding-left: 0;
+  }
 }
 
 #editor-container {
