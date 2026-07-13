@@ -1188,7 +1188,9 @@ export function exportPDF(widthOption, pageSize) {
     URL.revokeObjectURL(url);
 
     var marker = findActualSizeMarker();
-    var pixelsPerMm = marker ? marker.pixelsPerMm * (targetWidth / dims.width) : null;
+    var dpi = parseInt(document.getElementById('dpi-input').value) || 300;
+    var markerPxPerMm = marker ? marker.pixelsPerMm : (dpi / 25.4);
+    var pixelsPerMm = markerPxPerMm * (targetWidth / dims.width);
     var marginUnit = document.getElementById('margin-unit-select').value;
     var toMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 }[marginUnit] || 1;
     var marginTopMm = (parseFloat(document.getElementById('export-margin-top').value) || 0) * toMm;
