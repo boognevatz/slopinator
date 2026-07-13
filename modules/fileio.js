@@ -195,10 +195,25 @@ export function initFileIO() {
   tabPdf.addEventListener('click', (e) => { e.stopPropagation(); activateTab('pdf'); });
 
   // File dropdown toggle
+  function positionDropdown(menu, btn) {
+    if (window.innerWidth < 768) {
+      var rect = btn.getBoundingClientRect();
+      menu.style.position = 'fixed';
+      menu.style.top = (rect.bottom + 4) + 'px';
+      menu.style.left = rect.left + 'px';
+    } else {
+      menu.style.position = '';
+      menu.style.top = '';
+      menu.style.left = '';
+    }
+  }
   btnFileDropdown.addEventListener('click', (e) => {
     e.stopPropagation();
     fileMenu.hidden = !fileMenu.hidden;
-    if (!fileMenu.hidden) activateTab(currentFormat);
+    if (!fileMenu.hidden) {
+      activateTab(currentFormat);
+      positionDropdown(fileMenu, btnFileDropdown);
+    }
   });
 
   // Nested export dropdown toggle
