@@ -493,6 +493,56 @@ button.tool-btn.active {
   border-color: var(--color-accent);
 }
 
+/* ── Group Children Preview ──────────────────────────────── */
+
+#element-id-group {
+  position: relative;
+}
+
+#group-children-preview {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 300;
+  margin-top: 2px;
+  padding: 4px 6px;
+  background: var(--color-bg-dark);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.7;
+  max-height: 160px;
+  min-width: 280px;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  overflow-y: auto;
+}
+.child-id-line {
+  white-space: nowrap;
+}
+.child-id-old {
+  background: rgba(0, 120, 212, 0.35);
+  color: #fff;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.child-id-arrow {
+  color: var(--color-text-dim);
+  margin: 0 4px;
+}
+.child-id-new {
+  color: var(--color-accent-light);
+}
+.child-id-rest {
+  color: var(--color-text-muted);
+}
+.child-id-no-match {
+  opacity: 0.45;
+}
+
 @media (max-width: 768px) {
   .mobile-group-btn {
     display: block;

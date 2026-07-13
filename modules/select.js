@@ -140,11 +140,47 @@ export function initSelect() {
         return;
       }
       var oldId = data.id;
-      data.id = sanitized;
-      if (data.type === 'group') {
+
+      // Find longest common prefix between old group ID and child IDs
+      var prefix = oldId;
+      if (data.type === 'group' && data.childIds) {
         for (var ci = 0; ci < data.childIds.length; ci++) {
-          var child = state.elements.find(function(e) { return e.id === data.childIds[ci]; });
-          if (child) child.parentId = sanitized;
+          while (data.childIds[ci].indexOf(prefix) !== 0 && prefix.length > 0) {
+            prefix = prefix.slice(0, -1);
+          }
+          if (prefix.length === 0) break;
+        }
+      }
+
+      data.id = sanitized;
+
+      if (data.type === 'group') {
+        // Extra suffix on the group ID beyond the common prefix (e.g. "-group")
+        var extraSuffix = prefix.length > 0 ? oldId.slice(prefix.length) : '';
+        // Derive base name for children (strip same extra suffix if it matches)
+        var newBase = (extraSuffix && sanitized.endsWith(extraSuffix)) ? sanitized.slice(0, -extraSuffix.length) : sanitized;
+
+        var oldToNew = {};
+        for (var ci = 0; ci < data.childIds.length; ci++) {
+          var oldChildId = data.childIds[ci];
+          var child = state.elements.find(function(e) { return e.id === oldChildId; });
+          if (!child) continue;
+          child.parentId = sanitized;
+          if (prefix.length > 0 && oldChildId.indexOf(prefix) === 0) {
+            var newChildId = newBase + oldChildId.slice(prefix.length);
+            if (!state.elements.some(function(e) { return e.id === newChildId; }) || newChildId === oldChildId) {
+              child.id = newChildId;
+              var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(oldChildId));
+              if (childSvg) childSvg.id = newChildId;
+              oldToNew[oldChildId] = newChildId;
+            }
+          }
+        }
+        // Update childIds array
+        for (var ci = 0; ci < data.childIds.length; ci++) {
+          if (oldToNew[data.childIds[ci]]) {
+            data.childIds[ci] = oldToNew[data.childIds[ci]];
+          }
         }
       } else if (data.parentId) {
         var parentGroup = state.elements.find(function(e) { return e.id === data.parentId && e.type === 'group'; });
@@ -172,10 +208,17 @@ export function initSelect() {
       if (idSaveBtn) idSaveBtn.style.display = 'none';
     }
 
-    idInput.addEventListener('focus', showSaveBtn);
+    idInput.addEventListener('focus', function() {
+      showSaveBtn();
+      renderGroupChildrenPreview();
+    });
     idInput.addEventListener('blur', function () {
       // Delay so click on save button registers first
-      setTimeout(hideSaveBtn, 150);
+      setTimeout(function() {
+        hideSaveBtn();
+        var preview = document.getElementById('group-children-preview');
+        if (preview) preview.style.display = 'none';
+      }, 150);
     });
     idInput.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
@@ -191,6 +234,7 @@ export function initSelect() {
     });
     idInput.addEventListener('input', function () {
       this.value = this.value.replace(/[^a-zA-Z0-9_-]/g, '');
+      renderGroupChildrenPreview();
     });
     if (idSaveBtn) {
       idSaveBtn.addEventListener('click', function (e) {
@@ -503,6 +547,7 @@ export function selectElement(id, addToSelection) {
     document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
     document.getElementById('element-id-input').value = groupData.id;
     _renameTargetId = groupData.id;
+    renderGroupChildrenPreview();
     document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
     var groupBtn = document.getElementById('btn-group');
     if (groupBtn) groupBtn.disabled = true;
@@ -534,7 +579,7 @@ export function selectElement(id, addToSelection) {
         drawHandles(remaining);
         document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
         var inp = document.getElementById('element-id-input');
-        if (inp) { inp.value = remaining.id; _renameTargetId = remaining.id; }
+        if (inp) { inp.value = remaining.id; _renameTargetId = remaining.id; renderGroupChildrenPreview(); }
         document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remaining.id, data: remaining } }));
       }
       return;
@@ -599,6 +644,7 @@ export function selectElement(id, addToSelection) {
   // Sync element ID display
   var idInput = document.getElementById('element-id-input');
   if (idInput) { idInput.value = data.id; _renameTargetId = data.id; }
+  renderGroupChildrenPreview();
 
   updateGroupButton();
   updateUngroupButton();
@@ -659,6 +705,8 @@ export function clearSelection() {
   updateMoveButtons();
   var idInput = document.getElementById('element-id-input');
   if (idInput) { idInput.value = ''; _renameTargetId = null; }
+  var preview = document.getElementById('group-children-preview');
+  if (preview) preview.style.display = 'none';
   textInteractMode = 'resize';
   hideRotationTooltip();
 }
@@ -1471,21 +1519,101 @@ export function deleteSelected() {
 
 // ── Duplicate ────────────────────────────────────────────────────
 
-function nextDuplicateId(id) {
-  var m = id.match(/-(\d+)$/);
+function nextDupPrefix() {
+  var maxN = 0;
+  state.elements.forEach(function(el) {
+    var m = el.id.match(/^dup(\d+)-/);
+    if (m) {
+      var n = parseInt(m[1], 10);
+      if (n > maxN) maxN = n;
+    }
+  });
+  return 'dup' + (maxN + 1) + '-';
+}
+
+function nextDupSuffix(id) {
+  var n = 1;
   var candidate;
-  if (m) {
-    var num = parseInt(m[1]) + 1;
-    candidate = id.slice(0, m.index) + '-' + num;
-  } else {
-    candidate = id + '-1';
-  }
-  while (state.elements.some(function(el) { return el.id === candidate; })) {
-    var m2 = candidate.match(/-(\d+)$/);
-    if (m2) candidate = candidate.slice(0, m2.index) + '-' + (parseInt(m2[1]) + 1);
-    else candidate = candidate + '-1';
-  }
+  do {
+    candidate = id + '-' + n;
+    n++;
+  } while (state.elements.some(function(el) { return el.id === candidate; }));
   return candidate;
+}
+
+function renderGroupChildrenPreview() {
+  var preview = document.getElementById('group-children-preview');
+  if (!preview) return;
+  var data = _renameTargetId ? state.elements.find(function(e) { return e.id === _renameTargetId; }) : null;
+  if (!data || data.type !== 'group' || !data.childIds || data.childIds.length === 0) {
+    preview.style.display = 'none';
+    return;
+  }
+  var newGroupId = document.getElementById('element-id-input').value.trim();
+  if (!newGroupId) { preview.style.display = 'none'; return; }
+
+  // Find longest common prefix between old group ID and all child IDs
+  var prefix = _renameTargetId;
+  for (var ci = 0; ci < data.childIds.length; ci++) {
+    while (data.childIds[ci].indexOf(prefix) !== 0 && prefix.length > 0) {
+      prefix = prefix.slice(0, -1);
+    }
+    if (prefix.length === 0) break;
+  }
+
+  // Extra suffix on the group ID beyond the common prefix (e.g. "-group")
+  var extraSuffix = prefix.length > 0 ? _renameTargetId.slice(prefix.length) : '';
+  // Derive base name to use for children (strip same extra suffix if it matches)
+  var newBase = (extraSuffix && newGroupId.endsWith(extraSuffix)) ? newGroupId.slice(0, -extraSuffix.length) : newGroupId;
+
+  preview.style.display = 'block';
+  preview.innerHTML = '';
+
+  for (var ci = 0; ci < data.childIds.length; ci++) {
+    var childId = data.childIds[ci];
+    var line = document.createElement('div');
+    line.className = 'child-id-line';
+
+    if (prefix.length > 0 && childId.indexOf(prefix) === 0) {
+      var rest = childId.slice(prefix.length);
+      var oldSpan = document.createElement('span');
+      oldSpan.className = 'child-id-old';
+      oldSpan.textContent = prefix;
+      line.appendChild(oldSpan);
+
+      var restSpan = document.createElement('span');
+      restSpan.className = 'child-id-rest';
+      restSpan.textContent = rest;
+      line.appendChild(restSpan);
+
+      var arrowSpan = document.createElement('span');
+      arrowSpan.className = 'child-id-arrow';
+      arrowSpan.textContent = '\u2192';
+      line.appendChild(arrowSpan);
+
+      var newSpan = document.createElement('span');
+      newSpan.className = 'child-id-new';
+      newSpan.textContent = newBase;
+      line.appendChild(newSpan);
+
+      var rest2Span = document.createElement('span');
+      rest2Span.className = 'child-id-rest';
+      rest2Span.textContent = rest;
+      line.appendChild(rest2Span);
+    } else {
+      line.textContent = childId + ' (no match)';
+    }
+    preview.appendChild(line);
+  }
+
+  // Flip to right edge if dropdown overflows viewport
+  preview.style.left = '';
+  preview.style.right = '';
+  var rect = preview.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    preview.style.left = 'auto';
+    preview.style.right = '0';
+  }
 }
 
 export function duplicateSelected() {
@@ -1500,7 +1628,8 @@ export function duplicateSelected() {
   });
 
   if (parentGroup) {
-    var newGroupId = nextDuplicateId(parentGroup.id);
+    var dupPrefix = nextDupPrefix();
+    var newGroupId = dupPrefix + parentGroup.id;
     var newChildIds = [];
     var dupes = [];
     var origChildIds = parentGroup.childIds;
@@ -1510,7 +1639,7 @@ export function duplicateSelected() {
       var orig = state.elements.find(function(el) { return el.id === oldId; });
       if (!orig) continue;
       var copy = JSON.parse(JSON.stringify(orig));
-      var newId = nextDuplicateId(oldId);
+      var newId = dupPrefix + oldId;
       copy.id = newId;
       copy.parentId = newGroupId;
       newChildIds.push(newId);
@@ -1584,7 +1713,7 @@ export function duplicateSelected() {
     var orig = state.elements.find(function(el) { return el.id === ids[di]; });
     if (!orig) continue;
     var copy = JSON.parse(JSON.stringify(orig));
-    copy.id = nextDuplicateId(orig.id);
+    copy.id = nextDupSuffix(orig.id);
     if (copy.parentId) copy.parentId = undefined;
     state.elements.push(copy);
     if (copy.type === 'line') addLineSVGAtIndex(copy, -1);
