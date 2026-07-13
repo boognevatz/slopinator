@@ -516,6 +516,9 @@ button.tool-btn.active {
     flex-wrap: nowrap;
     overflow-x: auto;
   }
+  .btn-label {
+    display: none;
+  }
 }
 
 #editor-container {
