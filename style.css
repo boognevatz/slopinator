@@ -454,10 +454,9 @@ button.tool-btn.active {
   border-radius: 4px;
   padding: 6px 8px;
   z-index: 200;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 4px;
-  white-space: nowrap;
   min-width: max-content;
 }
 .mobile-group-wrap.always-dropdown [data-group-content].open {
@@ -501,9 +500,9 @@ button.tool-btn.active {
     border-radius: 4px;
     padding: 6px 8px;
     z-index: 200;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 4px;
-    white-space: nowrap;
     min-width: max-content;
   }
   .mobile-group-wrap [data-group-content].open {
