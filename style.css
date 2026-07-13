@@ -527,6 +527,24 @@ button.tool-btn.active {
     margin-left: 0;
     padding-left: 0;
   }
+  #thickness-group {
+    position: relative;
+    padding-top: 1.4em;
+  }
+  #thickness-group > .toolbar-label:first-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 10px;
+  }
+  #thickness-value {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 10px;
+    min-width: auto;
+    padding: 0 2px;
+  }
 }
 
 #editor-container {
