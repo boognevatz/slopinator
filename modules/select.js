@@ -506,7 +506,10 @@ export function selectElement(id, addToSelection) {
   }
 
   if (!addToSelection) {
+    var _selEl = state.elements.find(function(e) { return e.id === id; });
+    var _keepUngroup = _tempUngrouped && _selEl && _selEl.parentId;
     clearSelection();
+    _tempUngrouped = _keepUngroup;
   }
 
   state.selectedId = id;
