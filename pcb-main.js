@@ -90,15 +90,28 @@ function init() {
       }
     });
   });
+  function closeAllMobileDropdowns() {
+    document.querySelectorAll('[data-group-content].open').forEach(el => {
+      el.classList.remove('open');
+      el.style.position = ''; el.style.top = ''; el.style.left = ''; el.style.right = ''; el.style.minWidth = '';
+      const group = el.dataset.groupContent;
+      const btn = document.querySelector(`.mobile-group-btn[data-group="${group}"]`);
+      if (btn) btn.textContent = group.charAt(0).toUpperCase() + group.slice(1) + ' ▾';
+    });
+  }
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.mobile-group-wrap')) {
-      document.querySelectorAll('[data-group-content].open').forEach(el => {
-        el.classList.remove('open');
-        el.style.position = ''; el.style.top = ''; el.style.left = ''; el.style.right = ''; el.style.minWidth = '';
-        const group = el.dataset.groupContent;
-        const btn = document.querySelector(`.mobile-group-btn[data-group="${group}"]`);
-        if (btn) btn.textContent = group.charAt(0).toUpperCase() + group.slice(1) + ' ▾';
-      });
+      closeAllMobileDropdowns();
+      return;
+    }
+    var dd = e.target.closest('[data-group-content].open');
+    if (dd) {
+      var grp = dd.dataset.groupContent;
+      if ((grp === 'tools' || grp === 'rotate') && e.target.closest('button')) {
+        closeAllMobileDropdowns();
+        return;
+      }
     }
   });
 
