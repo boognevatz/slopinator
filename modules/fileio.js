@@ -197,10 +197,10 @@ export function initFileIO() {
   // File dropdown toggle
   function positionDropdown(menu, btn) {
     if (window.innerWidth < 768) {
-      var rect = btn.getBoundingClientRect();
-      menu.style.position = 'fixed';
-      menu.style.top = (rect.bottom + 4) + 'px';
-      menu.style.left = rect.left + 'px';
+      // CSS handles positioning via position: fixed media query
+      menu.style.position = '';
+      menu.style.top = '';
+      menu.style.left = '';
     } else {
       menu.style.position = '';
       menu.style.top = '';
