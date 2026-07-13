@@ -181,6 +181,12 @@ export function initSelect() {
       if (e.key === 'Enter') {
         e.preventDefault();
         saveId();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        idInput.value = _renameTargetId || state.selectedId || '';
+        if (idSaveBtn) idSaveBtn.style.display = 'none';
+        renderGroupChildrenPreview();
+        idInput.blur();
       }
     });
     idInput.addEventListener('input', function () {
