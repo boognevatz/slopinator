@@ -119,6 +119,13 @@ button:disabled {
   cursor: default;
 }
 
+#btn-move-up, #btn-move-down {
+  display: none;
+}
+#btn-move-up.show, #btn-move-down.show {
+  display: inline-block;
+}
+
 button.tool-btn.active {
   background: var(--color-accent);
   border-color: var(--color-accent);

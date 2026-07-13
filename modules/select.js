@@ -310,8 +310,8 @@ function onMouseDown(e) {
       if (annotGroup.dataset && annotGroup.dataset.type === 'group') {
         var actualAnnot = findActualAnnotation(target);
         if (actualAnnot) {
-          selectElement(actualAnnot.id, false);
           _tempUngrouped = true;
+          selectElement(actualAnnot.id, false);
           return;
         }
       }
@@ -1686,15 +1686,21 @@ export function updateMoveButtons() {
   if (!upBtn || !downBtn) return;
   upBtn.disabled = true;
   downBtn.disabled = true;
-  if (!state.selectedId) return;
+  if (!state.selectedId || !_tempUngrouped) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
   var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!selData || !selData.parentId) return;
+  if (!selData || !selData.parentId) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
   var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-  if (!groupData) return;
+  if (!groupData) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
   var idx = groupData.childIds.indexOf(state.selectedId);
-  if (idx === -1) return;
+  if (idx === -1) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
+  setMoveBtnVisibility(upBtn, downBtn, true);
   if (idx < groupData.childIds.length - 1) upBtn.disabled = false;
   if (idx > 0) downBtn.disabled = false;
+}
+
+function setMoveBtnVisibility(upBtn, downBtn, visible) {
+  upBtn.classList.toggle('show', visible);
+  downBtn.classList.toggle('show', visible);
 }
 
 function addLineSVGAtIndex(data, _idx) {
