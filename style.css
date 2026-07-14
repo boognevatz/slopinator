@@ -604,6 +604,11 @@ button.tool-btn.active {
   }
 }
 @media (max-width: 768px) {
+  .color-dropdown {
+    position: fixed;
+    z-index: 300;
+    margin-top: 0;
+  }
   #file-menu {
     position: fixed;
     top: 40px;

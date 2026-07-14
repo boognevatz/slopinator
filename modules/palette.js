@@ -89,12 +89,33 @@ function openDropdown() {
   syncOpacitySlider();
   highlightActiveSwatch();
   const dd = document.getElementById('color-dropdown');
+  if (window.innerWidth < 768) {
+    const indicator = document.getElementById('color-indicator');
+    const rect = indicator.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top = (rect.bottom + 4) + 'px';
+    let left = rect.left;
+    if (left + 160 > window.innerWidth - 4) {
+      left = Math.max(4, window.innerWidth - 160 - 4);
+    }
+    dd.style.left = left + 'px';
+    dd.style.marginTop = '0';
+  } else {
+    dd.style.position = '';
+    dd.style.top = '';
+    dd.style.left = '';
+    dd.style.marginTop = '';
+  }
   dropdownOpen = true;
   dd.hidden = false;
 }
 
 function closeDropdown() {
   const dd = document.getElementById('color-dropdown');
+  dd.style.position = '';
+  dd.style.top = '';
+  dd.style.left = '';
+  dd.style.marginTop = '';
   dropdownOpen = false;
   dd.hidden = true;
 }
