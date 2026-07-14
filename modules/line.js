@@ -22,6 +22,7 @@ let extendOrigStyle = null;
 let isDraggingVertex = false;
 let dragVertexIdx = -1;
 let dragVertexOrigPoints = null;
+let dragStartPt = null;
 let dragVisualHandle = null;
 let coordTooltip = null;
 
@@ -94,7 +95,7 @@ function applyStyleToPendingPolyline() {
   pendingPolyline.lineStyle = state.activeLineStyle;
   pendingPolyline.lineMarkerSize = state.activeLineMarkerSize;
   updateLineElement(pendingPolyline);
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
 }
 
 function applySizeToPendingPolyline() {
@@ -102,7 +103,7 @@ function applySizeToPendingPolyline() {
   pendingPolyline.startDecorationSize = state.activeLineMarkerSize;
   pendingPolyline.endDecorationSize = state.activeLineMarkerSize;
   updateLineElement(pendingPolyline);
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
 }
 
 export function activateLine(selectedData) {
@@ -120,6 +121,7 @@ function loadExistingPolyline(data) {
   }
   pendingPolyline = data;
   isEditingExisting = true;
+  if (!data.closed) delete data.fill;
   extendOrigPoints = data.points.map(p => ({...p}));
   extendOrigStyle = {
     lineStyle: data.lineStyle,
@@ -131,7 +133,7 @@ function loadExistingPolyline(data) {
   };
   activeExtendIdx = data.points.length - 1;
   updateLineElement(data);
-  showExtendHandles(data, activeExtendIdx);
+  drawLineToolCircleHandles(data, activeExtendIdx);
 }
 
 export function deactivateLine() {
@@ -153,25 +155,43 @@ export function deactivateLine() {
 function onMouseDown(e) {
   if (e.button !== 0) return;
   if (!state.hasImage) return;
+  if (!e.isPrimary) return;
+  if (isDraggingVertex) return;
 
   const target = e.target;
 
   // If we have a pending polyline waiting for extend/finalize
   if (pendingPolyline) {
     const clickPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-    const threshold = getExtendHitRadius();
-    const nearIdx = findNearestVertex(clickPt, pendingPolyline.points, threshold);
-    if (nearIdx !== -1) {
+    let handleEl = target.closest('.handle-endpoint');
+    if (!handleEl) {
+      const handles = dom.handleLayer.querySelectorAll('.handle-endpoint');
+      for (let i = 0; i < handles.length; i++) {
+        const c = handles[i];
+        const cx = parseFloat(c.getAttribute('cx'));
+        const cy = parseFloat(c.getAttribute('cy'));
+        const r = parseFloat(c.getAttribute('r'));
+        const dx = clickPt.x - cx;
+        const dy = clickPt.y - cy;
+        if (dx * dx + dy * dy <= (r + 3) * (r + 3)) {
+          handleEl = c;
+          break;
+        }
+      }
+    }
+    if (handleEl) {
+      e.preventDefault();
+      const idx = parseInt(handleEl.dataset.index);
+
       // Shift+click → toggle multi-selection without drag
       if (e.shiftKey) {
-        e.preventDefault();
-        if (selectedNodeIndices.has(nearIdx)) {
-          selectedNodeIndices.delete(nearIdx);
+        if (selectedNodeIndices.has(idx)) {
+          selectedNodeIndices.delete(idx);
         } else {
-          selectedNodeIndices.add(nearIdx);
+          selectedNodeIndices.add(idx);
         }
-        activeExtendIdx = nearIdx;
-        showExtendHandles(pendingPolyline, activeExtendIdx);
+        activeExtendIdx = idx;
+        drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
         updateCutButtonState();
         return;
       }
@@ -180,41 +200,64 @@ function onMouseDown(e) {
       selectedNodeIndices.clear();
 
       const pts = pendingPolyline.points;
-      if (pts.length >= 3 &&
-          ((activeExtendIdx === 0 && nearIdx === pts.length - 1) ||
-           (activeExtendIdx === pts.length - 1 && nearIdx === 0))) {
-        e.preventDefault();
+      if (pts.length >= 3 && !isEditingExisting &&
+          ((activeExtendIdx === 0 && idx === pts.length - 1) ||
+           (activeExtendIdx === pts.length - 1 && idx === 0))) {
         pendingPolyline.closed = true;
         pendingPolyline.fill = state.bgColor && state.bgColor !== 'transparent' ? state.bgColor : 'none';
         pendingPolyline.startDecoration = 'none';
         pendingPolyline.endDecoration = 'none';
         updateLineElement(pendingPolyline);
-        activeExtendIdx = nearIdx;
-        selectedNodeIndices.add(nearIdx);
-        showExtendHandles(pendingPolyline, activeExtendIdx);
+        activeExtendIdx = idx;
+        selectedNodeIndices.add(idx);
+        drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
         updateCutButtonState();
         return;
       }
-      e.preventDefault();
 
       // Select the node immediately — show handles + tooltip without dragging
-      activeExtendIdx = nearIdx;
-      dragVertexIdx = nearIdx;
+      const prevActive = activeExtendIdx;
+      activeExtendIdx = idx;
+      dragVertexIdx = idx;
+      dragStartPt = { x: clickPt.x, y: clickPt.y };
       dragVertexOrigPoints = pendingPolyline.points.map(p => ({...p}));
       isDraggingVertex = false;
 
-      showExtendHandles(pendingPolyline, activeExtendIdx);
+      if (prevActive !== idx) {
+        drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
+      } else {
+        updateCoordTooltipForIdx(pendingPolyline, activeExtendIdx);
+      }
 
       document.addEventListener('pointermove', onVertexDragPrepare);
       document.addEventListener('pointerup', onVertexClickEnd);
       return;
     }
+
     // Clicking on other annotation → don't interfere
-    if (target.classList.contains('annotation-line') ||
-        target.classList.contains('annotation-text') ||
-        target.classList.contains('line-hit-area')) return;
+    if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle')) return;
+    // Check if click is on the pending polyline's stroke (target is SVG root due to pointer-events:stroke)
+    const lineGroup = dom.annotationLayer.querySelector(`#${CSS.escape(pendingPolyline.id)}`);
+    if (lineGroup) {
+      const lineEl = lineGroup.querySelector('.annotation-line');
+      const hitArea = lineGroup.querySelector('.line-hit-area');
+      if (lineEl || hitArea) {
+        const svgPt = dom.svg.createSVGPoint();
+        svgPt.x = clickPt.x;
+        svgPt.y = clickPt.y;
+        if ((lineEl && lineEl.isPointInStroke(svgPt)) ||
+            (hitArea && hitArea.isPointInStroke(svgPt))) return;
+      }
+    }
     // Clicked empty space → one-click extend from active endpoint (not for closed polygons)
     if (pendingPolyline.closed) return;
+    // Don't extend if click is too close to an existing vertex
+    const nearR = getExtendHandleRadius() * 2.5;
+    for (let i = 0; i < pendingPolyline.points.length; i++) {
+      const dx = clickPt.x - pendingPolyline.points[i].x;
+      const dy = clickPt.y - pendingPolyline.points[i].y;
+      if (dx * dx + dy * dy < nearR * nearR) return;
+    }
     addExtensionPoint(e);
     return;
   }
@@ -298,7 +341,7 @@ function onMouseUp(e) {
   // Each click on empty space adds a new segment from the active endpoint
   pendingPolyline = lineData;
   activeExtendIdx = 1; // last point is active by default
-  showExtendHandles(lineData, 1);
+  drawLineToolCircleHandles(lineData, 1);
 
   isDrawing = false;
 }
@@ -315,42 +358,29 @@ function cancelDraw() {
 
 // ── Polyline extend mode ────────────────────────────────────────
 
-function showExtendHandles(data, activeIdx) {
+function drawLineToolCircleHandles(data, activeIdx) {
   dom.handleLayer.innerHTML = '';
-  const visR = getExtendHandleRadius();
-  const hitR = getExtendHitRadius();
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
+  const visR = Math.max(6, 10 * scale);
   const pts = data.points;
-
   for (let i = 0; i < pts.length; i++) {
     const x = pts[i].x, y = pts[i].y;
-    const isFirst = i === 0;
-    const isLast = i === pts.length - 1;
     const isActive = i === activeIdx || selectedNodeIndices.has(i);
-    const handleLabel = isFirst ? 'p1' : isLast ? 'p2' : 'v' + i;
-
-    // Hit area (larger, transparent, captures mouse events for hand cursor)
-    const hit = svgEl('circle', {
-      cx: x, cy: y, r: hitR,
-      class: 'handle-extend',
-      fill: 'transparent',
-      stroke: 'none',
-      'data-handle': handleLabel,
-      'data-index': i,
-    });
-    dom.handleLayer.appendChild(hit);
-
-    // Visual circle (smaller, visible, does not capture mouse events)
-    const vis = svgEl('circle', {
+    dom.handleLayer.appendChild(svgEl('circle', {
       cx: x, cy: y, r: visR,
       class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'),
-      'pointer-events': 'none',
-    });
-    dom.handleLayer.appendChild(vis);
+      'data-index': i,
+    }));
   }
+  updateCoordTooltipForIdx(data, activeIdx);
+}
 
-  // Show coordinate tooltip for the active node
-  if (activeIdx >= 0 && activeIdx < pts.length) {
-    var pt = pts[activeIdx];
+function updateCoordTooltipForIdx(data, idx) {
+  const pts = data.points;
+  if (idx >= 0 && idx < pts.length) {
+    var pt = pts[idx];
     var svgPt = dom.svg.createSVGPoint();
     svgPt.x = pt.x;
     svgPt.y = pt.y;
@@ -370,10 +400,6 @@ function getExtendHandleRadius() {
   const svgRect = dom.svg.getBoundingClientRect();
   const scale = viewBox.width / svgRect.width;
   return Math.max(6, 10 * scale);
-}
-
-function getExtendHitRadius() {
-  return getExtendHandleRadius() + 4;
 }
 
 function addExtensionPoint(e) {
@@ -405,25 +431,10 @@ function addExtensionPoint(e) {
 
   // The new point becomes the active endpoint
   activeExtendIdx = activeExtendIdx === 0 ? 0 : pts.length - 1;
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
 }
 
 // ── Vertex dragging ─────────────────────────────────────────────
-
-function findNearestVertex(pt, points, threshold) {
-  let nearest = -1;
-  let minDist = threshold;
-  for (let i = 0; i < points.length; i++) {
-    const dx = pt.x - points[i].x;
-    const dy = pt.y - points[i].y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < minDist) {
-      minDist = dist;
-      nearest = i;
-    }
-  }
-  return nearest;
-}
 
 function syncLineEndpoints(data) {
   data.x1 = data.points[0].x;
@@ -486,7 +497,7 @@ function startVertexDrag(idx, e) {
 
 function onVertexDragMove(e) {
   if (!isDraggingVertex || !pendingPolyline) return;
-  const pt = snapToGrid(screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY));
+  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const pts = pendingPolyline.points;
 
   pts[dragVertexIdx] = { x: pt.x, y: pt.y };
@@ -507,6 +518,8 @@ function onVertexDragEnd() {
 
   if (!isDraggingVertex || !pendingPolyline) return;
   isDraggingVertex = false;
+  dragVertexIdx = -1;
+  dragStartPt = null;
 
   const origPt = dragVertexOrigPoints[dragVertexIdx];
   const currPt = pendingPolyline.points[dragVertexIdx];
@@ -538,15 +551,14 @@ function onVertexDragEnd() {
 
   dom.svg.style.cursor = 'crosshair';
   cleanupDragUI();
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
 }
 
 function onVertexDragPrepare(e) {
-  if (!pendingPolyline) { cleanupVertexClickState(); return; }
-  const startPt = pendingPolyline.points[dragVertexIdx];
+  if (!pendingPolyline || !dragStartPt) { cleanupVertexClickState(); return; }
   const currentPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const dx = currentPt.x - startPt.x;
-  const dy = currentPt.y - startPt.y;
+  const dx = currentPt.x - dragStartPt.x;
+  const dy = currentPt.y - dragStartPt.y;
   if (Math.sqrt(dx * dx + dy * dy) < 3) return;
 
   document.removeEventListener('pointermove', onVertexDragPrepare);
@@ -574,6 +586,7 @@ function onVertexClickEnd() {
   document.removeEventListener('pointerup', onVertexClickEnd);
   dragVertexOrigPoints = null;
   dragVertexIdx = -1;
+  dragStartPt = null;
   updateCutButtonState();
 }
 
@@ -582,6 +595,7 @@ function cleanupVertexClickState() {
   document.removeEventListener('pointerup', onVertexClickEnd);
   dragVertexOrigPoints = null;
   dragVertexIdx = -1;
+  dragStartPt = null;
   isDraggingVertex = false;
 }
 
@@ -633,7 +647,7 @@ function cutPolygonEdge() {
 
   selectedNodeIndices.clear();
   activeExtendIdx = newPts.length - 1;
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
   updateCutButtonState();
 }
 
@@ -654,7 +668,7 @@ export function deleteActiveNode() {
   syncLineEndpoints(pendingPolyline);
   updateLineElement(pendingPolyline);
   selectedNodeIndices.clear();
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
   updateCutButtonState();
 }
 
@@ -753,7 +767,7 @@ function onLineKeyDown(e) {
       } else {
         activeExtendIdx = (idx + 1) % pts.length;
       }
-      showExtendHandles(pendingPolyline, activeExtendIdx);
+      drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
       return;
     case 'Delete':
     case 'Backspace':
@@ -769,7 +783,7 @@ function onLineKeyDown(e) {
   pt.y += dy;
   syncLineEndpoints(pendingPolyline);
   updateLineElement(pendingPolyline);
-  showExtendHandles(pendingPolyline, activeExtendIdx);
+  drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
   if (coordTooltip) {
     var svgPt = dom.svg.createSVGPoint();
     svgPt.x = pt.x;
@@ -891,8 +905,98 @@ export function addLineElement(data) {
 
 export function updateLineElement(data) {
   const group = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
-  if (group) group.remove();
-  addLineElement(data);
+  if (!group) {
+    addLineElement(data);
+    return;
+  }
+  const pts = data.points || [{x: data.x1, y: data.y1}, {x: data.x2, y: data.y2}];
+  const lineEl = group.querySelector('.annotation-line');
+  const hitArea = group.querySelector('.line-hit-area');
+  if (!lineEl || !hitArea) {
+    group.remove();
+    addLineElement(data);
+    return;
+  }
+  const lineState = getLineState(data);
+  const isPoly = pts.length >= 3;
+  const isClosed = !!data.closed;
+  const currentTag = lineEl.tagName.toLowerCase();
+  const expectedTag = isPoly ? (isClosed ? 'polygon' : 'polyline') : 'line';
+  if (currentTag !== expectedTag) {
+    group.remove();
+    addLineElement(data);
+    return;
+  }
+  group.dataset.lineStyle = normalizeLineStyle(lineState.lineStyle);
+  group.dataset.lineMarkerSize = normalizeLineMarkerSize(lineState.lineMarkerSize);
+  group.dataset.startDecoration = lineState.startDecoration;
+  group.dataset.endDecoration = lineState.endDecoration;
+  group.dataset.startDecorationSize = lineState.startDecorationSize;
+  group.dataset.endDecorationSize = lineState.endDecorationSize;
+  if (data.rotation) {
+    const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+    const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+    group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
+  } else {
+    group.removeAttribute('transform');
+  }
+  const decorData = {
+    ...lineState,
+    stroke: data.stroke,
+    x1: pts[0].x, y1: pts[0].y,
+    x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y,
+  };
+  if (pts.length >= 3) {
+    decorData.startDirX = pts[1].x;
+    decorData.startDirY = pts[1].y;
+    decorData.endDirX = pts[pts.length - 2].x;
+    decorData.endDirY = pts[pts.length - 2].y;
+  }
+  if (isPoly) {
+    const ptsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
+    lineEl.setAttribute('points', ptsStr);
+    hitArea.setAttribute('points', ptsStr);
+    lineEl.setAttribute('stroke', data.stroke);
+    lineEl.setAttribute('stroke-width', data.strokeWidth);
+    applyLineStyle(lineEl, data.lineStyle);
+    if (isClosed) {
+      const hasFill = data.fill && data.fill !== 'none' && data.fill !== 'transparent';
+      lineEl.setAttribute('fill', hasFill ? data.fill : 'none');
+      if (hasFill) {
+        lineEl.setAttribute('style', 'pointer-events: visibleFill');
+      } else {
+        lineEl.removeAttribute('style');
+      }
+      const decorations = group.querySelector('.line-decorations');
+      if (decorations) decorations.remove();
+    } else {
+      lineEl.setAttribute('fill', 'none');
+      if (lineEl.getAttribute('style') === 'pointer-events: visibleFill') {
+        lineEl.removeAttribute('style');
+      }
+      replaceLineDecorations(group, decorData);
+    }
+  } else {
+    lineEl.setAttribute('x1', pts[0].x);
+    lineEl.setAttribute('y1', pts[0].y);
+    lineEl.setAttribute('x2', pts[1].x);
+    lineEl.setAttribute('y2', pts[1].y);
+    lineEl.setAttribute('stroke', data.stroke);
+    lineEl.setAttribute('stroke-width', data.strokeWidth);
+    applyLineStyle(lineEl, data.lineStyle);
+    hitArea.setAttribute('x1', pts[0].x);
+    hitArea.setAttribute('y1', pts[0].y);
+    hitArea.setAttribute('x2', pts[1].x);
+    hitArea.setAttribute('y2', pts[1].y);
+    replaceLineDecorations(group, decorData);
+  }
+}
+
+function replaceLineDecorations(group, decorData) {
+  const old = group.querySelector('.line-decorations');
+  if (old) old.remove();
+  const decorations = buildLineDecorations(decorData);
+  group.appendChild(decorations);
 }
 
 export function normalizeLineStyle(style) {
