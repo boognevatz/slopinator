@@ -900,8 +900,11 @@ function drawFreehandHandles(data) {
 }
 
 function drawRectangleHandles(data) {
-  const hw = 22;
-  const hh = 22;
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
+  const hw = Math.max(22, 28 * scale);
+  const hh = hw;
   const { x, y, width: w, height: h } = data;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -965,7 +968,8 @@ function getHandleRadius() {
   if (!viewBox || viewBox.width === 0) return 6;
   const svgRect = dom.svg.getBoundingClientRect();
   const scale = viewBox.width / svgRect.width;
-  return Math.max(4, 6 * scale);
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  return Math.max(isTouch ? 16 : 6, 8 * scale);
 }
 
 // ── Drag (move) ─────────────────────────────────────────────────

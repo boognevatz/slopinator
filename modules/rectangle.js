@@ -1,7 +1,7 @@
 import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
-import { selectElement } from './select.js';
+import { selectElement, clearSelection } from './select.js';
 
 let isDrawing = false;
 let startPt = null;
@@ -16,6 +16,10 @@ let resizeStart = null;
 let resizeOrig = null;
 let moveStart = null;
 let moveOrig = null;
+
+let isPreparingDrag = false;
+let dragStartPt = null;
+let dragCornerIdx = -1;
 
 var CORNERS = ['tl', 'tr', 'br', 'bl'];
 
@@ -54,6 +58,11 @@ function onPaletteBgChange() {
 }
 
 function cancelResizeMove() {
+  if (isPreparingDrag) {
+    document.removeEventListener('pointermove', onDragPrepare);
+    document.removeEventListener('pointerup', onDragCancel);
+    isPreparingDrag = false;
+  }
   isResizing = false;
   isMoving = false;
   resizeAnchor = null;
@@ -61,14 +70,14 @@ function cancelResizeMove() {
   resizeOrig = null;
   moveStart = null;
   moveOrig = null;
+  dragStartPt = null;
+  dragCornerIdx = -1;
   document.removeEventListener('pointermove', onResizeMove);
   document.removeEventListener('pointerup', onResizeEnd);
-  document.removeEventListener('pointermove', onMoveMove);
-  document.removeEventListener('pointerup', onMoveEnd);
 }
 
 function onKeyDown(e) {
-  if (isDrawing || isResizing || isMoving) return;
+  if (isDrawing || isResizing || isMoving || isPreparingDrag) return;
   var tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (!state.selectedId) return;
@@ -121,28 +130,68 @@ function onMouseDown(e) {
   var target = e.target;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
-  var handleEl = target.closest('.handle-extend');
+  var handleEl = target.closest('.handle-endpoint');
+  if (!handleEl) {
+    var handles = dom.handleLayer.querySelectorAll('.handle-endpoint');
+    for (var i = 0; i < handles.length; i++) {
+      var c = handles[i];
+      var cx = parseFloat(c.getAttribute('cx'));
+      var cy = parseFloat(c.getAttribute('cy'));
+      var r = parseFloat(c.getAttribute('r'));
+      var dx = pt.x - cx;
+      var dy = pt.y - cy;
+      if (dx * dx + dy * dy <= (r + 3) * (r + 3)) {
+        handleEl = c;
+        break;
+      }
+    }
+  }
   if (handleEl) {
     e.preventDefault();
     var idx = parseInt(handleEl.dataset.index);
-    startResizeRect(idx, pt);
-    return;
+    if (!isNaN(idx)) {
+      startHandleDrag(idx, pt);
+      return;
+    }
   }
 
   var rectBody = target.closest('.rect-fill, .rect-stroke');
+  var foundId = null;
   if (rectBody) {
-    e.preventDefault();
     var parentG = rectBody.closest('g[data-type="rectangle"]');
-    if (parentG) {
-      var id = parentG.id;
-      selectElement(id);
-      var data = state.elements.find(function(el) { return el.id === id; });
-      if (data) {
-        drawRectToolCircleHandles(data, activeCorner);
-        startMoveRect(id, pt);
+    if (parentG) foundId = parentG.id;
+  }
+  if (!foundId) {
+    for (var i = state.elements.length - 1; i >= 0; i--) {
+      var el = state.elements[i];
+      if (el.type !== 'rectangle') continue;
+      if (pt.x >= el.x && pt.x <= el.x + el.width &&
+          pt.y >= el.y && pt.y <= el.y + el.height) {
+        foundId = el.id;
+        break;
       }
     }
+  }
+  if (foundId) {
+    e.preventDefault();
+    if (foundId === state.selectedId) {
+      clearSelection();
+      activeCorner = -1;
+    } else {
+      selectElement(foundId);
+      var data = state.elements.find(function(el) { return el.id === foundId; });
+      if (data) drawRectToolCircleHandles(data, activeCorner);
+    }
     return;
+  }
+
+  if (state.selectedId) {
+    var selEl = state.elements.find(function(el) { return el.id === state.selectedId; });
+    if (selEl && selEl.type === 'rectangle') {
+      clearSelection();
+      activeCorner = -1;
+      return;
+    }
   }
 
   if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle, polyline')) return;
@@ -230,6 +279,40 @@ function onMouseUp(e) {
   drawRectToolCircleHandles(data, activeCorner);
 }
 
+function startHandleDrag(idx, pt) {
+  if (isResizing || isPreparingDrag) return;
+  activeCorner = idx;
+  dragCornerIdx = idx;
+  dragStartPt = { x: pt.x, y: pt.y };
+  isPreparingDrag = true;
+
+  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  if (data) drawRectToolCircleHandles(data, activeCorner);
+
+  document.addEventListener('pointermove', onDragPrepare);
+  document.addEventListener('pointerup', onDragCancel);
+}
+
+function onDragPrepare(e) {
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var dx = pt.x - dragStartPt.x;
+  var dy = pt.y - dragStartPt.y;
+  if (dx * dx + dy * dy < 9) return;
+
+  document.removeEventListener('pointermove', onDragPrepare);
+  document.removeEventListener('pointerup', onDragCancel);
+  isPreparingDrag = false;
+  startResizeRect(dragCornerIdx, pt);
+}
+
+function onDragCancel(e) {
+  document.removeEventListener('pointermove', onDragPrepare);
+  document.removeEventListener('pointerup', onDragCancel);
+  isPreparingDrag = false;
+  dragStartPt = null;
+  dragCornerIdx = -1;
+}
+
 function startResizeRect(idx, pt) {
   activeCorner = idx;
   var data = state.elements.find(function(el) { return el.id === state.selectedId; });
@@ -299,57 +382,6 @@ function onResizeEnd(e) {
       },
       undoFn: function() {
         data.x = orig.x; data.y = orig.y; data.width = orig.width; data.height = orig.height;
-        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
-      },
-    });
-  }
-
-  drawRectToolCircleHandles(data, activeCorner);
-}
-
-function startMoveRect(id, pt) {
-  var data = state.elements.find(function(el) { return el.id === id; });
-  if (!data) return;
-  moveStart = { x: pt.x, y: pt.y };
-  moveOrig = { x: data.x, y: data.y };
-  isMoving = true;
-  document.addEventListener('pointermove', onMoveMove);
-  document.addEventListener('pointerup', onMoveEnd);
-}
-
-function onMoveMove(e) {
-  if (!isMoving) return;
-  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!data || data.type !== 'rectangle') return;
-  data.x = moveOrig.x + (pt.x - moveStart.x);
-  data.y = moveOrig.y + (pt.y - moveStart.y);
-  updateRectangleElement(data);
-  drawRectToolCircleHandles(data, activeCorner);
-}
-
-function onMoveEnd(e) {
-  document.removeEventListener('pointermove', onMoveMove);
-  document.removeEventListener('pointerup', onMoveEnd);
-  if (!isMoving) return;
-  isMoving = false;
-
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!data) return;
-
-  var orig = moveOrig;
-  var final = { x: data.x, y: data.y };
-  var cornerIdx = activeCorner;
-
-  if (orig.x !== final.x || orig.y !== final.y) {
-    pushAction({
-      description: 'Move rectangle',
-      doFn: function() {
-        data.x = final.x; data.y = final.y;
-        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
-      },
-      undoFn: function() {
-        data.x = orig.x; data.y = orig.y;
         updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
       },
     });
@@ -447,7 +479,6 @@ function drawRectToolCircleHandles(data, activeIdx) {
   var svgRect = dom.svg.getBoundingClientRect();
   var scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
   var visR = Math.max(6, 10 * scale);
-  var hitR = Math.max(10, 16 * scale);
   var pts = [
     { x: data.x, y: data.y },
     { x: data.x + data.width, y: data.y },
@@ -457,7 +488,6 @@ function drawRectToolCircleHandles(data, activeIdx) {
   for (var i = 0; i < pts.length; i++) {
     var x = pts[i].x, y = pts[i].y;
     var isActive = i === activeIdx;
-    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: hitR, class: 'handle-extend', fill: 'transparent', stroke: 'none', 'data-index': i, 'data-corner': CORNERS[i] }));
-    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: visR, class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'), 'pointer-events': 'none' }));
+    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: visR, class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'), 'data-index': i, 'data-corner': CORNERS[i] }));
   }
 }
