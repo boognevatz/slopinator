@@ -28,6 +28,8 @@ let coordTooltip = null;
 
 // Multi-selection (for closed polygons)
 let selectedNodeIndices = new Set();
+let longPressTimer = null;
+const LONG_PRESS_MS = 400;
 
 const LINE_STYLES = ['normal', 'arrows', 'circle'];
 const LINE_DECORATIONS = ['none', 'arrow', 'circle'];
@@ -197,6 +199,7 @@ function onMouseDown(e) {
       }
 
       // Non-Shift click → clear multi-selection
+      const prevSelection = new Set(selectedNodeIndices);
       selectedNodeIndices.clear();
 
       const pts = pendingPolyline.points;
@@ -228,6 +231,27 @@ function onMouseDown(e) {
       } else {
         updateCoordTooltipForIdx(pendingPolyline, activeExtendIdx);
       }
+
+      // Long-press timer for multi-selection
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        // Build selection: always include the long-pressed node, plus up to 1 from prevSelection
+        const result = new Set([idx]);
+        for (const i of prevSelection) {
+          if (result.size >= 2) break;
+          if (i !== idx) result.add(i);
+        }
+        selectedNodeIndices.clear();
+        for (const i of result) selectedNodeIndices.add(i);
+        drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
+        updateCutButtonState();
+        // Cancel drag prep — staying in multi-select mode
+        document.removeEventListener('pointermove', onVertexDragPrepare);
+        document.removeEventListener('pointerup', onVertexClickEnd);
+        dragVertexOrigPoints = null;
+        dragVertexIdx = -1;
+        dragStartPt = null;
+      }, LONG_PRESS_MS);
 
       document.addEventListener('pointermove', onVertexDragPrepare);
       document.addEventListener('pointerup', onVertexClickEnd);
@@ -555,6 +579,7 @@ function onVertexDragEnd() {
 }
 
 function onVertexDragPrepare(e) {
+  clearTimeout(longPressTimer);
   if (!pendingPolyline || !dragStartPt) { cleanupVertexClickState(); return; }
   const currentPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const dx = currentPt.x - dragStartPt.x;
@@ -582,6 +607,7 @@ function onVertexDragPrepare(e) {
 }
 
 function onVertexClickEnd() {
+  clearTimeout(longPressTimer);
   document.removeEventListener('pointermove', onVertexDragPrepare);
   document.removeEventListener('pointerup', onVertexClickEnd);
   dragVertexOrigPoints = null;
@@ -591,6 +617,7 @@ function onVertexClickEnd() {
 }
 
 function cleanupVertexClickState() {
+  clearTimeout(longPressTimer);
   document.removeEventListener('pointermove', onVertexDragPrepare);
   document.removeEventListener('pointerup', onVertexClickEnd);
   dragVertexOrigPoints = null;
