@@ -229,6 +229,12 @@ function onMouseDown(e) {
       if (prevActive !== idx) {
         drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
       } else {
+        // Update handle classes in-place — don't destroy handle layer during active pointer
+        const handles = dom.handleLayer.querySelectorAll('.handle-endpoint');
+        for (let i = 0; i < handles.length; i++) {
+          const isActive = i === activeExtendIdx || selectedNodeIndices.has(i);
+          handles[i].setAttribute('class', 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'));
+        }
         updateCoordTooltipForIdx(pendingPolyline, activeExtendIdx);
       }
 
