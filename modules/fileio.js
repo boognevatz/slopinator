@@ -13,6 +13,35 @@ import { downloadString, downloadBlob, generateId } from './utils.js';
 import { switchTool } from './tools.js';
 import { isLayerVisible, updateWatermark } from './layers.js';
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function showExportProgress(text) {
+  const bar = document.getElementById('resize-notification');
+  if (!bar) return;
+  for (const child of bar.children)
+    if (child.tagName === 'BUTTON') child.style.display = 'none';
+  const span = bar.querySelector('span');
+  if (span) span.textContent = text;
+  bar.hidden = false;
+}
+
+function updateExportProgress(text) {
+  const bar = document.getElementById('resize-notification');
+  if (!bar) return;
+  const span = bar.querySelector('span');
+  if (span) span.textContent = text;
+}
+
+function hideExportProgress() {
+  const bar = document.getElementById('resize-notification');
+  if (!bar) return;
+  bar.hidden = true;
+  for (const child of bar.children)
+    if (child.tagName === 'BUTTON') child.style.display = '';
+  const span = bar.querySelector('span');
+  if (span) span.textContent = 'Image is very large. Resize to:';
+}
+
 export function initFileIO() {
   const fileInput = document.getElementById('file-input');
   const btnOpen = document.getElementById('btn-open');
@@ -251,10 +280,10 @@ export function initFileIO() {
     if (currentFormat === 'pdf') {
       const pageSize = exportPdfSizeSelect.value;
       const res = exportPdfResSelect.value;
-      exportPDF(res, pageSize);
+      exportPDF(res, pageSize).catch(err => { console.error(err); hideExportProgress(); });
     } else {
       const width = exportSizeSelect.value;
-      exportJPG(width);
+      exportJPG(width).catch(err => { console.error(err); hideExportProgress(); });
     }
   }
 
@@ -979,7 +1008,7 @@ export function saveSVG() {
 
 // ── Export JPG ──────────────────────────────────────────────────
 
-export function exportJPG(widthOption) {
+export async function exportJPG(widthOption) {
   if (!state.hasImage) return;
 
   const dims = getViewBoxDims();
@@ -992,6 +1021,8 @@ export function exportJPG(widthOption) {
     targetWidth = parseInt(widthOption);
     targetHeight = Math.round((targetWidth / dims.width) * dims.height);
   }
+
+  showExportProgress('1/5 — Building SVG...');
 
   // Build a clean SVG string (same as save, but without hit areas)
   let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
@@ -1066,50 +1097,69 @@ export function exportJPG(widthOption) {
 
   svgStr += `</svg>`;
 
+  showExportProgress('2/5 — Rendering image...');
+  await sleep(0);
+
   // Render SVG to canvas
   const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
 
-  const imgEl = new Image();
-  imgEl.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
+  const canvas = await new Promise((resolve, reject) => {
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
 
-    // White background for JPG
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, targetWidth, targetHeight);
+      // White background for JPG
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
 
-    ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
-    URL.revokeObjectURL(url);
+      ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    imgEl.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('Failed to render image for export. This can happen due to browser security restrictions.');
+      reject(new Error('Image render failed'));
+    };
+    imgEl.src = url;
+  });
 
-    canvas.toBlob((blob) => {
-      if (blob) {
-        let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
-        const dot = filename.lastIndexOf('.');
-        let ext = '.jpg';
-        if (dot !== -1) {
-          const userExt = filename.slice(dot).toLowerCase();
-          if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
-            ext = userExt;
-            filename = filename.slice(0, dot);
-          }
-        }
-        downloadBlob(blob, `${filename}_${targetWidth}x${targetHeight}${ext}`);
+  showExportProgress('3/5 — Encoding JPEG...');
+  await sleep(0);
+
+  const blob = await new Promise(resolve => {
+    canvas.toBlob(b => resolve(b), 'image/jpeg', 0.92);
+  });
+
+  showExportProgress('4/5 — Downloading...');
+  await sleep(0);
+
+  if (blob) {
+    let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
+    const dot = filename.lastIndexOf('.');
+    let ext = '.jpg';
+    if (dot !== -1) {
+      const userExt = filename.slice(dot).toLowerCase();
+      if (userExt === '.jpg' || userExt === '.jpeg' || userExt === '.png') {
+        ext = userExt;
+        filename = filename.slice(0, dot);
       }
-    }, 'image/jpeg', 0.92);
-  };
-  imgEl.onerror = () => {
-    URL.revokeObjectURL(url);
-    alert('Failed to render image for export. This can happen due to browser security restrictions.');
-  };
-  imgEl.src = url;
+    }
+    downloadBlob(blob, `${filename}_${targetWidth}x${targetHeight}${ext}`);
+  }
+
+  showExportProgress('5/5 — Done!');
+  await sleep(1500);
+  hideExportProgress();
 }
 
 // ── Export PDF ──────────────────────────────────────────────────
 
-export function exportPDF(widthOption, pageSize) {
+export async function exportPDF(widthOption, pageSize) {
   if (!state.hasImage) return;
 
   const dims = getViewBoxDims();
@@ -1124,6 +1174,8 @@ export function exportPDF(widthOption, pageSize) {
 
   const useA4 = pageSize && pageSize !== 'fit';
   const isLandscape = pageSize === 'A4-landscape';
+
+  showExportProgress('1/6 — Building SVG...');
 
   let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
   svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
@@ -1188,48 +1240,68 @@ export function exportPDF(widthOption, pageSize) {
   }
   svgStr += `</svg>`;
 
+  showExportProgress('2/6 — Rendering image...');
+  await sleep(0);
+
   const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
 
-  const imgEl = new Image();
-  imgEl.onload = () => {
-    var canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, targetWidth, targetHeight);
-    ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
-    URL.revokeObjectURL(url);
+  const canvas = await new Promise((resolve, reject) => {
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    imgEl.onerror = () => {
+      URL.revokeObjectURL(url);
+      alert('Failed to render image for PDF export.');
+      reject(new Error('Image render failed'));
+    };
+    imgEl.src = url;
+  });
 
-    var marker = findActualSizeMarker();
-    var dpi = parseInt(document.getElementById('dpi-input').value) || 300;
-    var markerPxPerMm = marker ? marker.pixelsPerMm : (dpi / 25.4);
-    var pixelsPerMm = markerPxPerMm * (targetWidth / dims.width);
-    var marginUnit = document.getElementById('margin-unit-select').value;
-    var toMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 }[marginUnit] || 1;
-    var marginTopMm = (parseFloat(document.getElementById('export-margin-top').value) || 0) * toMm;
-    var marginRightMm = (parseFloat(document.getElementById('export-margin-right').value) || 0) * toMm;
-    var marginBottomMm = (parseFloat(document.getElementById('export-margin-bottom').value) || 0) * toMm;
-    var marginLeftMm = (parseFloat(document.getElementById('export-margin-left').value) || 0) * toMm;
-    console.log('PDF: viewBox=' + dims.width + 'x' + dims.height + ' target=' + targetWidth + 'x' + targetHeight + ' canvasPxPerMm=' + pixelsPerMm + ' markerPxLen=' + (marker ? marker.pixelLen : 'none') + ' markerRealMm=' + (marker ? marker.realMm : 'none'));
-    var pdfBytes = buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm);
+  var marker = findActualSizeMarker();
+  var dpi = parseInt(document.getElementById('dpi-input').value) || 300;
+  var markerPxPerMm = marker ? marker.pixelsPerMm : (dpi / 25.4);
+  var pixelsPerMm = markerPxPerMm * (targetWidth / dims.width);
+  var marginUnit = document.getElementById('margin-unit-select').value;
+  var toMm = { mm: 1, cm: 10, pt: 25.4 / 72, in: 25.4 }[marginUnit] || 1;
+  var marginTopMm = (parseFloat(document.getElementById('export-margin-top').value) || 0) * toMm;
+  var marginRightMm = (parseFloat(document.getElementById('export-margin-right').value) || 0) * toMm;
+  var marginBottomMm = (parseFloat(document.getElementById('export-margin-bottom').value) || 0) * toMm;
+  var marginLeftMm = (parseFloat(document.getElementById('export-margin-left').value) || 0) * toMm;
+  console.log('PDF: viewBox=' + dims.width + 'x' + dims.height + ' target=' + targetWidth + 'x' + targetHeight + ' canvasPxPerMm=' + pixelsPerMm + ' markerPxLen=' + (marker ? marker.pixelLen : 'none') + ' markerRealMm=' + (marker ? marker.realMm : 'none'));
 
-    let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
-    const dot = filename.lastIndexOf('.');
-    if (dot !== -1) {
-      const ext = filename.slice(dot).toLowerCase();
-      if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.pdf') {
-        filename = filename.slice(0, dot);
-      }
+  showExportProgress('3/6 — Encoding pages...');
+  await sleep(0);
+
+  var pdfBytes = await buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm,
+    (done, total) => updateExportProgress(`3/6 — Encoding page ${done}/${total}...`)
+  );
+
+  showExportProgress('4/6 — Downloading...');
+  await sleep(0);
+
+  let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
+  const dot = filename.lastIndexOf('.');
+  if (dot !== -1) {
+    const ext = filename.slice(dot).toLowerCase();
+    if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.pdf') {
+      filename = filename.slice(0, dot);
     }
-    downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
-  };
-  imgEl.onerror = () => {
-    URL.revokeObjectURL(url);
-    alert('Failed to render image for PDF export.');
-  };
-  imgEl.src = url;
+  }
+  downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
+
+  showExportProgress('5/6 — Done!');
+  await sleep(1500);
+  hideExportProgress();
 }
 
 function findActualSizeMarker() {
@@ -1319,7 +1391,7 @@ function buildWatermarkDefs() {
   return '<defs>\n<pattern id="watermark-pattern" width="' + spacing + '" height="' + spacing + '" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M ' + spacing + ' 0 L 0 0 0 ' + spacing + '" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
-function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm) {
+async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm, onProgress) {
   // v7 — proven PDF construction (same approach as original working version)
   var DPI = 300;
   var ptsPerPx = 72 / DPI;
@@ -1415,6 +1487,8 @@ function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, margin
     ctx.fillRect(0, 0, pgPxW, pgPxH);
     ctx.drawImage(srcCanvas, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
     jpegs.push(base64ToBytes(c.toDataURL('image/jpeg', 0.92).split(',')[1]));
+    if (onProgress) onProgress(ti + 1, numPages);
+    await sleep(0);
   }
 
   // ── Build PDF using proven original approach ──
