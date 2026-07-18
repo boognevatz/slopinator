@@ -15,6 +15,72 @@ import { isLayerVisible, updateWatermark } from './layers.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── Export temp file store (OPFS + in-memory fallback) ──
+const _tmpFiles = new Map();
+
+async function _tmpWrite(name, data) {
+  try {
+    const root = await navigator.storage.getDirectory();
+    const w = await (await root.getFileHandle(name, { create: true })).createWritable();
+    await w.write(data);
+    await w.close();
+    return true;
+  } catch {
+    _tmpFiles.set(name, typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data));
+    return false;
+  }
+}
+
+async function _tmpReadBlob(name) {
+  try {
+    return await (await (await navigator.storage.getDirectory()).getFileHandle(name)).getFile();
+  } catch {}
+  const d = _tmpFiles.get(name);
+  return d ? new Blob([d]) : null;
+}
+
+async function _tmpReadBytes(name) {
+  try {
+    var file = await (await (await navigator.storage.getDirectory()).getFileHandle(name)).getFile();
+    return new Uint8Array(await file.arrayBuffer());
+  } catch {}
+  return _tmpFiles.get(name) || null;
+}
+
+async function _tmpRemove(name) {
+  try { (await navigator.storage.getDirectory()).removeEntry(name).catch(()=>{}); } catch {}
+  _tmpFiles.delete(name);
+}
+
+async function _tmpCleanup(names) {
+  for (const n of names) await _tmpRemove(n);
+}
+
+async function _tmpCreateWriter(name) {
+  var opfsWriter, fallbackChunks = [];
+  try {
+    const root = await navigator.storage.getDirectory();
+    opfsWriter = await (await root.getFileHandle(name, { create: true })).createWritable();
+  } catch {}
+  return {
+    write: async function(data) {
+      if (opfsWriter) await opfsWriter.write(data);
+      else fallbackChunks.push(data instanceof Uint8Array ? data : new TextEncoder().encode(data));
+    },
+    close: async function() {
+      if (opfsWriter) await opfsWriter.close();
+      else {
+        var totalLen = 0;
+        for (var i = 0; i < fallbackChunks.length; i++) totalLen += fallbackChunks[i].length;
+        var out = new Uint8Array(totalLen);
+        var off = 0;
+        for (var i = 0; i < fallbackChunks.length; i++) { out.set(fallbackChunks[i], off); off += fallbackChunks[i].length; }
+        _tmpFiles.set(name, out);
+      }
+    }
+  };
+}
+
 function showExportProgress(text) {
   const bar = document.getElementById('resize-notification');
   if (!bar) return;
@@ -1100,9 +1166,10 @@ export async function exportJPG(widthOption) {
   showExportProgress('2/5 — Rendering image...');
   await sleep(0);
 
-  // Render SVG to canvas
-  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(svgBlob);
+  await _tmpWrite('export.svg', svgStr);
+  svgStr = null;
+  const svgFile = await _tmpReadBlob('export.svg');
+  const url = URL.createObjectURL(svgFile);
 
   const canvas = await new Promise((resolve, reject) => {
     const imgEl = new Image();
@@ -1112,7 +1179,6 @@ export async function exportJPG(widthOption) {
       canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
 
-      // White background for JPG
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, targetWidth, targetHeight);
 
@@ -1127,6 +1193,7 @@ export async function exportJPG(widthOption) {
     };
     imgEl.src = url;
   });
+  await _tmpRemove('export.svg');
 
   showExportProgress('3/5 — Encoding JPEG...');
   await sleep(0);
@@ -1243,8 +1310,10 @@ export async function exportPDF(widthOption, pageSize) {
   showExportProgress('2/6 — Rendering image...');
   await sleep(0);
 
-  const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(svgBlob);
+  await _tmpWrite('export.svg', svgStr);
+  svgStr = null;
+  const svgFile = await _tmpReadBlob('export.svg');
+  const url = URL.createObjectURL(svgFile);
 
   const canvas = await new Promise((resolve, reject) => {
     const imgEl = new Image();
@@ -1266,6 +1335,7 @@ export async function exportPDF(widthOption, pageSize) {
     };
     imgEl.src = url;
   });
+  await _tmpRemove('export.svg');
 
   var marker = findActualSizeMarker();
   var dpi = parseInt(document.getElementById('dpi-input').value) || 300;
@@ -1282,7 +1352,7 @@ export async function exportPDF(widthOption, pageSize) {
   showExportProgress('3/6 — Encoding pages...');
   await sleep(0);
 
-  var pdfBytes = await buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm,
+  var pdfBlob = await buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm,
     (done, total) => updateExportProgress(`3/6 — Encoding page ${done}/${total}...`)
   );
 
@@ -1297,7 +1367,7 @@ export async function exportPDF(widthOption, pageSize) {
       filename = filename.slice(0, dot);
     }
   }
-  downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), `${filename}_${targetWidth}x${targetHeight}.pdf`);
+  downloadBlob(pdfBlob, `${filename}_${targetWidth}x${targetHeight}.pdf`);
 
   showExportProgress('5/6 — Done!');
   await sleep(1500);
@@ -1448,8 +1518,9 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
   var totalPages = numPages + (hasRef ? 1 : 0);
   console.log('buildPdf[v7]: img=' + imgW + 'x' + imgH + ' cropPages=' + numPages + ' totalPages=' + totalPages);
 
-  // ── Render all pages to JPEG ──
-  var jpegs = [];
+  // ── Render all pages to JPEG, store in temp files ──
+  var jpegLengths = [];
+  var jpegIndex = 0;
 
   if (hasRef) {
     var ref = document.createElement('canvas');
@@ -1474,7 +1545,9 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
       var xx = fx + Math.round(cc * srcPerPageW * fit);
       rctx.beginPath(); rctx.moveTo(xx, fy); rctx.lineTo(xx, fy + fh); rctx.stroke();
     }
-    jpegs.push(base64ToBytes(ref.toDataURL('image/jpeg', 0.92).split(',')[1]));
+    var refJpeg = base64ToBytes(ref.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    jpegLengths.push(refJpeg.length);
+    await _tmpWrite('export_jpeg_' + (jpegIndex++), refJpeg);
   }
 
   for (var ti = 0; ti < numPages; ti++) {
@@ -1486,7 +1559,9 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, pgPxW, pgPxH);
     ctx.drawImage(srcCanvas, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
-    jpegs.push(base64ToBytes(c.toDataURL('image/jpeg', 0.92).split(',')[1]));
+    var jpegBytes = base64ToBytes(c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    jpegLengths.push(jpegBytes.length);
+    await _tmpWrite('export_jpeg_' + (jpegIndex++), jpegBytes);
     if (onProgress) onProgress(ti + 1, numPages);
     await sleep(0);
   }
@@ -1523,34 +1598,21 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
     addObj(cN + ' 0 obj\n<< /Length ' + stream.length + ' >>\nstream\n' + stream + '\nendstream\nendobj');
   }
 
-  // Build image objects (self-contained: header + JPEG binary + endstream/endobj)
-  var imgObjOffsets = [];
-  var imageObjs = [];
-  for (var p = 0; p < totalPages; p++) {
-    var iN = imgBase + p;
-    var hdr = iN + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pgPxW + ' /Height ' + pgPxH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegs[p].length + ' >>\nstream\n';
-    var ftr = '\nendstream\nendobj';
-    var hdrBytes = new TextEncoder().encode(hdr);
-    var ftrBytes = new TextEncoder().encode(ftr);
-    var obj = new Uint8Array(hdrBytes.length + jpegs[p].length + ftrBytes.length);
-    obj.set(hdrBytes, 0);
-    obj.set(jpegs[p], hdrBytes.length);
-    obj.set(ftrBytes, hdrBytes.length + jpegs[p].length);
-    imageObjs.push(obj);
-  }
-
   // Convert text parts to bytes
   var textStr = textParts.join('\n');
   var textBytes = new TextEncoder().encode(textStr);
 
-  // Compute image object offsets relative to file start
-  var imgSectionStart = textBytes.length;
+  // Compute image object offsets for xref
+  var imgObjOffsets = [];
+  var off = textBytes.length;
   for (var p = 0; p < totalPages; p++) {
-    imgObjOffsets.push(imgSectionStart);
-    imgSectionStart += imageObjs[p].length;
+    var iN = imgBase + p;
+    var hdr = iN + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pgPxW + ' /Height ' + pgPxH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegLengths[p] + ' >>\nstream\n';
+    var ftr = '\nendstream\nendobj';
+    imgObjOffsets.push(off);
+    off += new TextEncoder().encode(hdr).length + jpegLengths[p] + new TextEncoder().encode(ftr).length;
   }
-  var imgSectionLen = imgSectionStart - textBytes.length;
-  var xrefOffset = imgSectionStart;
+  var xrefOffset = off;
 
   // Build xref/trailer
   var trailerParts = [];
@@ -1571,16 +1633,27 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
   trailerParts.push('%%EOF');
   var trailerBytes = new TextEncoder().encode(trailerParts.join('\n'));
 
-  // Assemble final PDF
-  var finalLen = textBytes.length + imgSectionLen + trailerBytes.length;
-  var total = new Uint8Array(finalLen);
-  var off = 0;
-  total.set(textBytes, off); off += textBytes.length;
+  // Stream PDF to temp file
+  var writer = await _tmpCreateWriter('export.pdf');
+  await writer.write(textBytes);
   for (var p = 0; p < totalPages; p++) {
-    total.set(imageObjs[p], off); off += imageObjs[p].length;
+    var iN = imgBase + p;
+    var hdr = iN + ' 0 obj\n<< /Type /XObject /Subtype /Image /Width ' + pgPxW + ' /Height ' + pgPxH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegLengths[p] + ' >>\nstream\n';
+    var ftr = '\nendstream\nendobj';
+    await writer.write(new TextEncoder().encode(hdr));
+    var jpegBytes = await _tmpReadBytes('export_jpeg_' + p);
+    await writer.write(jpegBytes);
+    await writer.write(new TextEncoder().encode(ftr));
   }
-  total.set(trailerBytes, off);
-  return total;
+  await writer.write(trailerBytes);
+  await writer.close();
+
+  // Clean up temp JPEG files
+  var tempNames = [];
+  for (var p = 0; p < totalPages; p++) tempNames.push('export_jpeg_' + p);
+  await _tmpCleanup(tempNames);
+
+  return await _tmpReadBlob('export.pdf');
 }
 
 function escapeXml(str) {
