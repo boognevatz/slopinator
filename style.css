@@ -892,6 +892,10 @@ body {
   background: var(--color-bg-hover);
 }
 
+.settings-tab:hover {
+  filter: brightness(1.2);
+}
+
 /* ── About Popup ───────────────────────────────────── */
 #about-popup {
   display: none;

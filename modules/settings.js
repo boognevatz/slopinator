@@ -31,6 +31,8 @@ export function initSettings() {
 
   document.getElementById('btn-settings-opfs-refresh').addEventListener('click', renderOpfsInfo);
   document.getElementById('btn-settings-opfs-clear').addEventListener('click', clearOpfsData);
+  document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
+  document.getElementById('tab-opfs').addEventListener('click', function() { switchSettingsTab('opfs'); });
 }
 
 function saveSettings() {
@@ -98,12 +100,42 @@ export function loadColorPreferences() {
   if (autosave != null) state.autosaveEnabled = autosave;
 }
 
+var _opfsRendered = false;
+
 function openSettings() {
   document.getElementById('settings-popup').hidden = false;
   syncOriginRadios();
   document.getElementById('setting-autosave-enabled').checked = state.autosaveEnabled;
+  _opfsRendered = false;
+  switchSettingsTab('localstorage');
   renderLocalStorageInfo();
-  renderOpfsInfo();
+}
+
+function switchSettingsTab(name) {
+  var isLocal = name === 'localstorage';
+  var tabLocal = document.getElementById('tab-localstorage');
+  var tabOpfs = document.getElementById('tab-opfs');
+  var panelLocal = document.getElementById('panel-localstorage');
+  var panelOpfs = document.getElementById('panel-opfs');
+  tabLocal.textContent = isLocal ? 'Saved Data (localStorage)' : 'localStorage';
+  tabLocal.style.background = isLocal ? 'var(--color-accent)' : '#3a3a3a';
+  tabLocal.style.color = isLocal ? '#fff' : '#aaa';
+  tabOpfs.textContent = isLocal ? 'OPFS' : 'Browser File System (OPFS)';
+  tabOpfs.style.background = isLocal ? '#3a3a3a' : 'var(--color-accent)';
+  tabOpfs.style.color = isLocal ? '#aaa' : '#fff';
+  panelLocal.hidden = !isLocal;
+  panelOpfs.hidden = isLocal;
+  if (!isLocal && !_opfsRendered) {
+    _opfsRendered = true;
+    renderOpfsInfo();
+  }
+  requestAnimationFrame(function() {
+    var visible = isLocal ? panelLocal : panelOpfs;
+    var h = visible.scrollHeight;
+    var container = document.getElementById('settings-tab-container');
+    var cur = parseInt(container.style.minHeight) || 0;
+    if (h > cur) container.style.minHeight = h + 'px';
+  });
 }
 
 function syncOriginRadios() {
