@@ -182,7 +182,7 @@ function renderLocalStorageInfo() {
 
 async function renderOpfsInfo() {
   const tbody = document.getElementById('settings-opfs-tbody');
-  tbody.innerHTML = '<tr><td colspan="2" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
   let total = 0;
   let count = 0;
   try {
@@ -194,7 +194,6 @@ async function renderOpfsInfo() {
       total += file.size;
       count++;
       const tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
       const tdName = document.createElement('td');
       tdName.textContent = name;
       tdName.style.fontFamily = 'monospace';
@@ -204,18 +203,46 @@ async function renderOpfsInfo() {
       tdSize.style.fontFamily = 'monospace';
       tdSize.style.fontSize = '11px';
       tdSize.textContent = formatSize(file.size);
+      const tdActions = document.createElement('td');
+      tdActions.style.textAlign = 'center';
+      const btn = document.createElement('button');
+      btn.textContent = '↓';
+      btn.title = 'Download ' + name;
+      btn.style.fontSize = '11px';
+      btn.style.padding = '1px 6px';
+      btn.style.cursor = 'pointer';
+      btn.addEventListener('click', async function(e) {
+        e.stopPropagation();
+        try {
+          const dlFile = await handle.getFile();
+          const dlUrl = URL.createObjectURL(dlFile);
+          const a = document.createElement('a');
+          a.href = dlUrl;
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function() { URL.revokeObjectURL(dlUrl); }, 1000);
+        } catch (dlErr) {
+          console.error('OPFS download error:', dlErr);
+        }
+      });
+      tdActions.appendChild(btn);
       tr.appendChild(tdName);
       tr.appendChild(tdSize);
+      tr.appendChild(tdActions);
       rows.push(tr);
     }
-    rows.sort((a, b) => a.firstChild.textContent.localeCompare(b.firstChild.textContent));
+    rows.sort(function(a, b) {
+      return a.firstChild.textContent.localeCompare(b.firstChild.textContent);
+    });
     tbody.innerHTML = '';
-    for (const tr of rows) tbody.appendChild(tr);
+    for (var i = 0; i < rows.length; i++) tbody.appendChild(rows[i]);
     document.getElementById('settings-opfs-total-usage').textContent = formatSize(total);
     document.getElementById('settings-opfs-total-items').textContent = count + ' file' + (count !== 1 ? 's' : '');
     document.getElementById('btn-settings-opfs-clear').disabled = count === 0;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="2" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
     document.getElementById('settings-opfs-total-usage').textContent = '0 B';
     document.getElementById('settings-opfs-total-items').textContent = '0 files';
     document.getElementById('btn-settings-opfs-clear').disabled = true;
