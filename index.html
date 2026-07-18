@@ -386,6 +386,28 @@
         <input type="checkbox" id="setting-autosave-enabled" checked> Auto-save to browser storage every 5 minutes
       </label>
     </div>
+    <div style="border-top:1px solid #444;margin:10px 0 8px 0;padding-top:8px;">
+      <div style="font-size:12px;color:#aaa;margin-bottom:6px;">Browser File System (OPFS)</div>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid #444;border-radius:3px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#3a3a3a;">
+              <th style="text-align:left;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">File</th>
+              <th style="text-align:right;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Size</th>
+            </tr>
+          </thead>
+          <tbody id="settings-opfs-tbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;">
+        <span style="color:#888;" id="settings-opfs-total-items">0 files</span>
+        <span style="color:#aaa;">Total: <strong id="settings-opfs-total-usage">0 B</strong></span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <button id="btn-settings-opfs-refresh" style="font-size:11px;padding:2px 8px;">Refresh</button>
+        <button id="btn-settings-opfs-clear" style="font-size:11px;padding:2px 8px;" disabled>Delete All</button>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;margin-top:4px;">
       <button id="btn-settings-cancel" style="font-size:12px;padding:4px 12px;">Cancel</button>
       <button id="btn-settings-clear" style="font-size:12px;padding:4px 12px;" disabled>Clear Saved Data</button>

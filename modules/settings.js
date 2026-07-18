@@ -28,6 +28,9 @@ export function initSettings() {
   autosaveCb.addEventListener('change', function () {
     state.autosaveEnabled = this.checked;
   });
+
+  document.getElementById('btn-settings-opfs-refresh').addEventListener('click', renderOpfsInfo);
+  document.getElementById('btn-settings-opfs-clear').addEventListener('click', clearOpfsData);
 }
 
 function saveSettings() {
@@ -100,6 +103,7 @@ function openSettings() {
   syncOriginRadios();
   document.getElementById('setting-autosave-enabled').checked = state.autosaveEnabled;
   renderLocalStorageInfo();
+  renderOpfsInfo();
 }
 
 function syncOriginRadios() {
@@ -174,4 +178,63 @@ function renderLocalStorageInfo() {
   document.getElementById('settings-total-usage').textContent = formatSize(total);
   document.getElementById('settings-total-items').textContent = items.length + ' item' + (items.length !== 1 ? 's' : '');
   document.getElementById('btn-settings-clear').disabled = items.length === 0;
+}
+
+async function renderOpfsInfo() {
+  const tbody = document.getElementById('settings-opfs-tbody');
+  tbody.innerHTML = '<tr><td colspan="2" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
+  let total = 0;
+  let count = 0;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const rows = [];
+    for await (const [name, handle] of root.entries()) {
+      if (handle.kind !== 'file') continue;
+      const file = await handle.getFile();
+      total += file.size;
+      count++;
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      const tdName = document.createElement('td');
+      tdName.textContent = name;
+      tdName.style.fontFamily = 'monospace';
+      tdName.style.fontSize = '11px';
+      const tdSize = document.createElement('td');
+      tdSize.style.textAlign = 'right';
+      tdSize.style.fontFamily = 'monospace';
+      tdSize.style.fontSize = '11px';
+      tdSize.textContent = formatSize(file.size);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      rows.push(tr);
+    }
+    rows.sort((a, b) => a.firstChild.textContent.localeCompare(b.firstChild.textContent));
+    tbody.innerHTML = '';
+    for (const tr of rows) tbody.appendChild(tr);
+    document.getElementById('settings-opfs-total-usage').textContent = formatSize(total);
+    document.getElementById('settings-opfs-total-items').textContent = count + ' file' + (count !== 1 ? 's' : '');
+    document.getElementById('btn-settings-opfs-clear').disabled = count === 0;
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="2" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
+    document.getElementById('settings-opfs-total-usage').textContent = '0 B';
+    document.getElementById('settings-opfs-total-items').textContent = '0 files';
+    document.getElementById('btn-settings-opfs-clear').disabled = true;
+  }
+}
+
+async function clearOpfsData() {
+  if (!confirm('Delete all files from browser file system?')) return;
+  try {
+    const root = await navigator.storage.getDirectory();
+    const names = [];
+    for await (const [name, handle] of root.entries()) {
+      if (handle.kind === 'file') names.push(name);
+    }
+    for (const name of names) {
+      await root.removeEntry(name).catch(() => {});
+    }
+  } catch (e) {
+    console.error('OPFS clear error:', e);
+  }
+  renderOpfsInfo();
 }
