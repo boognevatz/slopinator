@@ -141,6 +141,18 @@ function formatSize(bytes) {
   return (bytes / 1024).toFixed(1) + ' KB';
 }
 
+function formatRelativeTime(ts) {
+  var diff = Date.now() - ts;
+  var mins = Math.round(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + ' min' + (mins !== 1 ? 's' : '') + ' ago';
+  var hours = Math.round(mins / 60);
+  if (hours < 24) return hours + ' hour' + (hours !== 1 ? 's' : '') + ' ago';
+  var days = Math.round(hours / 24);
+  if (days < 7) return days + ' day' + (days !== 1 ? 's' : '') + ' ago';
+  return new Date(ts).toLocaleString();
+}
+
 let _selectedRow = null;
 
 function renderLocalStorageInfo() {
@@ -182,7 +194,7 @@ function renderLocalStorageInfo() {
 
 async function renderOpfsInfo() {
   const tbody = document.getElementById('settings-opfs-tbody');
-  tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
   let total = 0;
   let count = 0;
   try {
@@ -203,6 +215,12 @@ async function renderOpfsInfo() {
       tdSize.style.fontFamily = 'monospace';
       tdSize.style.fontSize = '11px';
       tdSize.textContent = formatSize(file.size);
+      const tdDate = document.createElement('td');
+      tdDate.style.textAlign = 'right';
+      tdDate.style.fontFamily = 'monospace';
+      tdDate.style.fontSize = '11px';
+      tdDate.style.color = '#999';
+      tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
       const tdActions = document.createElement('td');
       tdActions.style.textAlign = 'center';
       const btn = document.createElement('button');
@@ -230,6 +248,7 @@ async function renderOpfsInfo() {
       tdActions.appendChild(btn);
       tr.appendChild(tdName);
       tr.appendChild(tdSize);
+      tr.appendChild(tdDate);
       tr.appendChild(tdActions);
       rows.push(tr);
     }
@@ -242,7 +261,7 @@ async function renderOpfsInfo() {
     document.getElementById('settings-opfs-total-items').textContent = count + ' file' + (count !== 1 ? 's' : '');
     document.getElementById('btn-settings-opfs-clear').disabled = count === 0;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="3" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
     document.getElementById('settings-opfs-total-usage').textContent = '0 B';
     document.getElementById('settings-opfs-total-items').textContent = '0 files';
     document.getElementById('btn-settings-opfs-clear').disabled = true;
