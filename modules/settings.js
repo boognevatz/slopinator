@@ -117,10 +117,10 @@ function switchSettingsTab(name) {
   var tabOpfs = document.getElementById('tab-opfs');
   var panelLocal = document.getElementById('panel-localstorage');
   var panelOpfs = document.getElementById('panel-opfs');
-  tabLocal.textContent = isLocal ? 'Saved Data (localStorage)' : 'localStorage';
+  tabLocal.textContent = isLocal ? 'localStorage (saved data)' : 'localStorage';
   tabLocal.style.background = isLocal ? 'var(--color-accent)' : '#3a3a3a';
   tabLocal.style.color = isLocal ? '#fff' : '#aaa';
-  tabOpfs.textContent = isLocal ? 'OPFS' : 'Browser File System (OPFS)';
+  tabOpfs.textContent = isLocal ? 'OPFS' : 'OPFS (Browser File System)';
   tabOpfs.style.background = isLocal ? '#3a3a3a' : 'var(--color-accent)';
   tabOpfs.style.color = isLocal ? '#aaa' : '#fff';
   panelLocal.hidden = !isLocal;
@@ -130,9 +130,8 @@ function switchSettingsTab(name) {
     renderOpfsInfo();
   }
   requestAnimationFrame(function() {
-    var visible = isLocal ? panelLocal : panelOpfs;
-    var h = visible.scrollHeight;
     var container = document.getElementById('settings-tab-container');
+    var h = container.clientHeight;
     var cur = parseInt(container.style.minHeight) || 0;
     if (h > cur) container.style.minHeight = h + 'px';
   });

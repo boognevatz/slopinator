@@ -873,9 +873,24 @@ body {
 
 #settings-popup {
   display: none;
+  touch-action: none;
 }
 #settings-popup:not([hidden]) {
   display: flex;
+}
+#settings-popup > div {
+  touch-action: pan-y;
+}
+
+#settings-tab-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+#panel-localstorage:not([hidden]), #panel-opfs:not([hidden]) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 #settings-storage-tbody td {

@@ -247,9 +247,13 @@ function init() {
     }
   });
 
+  var settingsPopup = document.getElementById('settings-popup');
+  function _isOnPopup(e) { return settingsPopup && settingsPopup.contains(e.target); }
+
   document.getElementById('editor-container').addEventListener('wheel', (e) => {
-    e.preventDefault();
     if (!state.hasImage) return;
+    if (_isOnPopup(e)) return;
+    e.preventDefault();
 
     if (e.deltaY < 0) {
       zoomIn(e.clientX, e.clientY);
@@ -257,14 +261,15 @@ function init() {
       zoomOut(e.clientX, e.clientY);
     }
   }, { passive: false });
-
   let pinchPointers = [];
   document.addEventListener('pointerdown', (e) => {
+    if (_isOnPopup(e)) return;
     const idx = pinchPointers.findIndex(p => p.pointerId === e.pointerId);
     if (idx !== -1) pinchPointers.splice(idx, 1);
     pinchPointers.push({ pointerId: e.pointerId, x: e.clientX, y: e.clientY });
   });
   document.addEventListener('pointermove', (e) => {
+    if (_isOnPopup(e)) return;
     const p = pinchPointers.find(p => p.pointerId === e.pointerId);
     if (p) { p.x = e.clientX; p.y = e.clientY; }
     if (pinchPointers.length !== 2) return;
@@ -279,10 +284,12 @@ function init() {
     pinchPointers._lastDist = dist;
   });
   document.addEventListener('pointerup', (e) => {
+    if (_isOnPopup(e)) return;
     pinchPointers = pinchPointers.filter(p => p.pointerId !== e.pointerId);
     pinchPointers._lastDist = null;
   });
   document.addEventListener('pointercancel', (e) => {
+    if (_isOnPopup(e)) return;
     pinchPointers = pinchPointers.filter(p => p.pointerId !== e.pointerId);
     pinchPointers._lastDist = null;
   });
