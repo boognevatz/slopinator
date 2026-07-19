@@ -967,6 +967,202 @@ export function openSVGProject(svgText) {
   updateWatermark();
 }
 
+// ── Export render helpers ────────────────────────────────────────
+
+function getLayerElementIds(layerId) {
+  var layerEl = document.getElementById(layerId);
+  if (!layerEl) return new Set();
+  var ids = new Set();
+  layerEl.querySelectorAll('[id]').forEach(function(el) { ids.add(el.id); });
+  return ids;
+}
+
+function serializeElement(el, withinGroup) {
+  if (!withinGroup && el.parentId) return '';
+  if (el.type === 'group') {
+    var g = `<g id="${el.id}" data-type="group">\n`;
+    for (var ci = 0; ci < el.childIds.length; ci++) {
+      var child = state.elements.find(function(e) { return e.id === el.childIds[ci]; });
+      if (child) g += serializeElement(child, true);
+    }
+    g += `</g>\n`;
+    return g;
+  }
+  if (el.type === 'line') {
+    const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+    if (pts.length >= 3) {
+      if (el.closed) {
+        return `<polygon id="${el.id}" data-type="line" data-closed="true" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'none'}" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      } else {
+        return `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+      }
+    } else {
+      var s = `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+      if (el.rotation) {
+        const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
+        const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+        s += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
+      }
+      s += `>\n`;
+      s += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
+      s += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
+      s += `  ${getLineDecorationsSvg(el)}\n`;
+      s += `</g>\n`;
+      return s;
+    }
+  }
+  if (el.type === 'text') {
+    var s = `<text id="${el.id}" data-type="text" class="annotation-text" `;
+    s += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
+    if (el.rotation) {
+      const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
+      if (textEl) {
+        const transform = textEl.getAttribute('transform');
+        if (transform) s += ` transform="${transform}"`;
+      }
+    }
+    s += `>`;
+    s += escapeXml(el.content);
+    s += `</text>\n`;
+    return s;
+  }
+  if (el.type === 'freehand') {
+    return `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
+  }
+  if (el.type === 'rectangle') {
+    var s = `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
+    if (el.rotation) {
+      s += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
+    }
+    s += ` />\n`;
+    return s;
+  }
+  return '';
+}
+
+function getExportLayerIds() {
+  var svg = document.getElementById('editor-svg');
+  if (!svg) return [];
+  var out = [];
+  var children = svg.querySelectorAll('g[id^="layer-"], g[id^="layer-user-"]');
+  for (var i = 0; i < children.length; i++) {
+    var id = children[i].id;
+    if (id === 'layer-grid') continue;
+    out.push(id);
+  }
+  return out;
+}
+
+function buildLayerExportSvg(layerId, targetW, targetH) {
+  var dims = getViewBoxDims();
+  var imgTransform = dom.imageEl.getAttribute('transform') || '';
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ';
+  svg += 'viewBox="0 0 ' + dims.width + ' ' + dims.height + '" ';
+  svg += 'width="' + targetW + '" height="' + targetH + '">\n';
+
+  if (layerId === 'layer-watermark') {
+    svg += buildWatermarkDefs();
+    svg += '<g transform="' + imgTransform + '">\n';
+    svg += dom.watermarkLayer.innerHTML;
+    svg += '</g>\n';
+  } else {
+    var ids = getLayerElementIds(layerId);
+    svg += '<g transform="' + imgTransform + '">\n';
+    for (var ei = 0; ei < state.elements.length; ei++) {
+      var el = state.elements[ei];
+      if (ids.has(el.id)) {
+        svg += serializeElement(el);
+      }
+    }
+    svg += '</g>\n';
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function applyImageCanvasTransform(ctx, targetW, targetH) {
+  var dims = getViewBoxDims();
+  var img = state.image;
+  var cx = dims.width / 2;
+  var cy = dims.height / 2;
+  ctx.save();
+  ctx.scale(targetW / dims.width, targetH / dims.height);
+  ctx.translate(cx, cy);
+  if (img.rotation) ctx.rotate(img.rotation * Math.PI / 180);
+  if (img.flipH) ctx.scale(-1, 1);
+  if (img.flipV) ctx.scale(1, -1);
+  ctx.translate(-img.naturalWidth / 2, -img.naturalHeight / 2);
+}
+
+async function renderSvgToCtx(ctx, svgStr, targetW, targetH) {
+  await _tmpWrite('_export_tmp.svg', svgStr);
+  svgStr = null;
+  var blob = await _tmpReadBlob('_export_tmp.svg');
+  var url = URL.createObjectURL(blob);
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      URL.revokeObjectURL(url);
+      _tmpRemove('_export_tmp.svg').then(resolve, resolve);
+    };
+    img.onerror = function() {
+      URL.revokeObjectURL(url);
+      _tmpRemove('_export_tmp.svg').then(function() { reject(new Error('SVG render failed')); }, function() { reject(new Error('SVG render failed')); });
+    };
+    img.src = url;
+  });
+}
+
+async function renderExportCanvas(targetW, targetH) {
+  var c = document.createElement('canvas');
+  c.width = targetW;
+  c.height = targetH;
+  var ctx = c.getContext('2d');
+
+  var layerIds = getExportLayerIds();
+
+  // Determine order: image first, then annotation/user layers, then watermark last
+  var renderOrder = [];
+  for (var li = 0; li < layerIds.length; li++) {
+    var lid = layerIds[li];
+    if (lid === 'layer-image' || lid === 'layer-watermark') continue;
+    if (!isLayerVisible(lid)) continue;
+    var el = document.getElementById(lid);
+    if (el && el.querySelector('[id]')) renderOrder.push(lid);
+  }
+
+  var imgVisible = isLayerVisible('layer-image');
+  var wmVisible = isLayerVisible('layer-watermark');
+
+  if (imgVisible) {
+    updateExportProgress('Rendering image...');
+    await sleep(0);
+    applyImageCanvasTransform(ctx, targetW, targetH);
+    ctx.drawImage(dom.imageEl, 0, 0, state.image.naturalWidth, state.image.naturalHeight);
+    ctx.restore();
+  }
+
+  for (var ri = 0; ri < renderOrder.length; ri++) {
+    var layerName = renderOrder[ri];
+    var displayName = document.querySelector('[data-layer="' + CSS.escape(layerName) + '"] .layer-name')?.textContent || layerName;
+    updateExportProgress('Rendering ' + displayName + '...');
+    await sleep(0);
+    var svg = buildLayerExportSvg(layerName, targetW, targetH);
+    await renderSvgToCtx(ctx, svg, targetW, targetH);
+  }
+
+  if (wmVisible) {
+    updateExportProgress('Rendering Watermark...');
+    await sleep(0);
+    var svg = buildLayerExportSvg('layer-watermark', targetW, targetH);
+    await renderSvgToCtx(ctx, svg, targetW, targetH);
+  }
+
+  return { canvas: c };
+}
+
 // ── Save SVG ────────────────────────────────────────────────────
 
 export function generateSVGString() {
@@ -987,69 +1183,6 @@ export function generateSVGString() {
   svg += `<image data-type="background" href="${img.dataURI}" `;
   svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
   svg += `transform="${imgTransform}" />\n`;
-
-  function serializeElement(el, withinGroup) {
-    if (!withinGroup && el.parentId) return '';
-    if (el.type === 'group') {
-      var g = `<g id="${el.id}" data-type="group">\n`;
-      for (var ci = 0; ci < el.childIds.length; ci++) {
-        var child = state.elements.find(function(e) { return e.id === el.childIds[ci]; });
-        if (child) g += serializeElement(child, true);
-      }
-      g += `</g>\n`;
-      return g;
-    }
-    if (el.type === 'line') {
-      const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-      if (pts.length >= 3) {
-        if (el.closed) {
-          return `<polygon id="${el.id}" data-type="line" data-closed="true" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'none'}" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-        } else {
-          return `<polyline id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-        }
-      } else {
-        var s = `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
-        if (el.rotation) {
-          const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-          const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-          s += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
-        }
-        s += `>\n`;
-        s += `  <line class="annotation-line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" `;
-        s += `stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-        s += `  ${getLineDecorationsSvg(el)}\n`;
-        s += `</g>\n`;
-        return s;
-      }
-    }
-    if (el.type === 'text') {
-      var s = `<text id="${el.id}" data-type="text" class="annotation-text" `;
-      s += `x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-      if (el.rotation) {
-        const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-        if (textEl) {
-          const transform = textEl.getAttribute('transform');
-          if (transform) s += ` transform="${transform}"`;
-        }
-      }
-      s += `>`;
-      s += escapeXml(el.content);
-      s += `</text>\n`;
-      return s;
-    }
-    if (el.type === 'freehand') {
-      return `<polyline id="${el.id}" data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-    }
-    if (el.type === 'rectangle') {
-      var s = `<rect id="${el.id}" data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
-      if (el.rotation) {
-        s += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-      }
-      s += ` />\n`;
-      return s;
-    }
-    return '';
-  }
 
   svg += `<g id="layer-annotation" transform="${imgTransform}">\n`;
   for (const el of state.elements) {
@@ -1088,124 +1221,28 @@ export async function exportJPG(widthOption) {
     targetHeight = Math.round((targetWidth / dims.width) * dims.height);
   }
 
-  showExportProgress('1/5 — Building SVG...');
-
-  // Build a clean SVG string (same as save, but without hit areas)
-  let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
-  svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
-  svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
-
-  // Image
-  const img = state.image;
-  const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('layer-image')) {
-    svgStr += `<image href="${img.dataURI}" `;
-    svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-    svgStr += `transform="${imgTransform}" />\n`;
-  }
-
-  // Annotations
-  if (isLayerVisible('layer-annotation')) {
-    svgStr += `<g transform="${imgTransform}">\n`;
-    for (const el of state.elements) {
-      if (el.type === 'line') {
-        const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-        if (pts.length >= 3) {
-          if (el.closed) {
-            svgStr += `<polygon data-type="line" data-closed="true" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'none'}" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-          } else {
-            svgStr += `<polyline data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-          }
-        } else {
-          svgStr += `<g data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
-          if (el.rotation) {
-            const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-            const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-            svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
-          }
-          svgStr += `>\n`;
-          svgStr += `  <line data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}" x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-          svgStr += `  ${getLineDecorationsSvg(el)}\n`;
-          svgStr += `</g>\n`;
-        }
-      } else if (el.type === 'text') {
-        svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-        if (el.rotation) {
-          const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-          if (textEl) {
-            const transform = textEl.getAttribute('transform');
-            if (transform) svgStr += ` transform="${transform}"`;
-          }
-        }
-        svgStr += `>`;
-        svgStr += escapeXml(el.content);
-        svgStr += `</text>\n`;
-      } else if (el.type === 'freehand') {
-        svgStr += `<polyline data-type="freehand" data-epsilon="${el.epsilon}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-      } else if (el.type === 'rectangle') {
-        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
-        if (el.rotation) {
-          svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-        }
-        svgStr += ` />\n`;
-      }
-    }
-    svgStr += `</g>\n`;
-  }
-
-  // Watermark
-  if (isLayerVisible('layer-watermark')) {
-    svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
-    svgStr += `<g id="layer-watermark" transform="${imgTransform}">\n`;
-    svgStr += dom.watermarkLayer.innerHTML;
-    svgStr += `</g>\n`;
-  }
-
-  svgStr += `</svg>`;
-
-  showExportProgress('2/5 — Rendering image...');
+  showExportProgress('Rendering image...');
   await sleep(0);
 
-  await _tmpWrite('export.svg', svgStr);
-  svgStr = null;
-  const svgFile = await _tmpReadBlob('export.svg');
-  const url = URL.createObjectURL(svgFile);
+  var result = await renderExportCanvas(targetWidth, targetHeight);
 
-  const canvas = await new Promise((resolve, reject) => {
-    const imgEl = new Image();
-    imgEl.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      const ctx = canvas.getContext('2d');
+  // JPEG doesn't support alpha — fill white behind all layers
+  var ctx = result.canvas.getContext('2d');
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  ctx.globalCompositeOperation = 'source-over';
 
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, targetWidth, targetHeight);
+  updateExportProgress('Encoding JPEG...');
+  await sleep(0);
 
-      ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    imgEl.onerror = () => {
-      URL.revokeObjectURL(url);
-      alert('Failed to render image for export. This can happen due to browser security restrictions.');
-      reject(new Error('Image render failed'));
-    };
-    imgEl.src = url;
+  var blob = await new Promise(function(resolve) {
+    result.canvas.toBlob(function(b) { resolve(b); }, 'image/jpeg', 0.92);
   });
-  await _tmpRemove('export.svg');
-
-  showExportProgress('3/5 — Encoding JPEG...');
-  await sleep(0);
-
-  const blob = await new Promise(resolve => {
-    canvas.toBlob(b => resolve(b), 'image/jpeg', 0.92);
-  });
-
-  showExportProgress('4/5 — Downloading...');
-  await sleep(0);
 
   if (blob) {
+    updateExportProgress('Downloading...');
+    await sleep(0);
     let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
     const dot = filename.lastIndexOf('.');
     let ext = '.jpg';
@@ -1216,10 +1253,10 @@ export async function exportJPG(widthOption) {
         filename = filename.slice(0, dot);
       }
     }
-    downloadBlob(blob, `${filename}_${targetWidth}x${targetHeight}${ext}`);
+    downloadBlob(blob, filename + '_' + targetWidth + 'x' + targetHeight + ext);
   }
 
-  showExportProgress('5/5 — Done!');
+  updateExportProgress('Done!');
   await sleep(1500);
   hideExportProgress();
 }
@@ -1242,100 +1279,11 @@ export async function exportPDF(widthOption, pageSize) {
   const useA4 = pageSize && pageSize !== 'fit';
   const isLandscape = pageSize === 'A4-landscape';
 
-  showExportProgress('1/6 — Building SVG...');
-
-  let svgStr = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" `;
-  svgStr += `viewBox="0 0 ${dims.width} ${dims.height}" `;
-  svgStr += `width="${targetWidth}" height="${targetHeight}">\n`;
-  const img = state.image;
-  const imgTransform = dom.imageEl.getAttribute('transform') || '';
-  if (isLayerVisible('layer-image')) {
-    svgStr += `<image href="${img.dataURI}" `;
-    svgStr += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
-    svgStr += `transform="${imgTransform}" />\n`;
-  }
-  if (isLayerVisible('layer-annotation')) {
-    svgStr += `<g transform="${imgTransform}">\n`;
-    for (const el of state.elements) {
-      if (el.type === 'line') {
-        const pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
-        if (pts.length >= 3) {
-          if (el.closed) {
-            svgStr += `<polygon data-type="line" data-closed="true" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'none'}" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-          } else {
-            svgStr += `<polyline data-type="line" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-          }
-        } else {
-          svgStr += `<g data-type="line"`;
-          if (el.rotation) {
-            const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-            const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
-            svgStr += ` transform="rotate(${el.rotation}, ${cx}, ${cy})"`;
-          }
-          svgStr += `>\n`;
-          svgStr += `  <line x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" />\n`;
-          svgStr += `  ${getLineDecorationsSvg(el)}\n`;
-          svgStr += `</g>\n`;
-        }
-      } else if (el.type === 'text') {
-        svgStr += `<text x="${el.x}" y="${el.y}" font-size="${el.fontSize}" fill="${el.fill}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth || 0}" font-family="sans-serif"`;
-        if (el.rotation) {
-          const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(el.id)}`);
-          if (textEl) {
-            const transform = textEl.getAttribute('transform');
-            if (transform) svgStr += ` transform="${transform}"`;
-          }
-        }
-        svgStr += `>${escapeXml(el.content)}</text>\n`;
-      } else if (el.type === 'freehand') {
-        svgStr += `<polyline data-type="freehand" stroke="${el.stroke}" stroke-width="${el.strokeWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round" points="${el.points.map(p => `${p.x},${p.y}`).join(' ')}" />\n`;
-      } else if (el.type === 'rectangle') {
-        svgStr += `<rect data-type="rectangle" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.rx || 0}" stroke="${el.stroke || 'none'}" stroke-width="${el.strokeWidth}" fill="${el.fill || 'transparent'}"`;
-        if (el.rotation) {
-          svgStr += ` transform="rotate(${el.rotation}, ${el.x + el.width / 2}, ${el.y + el.height / 2})"`;
-        }
-        svgStr += ` />\n`;
-      }
-    }
-    svgStr += `</g>\n`;
-  }
-  if (isLayerVisible('layer-watermark')) {
-    svgStr = svgStr.replace('>\n', '>\n' + buildWatermarkDefs());
-    svgStr += `<g id="layer-watermark" transform="${imgTransform}">\n`;
-    svgStr += dom.watermarkLayer.innerHTML;
-    svgStr += `</g>\n`;
-  }
-  svgStr += `</svg>`;
-
-  showExportProgress('2/6 — Rendering image...');
+  showExportProgress('Rendering image...');
   await sleep(0);
 
-  await _tmpWrite('export.svg', svgStr);
-  svgStr = null;
-  const svgFile = await _tmpReadBlob('export.svg');
-  const url = URL.createObjectURL(svgFile);
-
-  const canvas = await new Promise((resolve, reject) => {
-    const imgEl = new Image();
-    imgEl.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, targetWidth, targetHeight);
-      ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
-      URL.revokeObjectURL(url);
-      resolve(canvas);
-    };
-    imgEl.onerror = () => {
-      URL.revokeObjectURL(url);
-      alert('Failed to render image for PDF export.');
-      reject(new Error('Image render failed'));
-    };
-    imgEl.src = url;
-  });
-  await _tmpRemove('export.svg');
+  var result = await renderExportCanvas(targetWidth, targetHeight);
+  var canvas = result.canvas;
 
   var marker = findActualSizeMarker();
   var dpi = parseInt(document.getElementById('dpi-input').value) || 300;
@@ -1349,14 +1297,14 @@ export async function exportPDF(widthOption, pageSize) {
   var marginLeftMm = (parseFloat(document.getElementById('export-margin-left').value) || 0) * toMm;
   console.log('PDF: viewBox=' + dims.width + 'x' + dims.height + ' target=' + targetWidth + 'x' + targetHeight + ' canvasPxPerMm=' + pixelsPerMm + ' markerPxLen=' + (marker ? marker.pixelLen : 'none') + ' markerRealMm=' + (marker ? marker.realMm : 'none'));
 
-  showExportProgress('3/6 — Encoding pages...');
+  updateExportProgress('Encoding pages...');
   await sleep(0);
 
   var pdfBlob = await buildPdf(canvas, targetWidth, targetHeight, useA4, isLandscape, pixelsPerMm, marginTopMm, marginRightMm, marginBottomMm, marginLeftMm,
-    (done, total) => updateExportProgress(`3/6 — Encoding page ${done}/${total}...`)
+    function(done, total) { updateExportProgress('Encoding page ' + done + '/' + total + '...'); }
   );
 
-  showExportProgress('4/6 — Downloading...');
+  updateExportProgress('Downloading...');
   await sleep(0);
 
   let filename = document.getElementById('export-filename')?.value?.trim() || 'annotation';
@@ -1367,9 +1315,9 @@ export async function exportPDF(widthOption, pageSize) {
       filename = filename.slice(0, dot);
     }
   }
-  downloadBlob(pdfBlob, `${filename}_${targetWidth}x${targetHeight}.pdf`);
+  downloadBlob(pdfBlob, filename + '_' + targetWidth + 'x' + targetHeight + '.pdf');
 
-  showExportProgress('5/6 — Done!');
+  updateExportProgress('Done!');
   await sleep(1500);
   hideExportProgress();
 }
@@ -1522,11 +1470,20 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
   var jpegLengths = [];
   var jpegIndex = 0;
 
+  var sharedCanvas = document.createElement('canvas');
+  sharedCanvas.width = pgPxW;
+  sharedCanvas.height = pgPxH;
+
+  function canvasToJpegBytes(cvs) {
+    return new Promise(function(resolve) {
+      cvs.toBlob(async function(b) {
+        resolve(new Uint8Array(await b.arrayBuffer()));
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
   if (hasRef) {
-    var ref = document.createElement('canvas');
-    ref.width = pgPxW;
-    ref.height = pgPxH;
-    var rctx = ref.getContext('2d');
+    var rctx = sharedCanvas.getContext('2d');
     rctx.fillStyle = '#ffffff';
     rctx.fillRect(0, 0, pgPxW, pgPxH);
     var fit = Math.min(prnPxW / imgW, prnPxH / imgH);
@@ -1545,21 +1502,18 @@ async function buildPdf(srcCanvas, imgW, imgH, useA4, isLandscape, pixelsPerMm, 
       var xx = fx + Math.round(cc * srcPerPageW * fit);
       rctx.beginPath(); rctx.moveTo(xx, fy); rctx.lineTo(xx, fy + fh); rctx.stroke();
     }
-    var refJpeg = base64ToBytes(ref.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    var refJpeg = await canvasToJpegBytes(sharedCanvas);
     jpegLengths.push(refJpeg.length);
     await _tmpWrite('export_jpeg_' + (jpegIndex++), refJpeg);
   }
 
   for (var ti = 0; ti < numPages; ti++) {
     var t = tiles[ti];
-    var c = document.createElement('canvas');
-    c.width = pgPxW;
-    c.height = pgPxH;
-    var ctx = c.getContext('2d');
+    var ctx = sharedCanvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, pgPxW, pgPxH);
     ctx.drawImage(srcCanvas, t.sx, t.sy, t.sw, t.sh, t.dx, t.dy, t.dw, t.dh);
-    var jpegBytes = base64ToBytes(c.toDataURL('image/jpeg', 0.92).split(',')[1]);
+    var jpegBytes = await canvasToJpegBytes(sharedCanvas);
     jpegLengths.push(jpegBytes.length);
     await _tmpWrite('export_jpeg_' + (jpegIndex++), jpegBytes);
     if (onProgress) onProgress(ti + 1, numPages);
