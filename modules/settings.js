@@ -2,7 +2,15 @@
 
 import { state } from './editor.js';
 
-const LS_PREFIX = 'annotator.';
+function getAppName() {
+  return document.documentElement.dataset.appname || 'index';
+}
+
+export var APP_PREFIX = getAppName() + ':';
+
+function getPrefixes() {
+  return ['index:', 'pcb:'];
+}
 
 export function initSettings() {
   document.getElementById('btn-settings').addEventListener('click', openSettings);
@@ -43,7 +51,7 @@ function saveSettings() {
 
 export function savePreference(key, value) {
   try {
-    localStorage.setItem(LS_PREFIX + key, JSON.stringify(value));
+    localStorage.setItem(APP_PREFIX + key, JSON.stringify(value));
   } catch (e) {
     console.warn('localStorage save failed:', e);
   }
@@ -51,7 +59,7 @@ export function savePreference(key, value) {
 
 export function loadPreference(key, defaultVal) {
   try {
-    const raw = localStorage.getItem(LS_PREFIX + key);
+    const raw = localStorage.getItem(APP_PREFIX + key);
     if (raw === null) return defaultVal;
     return JSON.parse(raw);
   } catch (e) {
@@ -60,7 +68,10 @@ export function loadPreference(key, defaultVal) {
 }
 
 export function removePreference(key) {
-  localStorage.removeItem(LS_PREFIX + key);
+  var prefixes = getPrefixes();
+  for (var i = 0; i < prefixes.length; i++) {
+    localStorage.removeItem(prefixes[i] + key);
+  }
 }
 
 export function saveColorPreferences() {
@@ -148,22 +159,38 @@ function closeSettings() {
 }
 
 function clearAllData() {
-  const keys = Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX));
+  var prefixes = getPrefixes().concat(['annotator.']);
+  var keys = Object.keys(localStorage).filter(function(k) {
+    for (var i = 0; i < prefixes.length; i++) {
+      if (k.startsWith(prefixes[i])) return true;
+    }
+    return false;
+  });
   keys.forEach(k => localStorage.removeItem(k));
   renderLocalStorageInfo();
 }
 
 function getLocalStorageItems() {
+  var prefixes = getPrefixes().concat(['annotator.']);
   const items = [];
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (!key || !key.startsWith(LS_PREFIX)) continue;
+    if (!key) continue;
+    var matchedPrefix = null;
+    for (var p = 0; p < prefixes.length; p++) {
+      if (key.startsWith(prefixes[p])) { matchedPrefix = prefixes[p]; break; }
+    }
+    if (!matchedPrefix) continue;
     const val = localStorage.getItem(key);
-    const displayKey = key.slice(LS_PREFIX.length);
+    const displayKey = key.slice(matchedPrefix.length);
     const size = val ? new Blob([val]).size : 0;
-    items.push({ key: displayKey, size, raw: key });
+    items.push({ key: displayKey, size, raw: key, prefix: matchedPrefix });
   }
-  items.sort((a, b) => a.key.localeCompare(b.key));
+  items.sort(function(a, b) {
+    var diff = a.prefix.localeCompare(b.prefix);
+    if (diff !== 0) return diff;
+    return a.key.localeCompare(b.key);
+  });
   return items;
 }
 
@@ -209,7 +236,7 @@ function renderLocalStorageInfo() {
       valueArea.rows = Math.max(10, (val || '').split('\n').length);
     });
     const tdKey = document.createElement('td');
-    tdKey.textContent = item.key;
+    tdKey.textContent = item.prefix + item.key;
     const tdSize = document.createElement('td');
     tdSize.style.textAlign = 'right';
     tdSize.textContent = formatSize(item.size);
