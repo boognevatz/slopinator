@@ -312,8 +312,8 @@
       <button id="tab-localstorage" class="settings-tab" style="background:var(--color-accent);color:#fff;border:none;border-radius:3px 3px 0 0;padding:6px 14px;font-size:12px;cursor:pointer;margin-right:2px;">localStorage (saved data)</button>
       <button id="tab-opfs" class="settings-tab" style="background:#3a3a3a;color:#aaa;border:none;border-radius:3px 3px 0 0;padding:6px 14px;font-size:12px;cursor:pointer;">OPFS (Browser File System)</button>
     </div>
-    <div id="settings-tab-container">
-      <div id="panel-localstorage">
+    <div id="settings-tab-container" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;">
+      <div id="panel-localstorage" style="display:flex;flex-direction:column;min-height:0;height:100%;">
         <div style="overflow-y:auto;border:1px solid #444;border-radius:3px;flex:1;min-height:0;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>

@@ -170,8 +170,8 @@ function switchSettingsTab(name) {
   tabOpfs.textContent = isLocal ? 'OPFS' : 'OPFS (Browser File System)';
   tabOpfs.style.background = isLocal ? '#3a3a3a' : 'var(--color-accent)';
   tabOpfs.style.color = isLocal ? '#aaa' : '#fff';
-  panelLocal.hidden = !isLocal;
-  panelOpfs.hidden = isLocal;
+  panelLocal.style.display = isLocal ? 'flex' : 'none';
+  panelOpfs.style.display = isLocal ? 'none' : 'block';
   if (!isLocal && !_opfsRendered) {
     _opfsRendered = true;
     renderOpfsInfo();
