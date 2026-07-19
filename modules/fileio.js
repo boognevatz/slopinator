@@ -81,31 +81,85 @@ async function _tmpCreateWriter(name) {
   };
 }
 
+var _exportStartTime = 0;
+var _exportProgressText = '';
+var _exportCloseHandler = null;
+
+function _renderProgress(bar, span) {
+  if (!_exportStartTime) { span.textContent = _exportProgressText; return; }
+  var elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
+  var min = Math.floor(elapsed / 60);
+  var sec = elapsed % 60;
+  var timeStr = min > 0 ? min + 'm ' + sec + 's' : sec + 's';
+  span.textContent = _exportProgressText + ' [' + timeStr + ']';
+}
+
 function showExportProgress(text) {
-  const bar = document.getElementById('resize-notification');
+  _exportStartTime = Date.now();
+  _exportProgressText = text;
+  var bar = document.getElementById('resize-notification');
   if (!bar) return;
-  for (const child of bar.children)
-    if (child.tagName === 'BUTTON') child.style.display = 'none';
-  const span = bar.querySelector('span');
-  if (span) span.textContent = text;
+  for (var ci = 0; ci < bar.children.length; ci++)
+    if (bar.children[ci].tagName === 'BUTTON') bar.children[ci].style.display = 'none';
+  var span = bar.querySelector('span');
+  if (span) _renderProgress(bar, span);
   bar.hidden = false;
 }
 
 function updateExportProgress(text) {
-  const bar = document.getElementById('resize-notification');
+  _exportProgressText = text;
+  var bar = document.getElementById('resize-notification');
   if (!bar) return;
-  const span = bar.querySelector('span');
-  if (span) span.textContent = text;
+  var span = bar.querySelector('span');
+  if (span) _renderProgress(bar, span);
 }
 
 function hideExportProgress() {
-  const bar = document.getElementById('resize-notification');
+  if (_exportCloseHandler) {
+    var cb = document.getElementById('btn-close-notification');
+    if (cb) cb.removeEventListener('click', _exportCloseHandler);
+    _exportCloseHandler = null;
+  }
+  _exportStartTime = 0;
+  _exportProgressText = '';
+  var bar = document.getElementById('resize-notification');
   if (!bar) return;
   bar.hidden = true;
-  for (const child of bar.children)
-    if (child.tagName === 'BUTTON') child.style.display = '';
-  const span = bar.querySelector('span');
+  for (var ci = 0; ci < bar.children.length; ci++)
+    if (bar.children[ci].tagName === 'BUTTON') bar.children[ci].style.display = '';
+  var span = bar.querySelector('span');
   if (span) span.textContent = 'Image is very large. Resize to:';
+}
+
+async function showExportDone() {
+  var bar = document.getElementById('resize-notification');
+  if (!bar) return;
+  var span = bar.querySelector('span');
+  if (!span) return;
+
+  var elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
+  var min = Math.floor(elapsed / 60);
+  var sec = elapsed % 60;
+  var timeStr = min > 0 ? min + 'm ' + sec + 's' : sec + 's';
+
+  // Reuse the existing close button from the HTML
+  var closeBtn = document.getElementById('btn-close-notification');
+  closeBtn.style.display = ''; // show it (overrides display:none from showExportProgress)
+
+  var done = false;
+  _exportCloseHandler = function() {
+    done = true;
+    hideExportProgress();
+  };
+  closeBtn.addEventListener('click', _exportCloseHandler);
+
+  for (var c = 5; c > 0; c--) {
+    if (done) return;
+    if (span) span.textContent = 'Done! [' + timeStr + ']  (auto-close in ' + c + ')';
+    await sleep(1000);
+  }
+
+  if (!done) hideExportProgress();
 }
 
 export function initFileIO() {
@@ -1256,9 +1310,7 @@ export async function exportJPG(widthOption) {
     downloadBlob(blob, filename + '_' + targetWidth + 'x' + targetHeight + ext);
   }
 
-  updateExportProgress('Done!');
-  await sleep(1500);
-  hideExportProgress();
+  await showExportDone();
 }
 
 // ── Export PDF ──────────────────────────────────────────────────
@@ -1317,9 +1369,7 @@ export async function exportPDF(widthOption, pageSize) {
   }
   downloadBlob(pdfBlob, filename + '_' + targetWidth + 'x' + targetHeight + '.pdf');
 
-  updateExportProgress('Done!');
-  await sleep(1500);
-  hideExportProgress();
+  await showExportDone();
 }
 
 function findActualSizeMarker() {
