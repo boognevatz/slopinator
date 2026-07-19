@@ -10,6 +10,7 @@ import { clearHistory } from './history.js';
 const BASE_TITLE = document.title || 'Slopinator';
 import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
+import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
 import { isLayerVisible, updateWatermark } from './layers.js';
 
@@ -200,6 +201,28 @@ export function initFileIO() {
     document.querySelectorAll('.margin-unit-label').forEach(function(el) { el.textContent = newUnit; });
     redrawPageBox();
   });
+
+  // Margin persistence
+  const marginKeys = ['exportPdfMarginTop', 'exportPdfMarginRight', 'exportPdfMarginBottom', 'exportPdfMarginLeft'];
+  function saveMarginPrefs() {
+    var unit = document.getElementById('margin-unit-select').value;
+    var toMm = unitToMm[unit];
+    for (var i = 0; i < marginIds.length; i++) {
+      var val = parseFloat(document.getElementById(marginIds[i]).value) || 0;
+      savePreference(marginKeys[i], val * toMm);
+    }
+  }
+  function loadMarginPrefs() {
+    var unit = document.getElementById('margin-unit-select').value;
+    var fromMm = 1 / unitToMm[unit];
+    for (var i = 0; i < marginIds.length; i++) {
+      var valMm = loadPreference(marginKeys[i]);
+      if (valMm != null) {
+        document.getElementById(marginIds[i]).value = Math.round(valMm * fromMm * 100) / 100;
+      }
+    }
+  }
+  loadMarginPrefs();
 
   // Page box canvas rendering — select sits at bottom below canvas
   var a4W = 210, a4H = 297, pad = 8, selectH = 22;
@@ -397,6 +420,7 @@ export function initFileIO() {
 
   function doExport() {
     fileMenu.hidden = true;
+    saveMarginPrefs();
     if (currentFormat === 'pdf') {
       const pageSize = exportPdfSizeSelect.value;
       const res = exportPdfResSelect.value;
