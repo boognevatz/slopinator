@@ -251,6 +251,7 @@ export function restoreState(parsed) {
 
   if (parsed.palette) state.palette = parsed.palette;
   if (parsed.originCoordinate) state.originCoordinate = parsed.originCoordinate;
+  if (parsed.dpi) state.image.dpi = parsed.dpi;
   // parsed.thicknessPresets is ignored; slider uses fixed range
 
   // Clear layers

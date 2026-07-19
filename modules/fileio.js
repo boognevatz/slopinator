@@ -829,6 +829,7 @@ export function openSVGProject(svgText) {
   const commentRegex = /<!--\s*annotator-palette:\s*(.+?)\s*-->/;
   const thicknessRegex = /<!--\s*annotator-thickness:\s*(.+?)\s*-->/
   const originRegex = /<!--\s*annotator-origin:\s*(.+?)\s*-->/;
+  const dpiRegex = /<!--\s*annotator-dpi:\s*(\d+)\s*-->/;
 
   const paletteMatch = svgText.match(commentRegex);
   if (paletteMatch) {
@@ -844,6 +845,9 @@ export function openSVGProject(svgText) {
   if (originMatch) {
     originCoordinate = originMatch[1].trim();
   }
+
+  const dpiMatch = svgText.match(dpiRegex);
+  let dpi = dpiMatch ? parseInt(dpiMatch[1]) : null;
 
   // Parse annotation elements
   const elements = [];
@@ -1005,6 +1009,7 @@ export function openSVGProject(svgText) {
     palette,
     originCoordinate,
     thicknessPresets,
+    dpi,
     elements,
   });
 
@@ -1255,6 +1260,7 @@ export function generateSVGString() {
 
   svg += `<!-- annotator-palette: ${state.palette.join(',')} -->\n`;
   svg += `<!-- annotator-origin: ${state.originCoordinate} -->\n`;
+  svg += `<!-- annotator-dpi: ${state.image.dpi} -->\n`;
 
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
