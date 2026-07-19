@@ -293,6 +293,16 @@ function showLayerProps(entry) {
   var body = document.getElementById('layer-props-body');
 
   if (entry.id === 'layer-watermark') {
+    var rotation = 45, spacing = 100, thickness = state.activeThickness;
+    var existingPattern = document.getElementById('watermark-pattern');
+    if (existingPattern) {
+      var tf = existingPattern.getAttribute('patternTransform') || '';
+      var m = tf.match(/rotate\(([^)]+)\)/);
+      if (m) rotation = parseFloat(m[1]) || 45;
+      spacing = parseFloat(existingPattern.getAttribute('width')) || 100;
+      var p = existingPattern.querySelector('path');
+      if (p) thickness = parseFloat(p.getAttribute('stroke-width')) || state.activeThickness;
+    }
     body.innerHTML =
       '<div class="layer-prop"><span class="layer-prop-label">Name:</span><span class="layer-prop-value">' + entry.name + '</span></div>' +
       '<div class="layer-prop"><span class="layer-prop-label">Visibility:</span><span class="layer-prop-value">' + (isHidden ? 'Off' : 'On') + '</span></div>' +
@@ -302,22 +312,22 @@ function showLayerProps(entry) {
         '<div style="display:flex;flex-direction:column;gap:1px;">' +
           '<span style="font-size:11px;color:var(--color-text-muted);">Thickness</span>' +
           '<div style="display:flex;align-items:center;gap:4px;">' +
-            '<input type="range" id="wm-thickness" min="0.5" max="5" step="0.5" value="' + state.activeThickness + '" style="flex:1;min-width:0;">' +
-            '<span id="wm-thickness-val" style="font-size:11px;color:var(--color-text);width:2em;text-align:right;flex-shrink:0;">' + state.activeThickness + '</span>' +
+            '<input type="range" id="wm-thickness" min="0.5" max="5" step="0.5" value="' + thickness + '" style="flex:1;min-width:0;">' +
+            '<span id="wm-thickness-val" style="font-size:11px;color:var(--color-text);width:2em;text-align:right;flex-shrink:0;">' + thickness + '</span>' +
           '</div>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:1px;">' +
           '<span style="font-size:11px;color:var(--color-text-muted);">Rotation</span>' +
           '<div style="display:flex;align-items:center;gap:4px;">' +
-            '<input type="range" id="wm-rotation" min="0" max="90" step="1" value="45" style="flex:1;min-width:0;">' +
-            '<span id="wm-rotation-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">45\u00B0</span>' +
+            '<input type="range" id="wm-rotation" min="0" max="90" step="1" value="' + rotation + '" style="flex:1;min-width:0;">' +
+            '<span id="wm-rotation-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">' + rotation + '\u00B0</span>' +
           '</div>' +
         '</div>' +
         '<div style="display:flex;flex-direction:column;gap:1px;">' +
           '<span style="font-size:11px;color:var(--color-text-muted);">Spacing</span>' +
           '<div style="display:flex;align-items:center;gap:4px;">' +
-            '<input type="range" id="wm-spacing" min="10" max="400" step="10" value="100" style="flex:1;min-width:0;">' +
-            '<span id="wm-spacing-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">100</span>' +
+            '<input type="range" id="wm-spacing" min="10" max="400" step="10" value="' + spacing + '" style="flex:1;min-width:0;">' +
+            '<span id="wm-spacing-val" style="font-size:11px;color:var(--color-text);width:2.5em;text-align:right;flex-shrink:0;">' + spacing + '</span>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -364,6 +374,9 @@ function showLayerProps(entry) {
 }
 
 function bindWatermarkControls() {
+  function getPattern() { return document.getElementById('watermark-pattern'); }
+  function getPatternPath() { var p = getPattern(); return p && p.querySelector('path'); }
+
   var thickness = document.getElementById('wm-thickness');
   var rotation = document.getElementById('wm-rotation');
   var spacing = document.getElementById('wm-spacing');
@@ -372,21 +385,29 @@ function bindWatermarkControls() {
     thickness.replaceWith(thickness.cloneNode(true));
     document.getElementById('wm-thickness').addEventListener('input', function () {
       document.getElementById('wm-thickness-val').textContent = this.value;
-      updateWatermark();
+      var path = getPatternPath();
+      if (path) path.setAttribute('stroke-width', this.value);
     });
   }
   if (rotation) {
     rotation.replaceWith(rotation.cloneNode(true));
     document.getElementById('wm-rotation').addEventListener('input', function () {
       document.getElementById('wm-rotation-val').textContent = this.value + '\u00B0';
-      updateWatermark();
+      var pattern = getPattern();
+      if (pattern) pattern.setAttribute('patternTransform', 'rotate(' + this.value + ')');
     });
   }
   if (spacing) {
     spacing.replaceWith(spacing.cloneNode(true));
     document.getElementById('wm-spacing').addEventListener('input', function () {
       document.getElementById('wm-spacing-val').textContent = this.value;
-      updateWatermark();
+      var pattern = getPattern();
+      var path = getPatternPath();
+      if (pattern) {
+        pattern.setAttribute('width', this.value);
+        pattern.setAttribute('height', this.value);
+      }
+      if (path) path.setAttribute('d', 'M ' + this.value + ' 0 L 0 0 0 ' + this.value);
     });
   }
 }
@@ -407,48 +428,49 @@ export function updateWatermark() {
   var layer = dom.watermarkLayer;
   if (!layer) return;
 
-  layer.innerHTML = '';
-  var oldPattern = document.getElementById('watermark-pattern');
-  if (oldPattern) oldPattern.remove();
-
   if (!state.hasImage) return;
   if (!isLayerVisible('layer-watermark')) return;
   if (!state.activeColor || state.activeColor === 'transparent') return;
 
-  var thicknessEl = document.getElementById('wm-thickness');
-  var rotationEl = document.getElementById('wm-rotation');
-  var spacingEl = document.getElementById('wm-spacing');
-  var thickness = thicknessEl ? parseFloat(thicknessEl.value) : state.activeThickness;
-  var color = state.activeColor;
-  var rotation = rotationEl ? parseFloat(rotationEl.value) : 45;
-  var spacing = spacingEl ? parseFloat(spacingEl.value) : 100;
-
-  var patternId = 'watermark-pattern';
   var defs = dom.svg.querySelector('defs');
   if (!defs) return;
 
-  var pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
-  pattern.setAttribute('id', patternId);
-  pattern.setAttribute('width', String(spacing));
-  pattern.setAttribute('height', String(spacing));
-  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
-  pattern.setAttribute('patternTransform', 'rotate(' + rotation + ')');
+  var pattern = document.getElementById('watermark-pattern');
+  if (pattern) {
+    var path = pattern.querySelector('path');
+    if (path) path.setAttribute('stroke', state.activeColor);
+  } else {
+    var thicknessEl = document.getElementById('wm-thickness');
+    var rotationEl = document.getElementById('wm-rotation');
+    var spacingEl = document.getElementById('wm-spacing');
+    var thickness = thicknessEl ? parseFloat(thicknessEl.value) : state.activeThickness;
+    var rotation = rotationEl ? parseFloat(rotationEl.value) : 45;
+    var spacing = spacingEl ? parseFloat(spacingEl.value) : 100;
 
-  var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', 'M ' + spacing + ' 0 L 0 0 0 ' + spacing);
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', color);
-  path.setAttribute('stroke-width', String(thickness));
-  path.setAttribute('opacity', '0.4');
-  pattern.appendChild(path);
-  defs.appendChild(pattern);
+    pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+    pattern.setAttribute('id', 'watermark-pattern');
+    pattern.setAttribute('width', String(spacing));
+    pattern.setAttribute('height', String(spacing));
+    pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+    pattern.setAttribute('patternTransform', 'rotate(' + rotation + ')');
 
+    var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M ' + spacing + ' 0 L 0 0 0 ' + spacing);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', state.activeColor);
+    path.setAttribute('stroke-width', String(thickness));
+    path.setAttribute('opacity', '0.4');
+    pattern.appendChild(path);
+    defs.appendChild(pattern);
+  }
+
+  layer.innerHTML = '';
   var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   rect.setAttribute('x', '0');
   rect.setAttribute('y', '0');
   rect.setAttribute('width', state.image.naturalWidth);
   rect.setAttribute('height', state.image.naturalHeight);
-  rect.setAttribute('fill', 'url(#' + patternId + ')');
+  rect.setAttribute('fill', 'url(#watermark-pattern)');
   rect.setAttribute('pointer-events', 'none');
   layer.appendChild(rect);
 }

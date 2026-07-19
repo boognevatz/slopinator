@@ -1482,10 +1482,16 @@ async function deflateRgb(imageData) {
 function buildWatermarkDefs() {
   if (!isLayerVisible('layer-watermark')) return '';
   if (!state.activeColor || state.activeColor === 'transparent') return '';
-  var thickness = parseFloat(document.getElementById('wm-thickness').value) || 1;
-  var color = state.activeColor;
-  var rotation = parseFloat(document.getElementById('wm-rotation').value) || 45;
-  var spacing = parseFloat(document.getElementById('wm-spacing').value) || 100;
+  var pattern = document.getElementById('watermark-pattern');
+  if (!pattern) return '';
+  var path = pattern.querySelector('path');
+  if (!path) return '';
+  var thickness = path.getAttribute('stroke-width') || '1';
+  var color = path.getAttribute('stroke') || state.activeColor;
+  var tf = pattern.getAttribute('patternTransform') || '';
+  var m = tf.match(/rotate\(([^)]+)\)/);
+  var rotation = m ? m[1] : '45';
+  var spacing = pattern.getAttribute('width') || '100';
   return '<defs>\n<pattern id="watermark-pattern" width="' + spacing + '" height="' + spacing + '" patternUnits="userSpaceOnUse" patternTransform="rotate(' + rotation + ')">\n<path d="M ' + spacing + ' 0 L 0 0 0 ' + spacing + '" fill="none" stroke="' + color + '" stroke-width="' + thickness + '" opacity="0.4"/>\n</pattern>\n</defs>\n';
 }
 
