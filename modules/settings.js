@@ -119,7 +119,43 @@ function openSettings() {
   document.getElementById('setting-autosave-enabled').checked = state.autosaveEnabled;
   _opfsRendered = false;
   switchSettingsTab('localstorage');
+  _setupEditActions();
   renderLocalStorageInfo();
+}
+
+function _setupEditActions() {
+  var saveBtn = document.getElementById('btn-settings-edit-save');
+  var cancelBtn = document.getElementById('btn-settings-edit-cancel');
+  var valueArea = document.getElementById('settings-key-value');
+  if (!valueArea || !saveBtn || !cancelBtn) return;
+
+  valueArea.oninput = function() {
+    if (!_selectedRow) { saveBtn.disabled = true; cancelBtn.disabled = true; return; }
+    var current = localStorage.getItem(_selectedRow.dataset.key) || '';
+    var isDiff = this.value !== current;
+    this.style.borderColor = isDiff ? 'var(--color-accent)' : '#444';
+    saveBtn.disabled = !isDiff;
+    cancelBtn.disabled = !isDiff;
+  };
+
+  saveBtn.onclick = function() {
+    if (!_selectedRow) return;
+    localStorage.setItem(_selectedRow.dataset.key, valueArea.value);
+    valueArea.style.borderColor = '#444';
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    renderLocalStorageInfo();
+  };
+
+  cancelBtn.onclick = function() {
+    if (!_selectedRow) return;
+    var original = localStorage.getItem(_selectedRow.dataset.key) || '';
+    valueArea.value = original;
+    valueArea.rows = Math.min(8, Math.max(2, original.split('\n').length));
+    valueArea.style.borderColor = '#444';
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+  };
 }
 
 function switchSettingsTab(name) {
@@ -218,8 +254,13 @@ function renderLocalStorageInfo() {
   const tbody = document.getElementById('settings-storage-tbody');
   tbody.innerHTML = '';
   const valueArea = document.getElementById('settings-key-value');
-  if (valueArea) { valueArea.value = ''; valueArea.rows = 1; }
+  if (valueArea) { valueArea.value = ''; valueArea.rows = 1; valueArea.style.borderColor = '#444'; }
   _selectedRow = null;
+
+  var saveBtn = document.getElementById('btn-settings-edit-save');
+  var cancelBtn = document.getElementById('btn-settings-edit-cancel');
+  if (saveBtn) saveBtn.disabled = true;
+  if (cancelBtn) cancelBtn.disabled = true;
 
   let total = 0;
   for (const item of items) {
@@ -233,7 +274,10 @@ function renderLocalStorageInfo() {
       _selectedRow = tr;
       const val = localStorage.getItem(item.raw);
       valueArea.value = val || '';
-      valueArea.rows = Math.max(10, (val || '').split('\n').length);
+      valueArea.rows = Math.min(8, Math.max(2, (val || '').split('\n').length));
+      valueArea.style.borderColor = '#444';
+      if (saveBtn) saveBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
     });
     const tdKey = document.createElement('td');
     tdKey.textContent = item.prefix + item.key;
