@@ -3,10 +3,12 @@ import { state } from './editor.js';
 
 const AUTOSAVE_FILE = 'autosave.svg';
 const AUTOSAVE_INTERVAL = 5 * 60 * 1000;
+const CHECK_INTERVAL = 10000;
 const BASE_TITLE = document.title || 'Slopinator';
 
 let _dirty = false;
-let _intervalId = null;
+let _dirtyTime = 0;
+let _autosaveIntervalId = null;
 
 async function getFileHandle(create) {
   const root = await navigator.storage.getDirectory();
@@ -39,6 +41,7 @@ export async function saveAutosave(showFeedback) {
     return;
   }
   try {
+    updateDisplay('saving...');
     await saveToOPFS(svg);
     if (showFeedback) {
       document.getElementById('file-menu').hidden = true;
@@ -87,6 +90,37 @@ function showNotification(msg, isError) {
   }, 1000);
 }
 
+function updateDisplay(text) {
+  var el = document.getElementById('autosave-status');
+  if (el) el.textContent = 'autosave: ' + text;
+}
+
+function formatRemaining(ms) {
+  if (ms <= 0) return '0:00';
+  var totalSec = Math.ceil(ms / 1000);
+  var min = Math.floor(totalSec / 60);
+  var sec = totalSec % 60;
+  return min + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function updateAutosaveDisplay() {
+  if (!state.autosaveEnabled || !_dirty) {
+    updateDisplay('--:--');
+    return;
+  }
+  var remaining = AUTOSAVE_INTERVAL - (Date.now() - _dirtyTime);
+  updateDisplay(formatRemaining(remaining));
+}
+
+function trySave() {
+  if (_dirty && state.autosaveEnabled) {
+    var elapsed = Date.now() - _dirtyTime;
+    if (elapsed >= AUTOSAVE_INTERVAL) {
+      saveAutosave();
+    }
+  }
+}
+
 export async function loadAutosave() {
   try {
     var svgText = await loadFromOPFS();
@@ -101,27 +135,34 @@ export async function loadAutosave() {
 
 export function markDirty() {
   _dirty = true;
+  _dirtyTime = Date.now();
 }
 
 export function initAutosave() {
-  document.addEventListener('editor-dirty', function() {
+  document.addEventListener('editor-dirty', function(e) {
     _dirty = true;
+    _dirtyTime = (e.detail && e.detail.timestamp) || Date.now();
   });
 
   document.addEventListener('delete-autosave', function() {
     deleteAutosave();
   });
 
-  _intervalId = setInterval(function() {
-    if (_dirty && state.autosaveEnabled) {
-      saveAutosave();
+  _autosaveIntervalId = setInterval(function() {
+    trySave();
+    updateAutosaveDisplay();
+  }, CHECK_INTERVAL);
+
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      trySave();
     }
-  }, AUTOSAVE_INTERVAL);
+  });
 }
 
 export function stopAutosave() {
-  if (_intervalId) {
-    clearInterval(_intervalId);
-    _intervalId = null;
+  if (_autosaveIntervalId) {
+    clearInterval(_autosaveIntervalId);
+    _autosaveIntervalId = null;
   }
 }

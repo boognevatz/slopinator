@@ -20,7 +20,7 @@ export function pushAction(action) {
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack.length = 0; // clear redo on new action
   notifyChange();
-  document.dispatchEvent(new CustomEvent('editor-dirty'));
+  document.dispatchEvent(new CustomEvent('editor-dirty', { detail: { timestamp: Date.now() } }));
 }
 
 export function undo() {
