@@ -9,6 +9,7 @@ const DEFAULT_PALETTE = [
 
 /** Application state – single source of truth */
 export const state = {
+  filename: 'annotation.svg',
   image: {
     dataURI: null,
     naturalWidth: 0,

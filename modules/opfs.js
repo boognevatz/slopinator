@@ -1,4 +1,4 @@
-import { generateSVGString, openSVGProject } from './fileio.js';
+import { generateSVGString, openSVGProject, updateFilenameDisplay } from './fileio.js';
 import { state } from './editor.js';
 
 const AUTOSAVE_FILE = 'autosave.svg';
@@ -92,7 +92,8 @@ export async function loadAutosave() {
     var svgText = await loadFromOPFS();
     if (svgText) {
       openSVGProject(svgText);
-      document.title = BASE_TITLE + ' - autosave.svg';
+      state.filename = 'autosave.svg';
+      updateFilenameDisplay();
       _dirty = false;
     }
   } catch {}

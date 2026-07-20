@@ -305,8 +305,47 @@ export function initFileIO() {
 
   btnSaveSvg.addEventListener('click', saveSVG);
 
+  // ── Filename rename UI ──────────────────────────────────
+  const currentFilenameSpan = document.getElementById('current-filename');
+  const filenameInput = document.getElementById('filename-input');
+  const filenameActions = document.getElementById('filename-actions');
+  const btnFilenameSave = document.getElementById('btn-filename-save');
+  const btnFilenameCancel = document.getElementById('btn-filename-cancel');
+
+  function enterRenameMode() {
+    filenameInput.value = state.filename;
+    currentFilenameSpan.hidden = true;
+    filenameInput.hidden = false;
+    filenameActions.hidden = false;
+    filenameInput.focus();
+    filenameInput.select();
+  }
+
+  function exitRenameMode(cancel) {
+    if (!cancel) {
+      const val = filenameInput.value.trim();
+      if (val) state.filename = val;
+    }
+    filenameInput.hidden = true;
+    filenameActions.hidden = true;
+    currentFilenameSpan.hidden = false;
+    updateFilenameDisplay();
+  }
+
+  currentFilenameSpan.addEventListener('click', function(e) { e.stopPropagation(); enterRenameMode(); });
+  btnFilenameSave.addEventListener('click', function(e) { e.stopPropagation(); exitRenameMode(false); });
+  btnFilenameCancel.addEventListener('click', function(e) { e.stopPropagation(); exitRenameMode(true); });
+  filenameInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); exitRenameMode(false); }
+    if (e.key === 'Escape') { exitRenameMode(true); }
+    e.stopPropagation();
+  });
+  filenameInput.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  updateFilenameDisplay();
+
   function createNewImage(w, h) {
-    document.title = BASE_TITLE;
+    state.filename = 'annotation.svg';
     fileMenu.hidden = true;
     dom.annotationLayer.innerHTML = '';
     dom.handleLayer.innerHTML = '';
@@ -324,6 +363,7 @@ export function initFileIO() {
     const dataURI = canvas.toDataURL('image/png');
     loadImage(dataURI, w, h);
     switchTool('text');
+    updateFilenameDisplay();
   }
 
   document.getElementById('btn-new-create').addEventListener('click', (e) => {
@@ -566,30 +606,30 @@ export function initFileIO() {
 function handleFileOpen(file) {
   const isSVG = file.name.toLowerCase().endsWith('.svg');
 
-  const exportFilename = document.getElementById('export-filename');
-  if (exportFilename) {
-    exportFilename.value = file.name;
-    const dot = file.name.lastIndexOf('.');
-    if (dot !== -1) {
-      exportFilename.setSelectionRange(0, dot);
-    } else {
-      exportFilename.select();
-    }
-    exportFilename.focus();
-  }
-
-  document.title = BASE_TITLE + ' - ' + file.name;
+  state.filename = file.name;
+  // updateFilenameDisplay is called at the end of the load, so we let the load settle first
+  var filenameDisplay = document.getElementById('current-filename');
+  if (filenameDisplay) filenameDisplay.textContent = file.name;
 
   if (isSVG) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const svgText = e.target.result;
       openSVGProject(svgText);
+      updateFilenameDisplay();
     };
     reader.readAsText(file);
   } else {
     openImageFile(file);
   }
+}
+
+export function updateFilenameDisplay() {
+  var span = document.getElementById('current-filename');
+  if (span) span.textContent = state.filename;
+  document.title = BASE_TITLE + ' - ' + state.filename;
+  var exportEl = document.getElementById('export-filename');
+  if (exportEl) exportEl.value = state.filename;
 }
 
 function openImageFile(file) {
@@ -610,6 +650,7 @@ function openImageFile(file) {
       } else {
         resizeNotification.hidden = true;
       }
+      updateFilenameDisplay();
     };
     img.onerror = () => {
       alert('Failed to load image.');
@@ -736,6 +777,7 @@ function resizeImage(newWidth, newHeight) {
 // ── Open SVG Project ────────────────────────────────────────────
 
 export function openSVGProject(svgText) {
+  if (!state.filename) state.filename = 'annotation.svg';
   // Check if it's our annotator project file
   if (!svgText.includes('data-annotator-version')) {
     // Treat as a plain image — embed as data URI
@@ -1327,7 +1369,12 @@ export function generateSVGString() {
 export function saveSVG() {
   const svg = generateSVGString();
   if (!svg) return;
-  downloadString(svg, 'annotation.svg', 'image/svg+xml');
+  let name = state.filename || 'annotation.svg';
+  const dot = name.lastIndexOf('.');
+  if (dot === -1) name += '.svg';
+  const ext = name.slice(dot).toLowerCase();
+  if (ext !== '.svg') name = name.slice(0, dot) + '.svg';
+  downloadString(svg, name, 'image/svg+xml');
 }
 
 // ── Export JPG ──────────────────────────────────────────────────
