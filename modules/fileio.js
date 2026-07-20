@@ -306,46 +306,79 @@ export function initFileIO() {
   btnSaveSvg.addEventListener('click', saveSVG);
 
   // ── Filename rename UI ──────────────────────────────────
-  const currentFilenameSpan = document.getElementById('current-filename');
-  const filenameInput = document.getElementById('filename-input');
-  const filenameActions = document.getElementById('filename-actions');
-  const btnFilenameSave = document.getElementById('btn-filename-save');
-  const btnFilenameCancel = document.getElementById('btn-filename-cancel');
+  var _cancelFilenameRename = null;
+  _setupFilenameRename();
 
-  function enterRenameMode() {
-    filenameInput.value = state.filename;
-    currentFilenameSpan.hidden = true;
-    filenameInput.hidden = false;
-    filenameActions.hidden = false;
-    filenameInput.focus();
-    filenameInput.select();
-  }
+  function _setupFilenameRename() {
+    var currentFilenameSpan = document.getElementById('current-filename');
+    var filenameInput = document.getElementById('filename-input');
+    var filenameActions = document.getElementById('filename-actions');
+    var btnFilenameSave = document.getElementById('btn-filename-save');
+    var btnFilenameCancel = document.getElementById('btn-filename-cancel');
+    var _originalFilename = '';
+    const BORDER_DEFAULT = '#444';
 
-  function exitRenameMode(cancel) {
-    if (!cancel) {
-      const val = filenameInput.value.trim();
-      if (val) state.filename = val;
+    function enterRenameMode() {
+      _originalFilename = state.filename;
+      filenameInput.value = state.filename;
+      filenameInput.style.borderColor = BORDER_DEFAULT;
+      currentFilenameSpan.hidden = true;
+      filenameInput.hidden = false;
+      filenameActions.style.display = 'flex';
+      filenameActions.hidden = false;
+      btnFilenameSave.disabled = true;
+      btnFilenameCancel.disabled = true;
+      filenameInput.focus();
+      filenameInput.select();
     }
-    filenameInput.hidden = true;
-    filenameActions.hidden = true;
-    currentFilenameSpan.hidden = false;
-    updateFilenameDisplay();
-  }
 
-  currentFilenameSpan.addEventListener('click', function(e) { e.stopPropagation(); enterRenameMode(); });
-  btnFilenameSave.addEventListener('click', function(e) { e.stopPropagation(); exitRenameMode(false); });
-  btnFilenameCancel.addEventListener('click', function(e) { e.stopPropagation(); exitRenameMode(true); });
-  filenameInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); exitRenameMode(false); }
-    if (e.key === 'Escape') { exitRenameMode(true); }
-    e.stopPropagation();
-  });
-  filenameInput.addEventListener('click', function(e) { e.stopPropagation(); });
+    function exitRenameMode(cancel) {
+      if (!cancel) {
+        var val = filenameInput.value.trim();
+        if (val) state.filename = val;
+      }
+      filenameInput.hidden = true;
+      filenameActions.style.display = '';
+      filenameActions.hidden = true;
+      currentFilenameSpan.hidden = false;
+      updateFilenameDisplay();
+    }
+
+    function syncFilenameButtons() {
+      var isDiff = (filenameInput.value !== _originalFilename);
+      filenameInput.style.borderColor = isDiff ? 'var(--color-accent)' : BORDER_DEFAULT;
+      btnFilenameSave.disabled = !isDiff;
+      btnFilenameCancel.disabled = !isDiff;
+    }
+
+    _cancelFilenameRename = function() {
+      if (filenameInput.hidden) return;
+      state.filename = _originalFilename;
+      updateFilenameDisplay();
+      filenameInput.hidden = true;
+      filenameActions.style.display = '';
+      filenameActions.hidden = true;
+      currentFilenameSpan.hidden = false;
+    };
+
+    currentFilenameSpan.onclick = function(e) { e.stopPropagation(); enterRenameMode(); };
+    btnFilenameSave.onclick = function(e) { e.stopPropagation(); exitRenameMode(false); };
+    btnFilenameCancel.onclick = function(e) { e.stopPropagation(); exitRenameMode(true); };
+    filenameInput.onkeydown = function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); exitRenameMode(false); return; }
+      if (e.key === 'Escape') { exitRenameMode(true); return; }
+      setTimeout(syncFilenameButtons, 0);
+      e.stopPropagation();
+    };
+    filenameInput.oninput = syncFilenameButtons;
+    filenameInput.onclick = function(e) { e.stopPropagation(); };
+  }
 
   updateFilenameDisplay();
 
   function createNewImage(w, h) {
     state.filename = 'annotation.svg';
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = true;
     dom.annotationLayer.innerHTML = '';
     dom.handleLayer.innerHTML = '';
@@ -368,6 +401,7 @@ export function initFileIO() {
 
   document.getElementById('btn-new-create').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = true;
     var w = parseInt(document.getElementById('new-width').value) || 640;
     var h = parseInt(document.getElementById('new-height').value) || 480;
@@ -385,6 +419,7 @@ export function initFileIO() {
   const aboutPopup = document.getElementById('about-popup');
   btnAbout.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = true;
     aboutPopup.hidden = false;
   });
@@ -421,6 +456,7 @@ export function initFileIO() {
   }
   btnFileDropdown.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = !fileMenu.hidden;
     if (!fileMenu.hidden) {
       activateTab(currentFormat);
@@ -442,6 +478,7 @@ export function initFileIO() {
   });
 
   document.addEventListener('click', () => {
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = true;
     exportMenu.hidden = true;
   });
@@ -459,6 +496,7 @@ export function initFileIO() {
   });
 
   function doExport() {
+    if (_cancelFilenameRename) _cancelFilenameRename();
     fileMenu.hidden = true;
     saveMarginPrefs();
     if (currentFormat === 'pdf') {
