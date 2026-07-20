@@ -1053,6 +1053,14 @@ export function openSVGProject(svgText) {
       dom.annotationLayer.removeAttribute('visibility');
     }
   }
+  var parsedImgG = doc.getElementById('layer-image');
+  if (parsedImgG && parsedImgG.hasAttribute('visibility')) {
+    if (parsedImgG.getAttribute('visibility') === 'hidden') {
+      dom.imageLayer.setAttribute('visibility', 'hidden');
+    } else {
+      dom.imageLayer.removeAttribute('visibility');
+    }
+  }
   var parsedWmG = doc.getElementById('layer-watermark');
   if (parsedWmG && parsedWmG.hasAttribute('visibility')) {
     if (parsedWmG.getAttribute('visibility') === 'hidden') {
@@ -1292,9 +1300,12 @@ export function generateSVGString() {
 
   const img = state.image;
   const imgTransform = dom.imageEl.getAttribute('transform') || '';
+  var imgVis = dom.imageLayer.getAttribute('visibility');
+  svg += `<g id="layer-image" visibility="${imgVis === 'hidden' ? 'hidden' : 'visible'}">\n`;
   svg += `<image data-type="background" href="${img.dataURI}" `;
   svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
   svg += `transform="${imgTransform}" />\n`;
+  svg += `</g>\n`;
 
   var annVis = dom.annotationLayer.getAttribute('visibility');
   svg += `<g id="layer-annotation" transform="${imgTransform}" visibility="${annVis === 'hidden' ? 'hidden' : 'visible'}">\n`;
