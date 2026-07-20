@@ -12,7 +12,7 @@ import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
 import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
-import { isLayerVisible, updateWatermark } from './layers.js';
+import { isLayerVisible, updateWatermark, renderLayerList } from './layers.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -1044,6 +1044,34 @@ export function openSVGProject(svgText) {
     }
   }
 
+  // Restore layer visibility from parsed SVG
+  var parsedAnnG = doc.getElementById('layer-annotation');
+  if (parsedAnnG && parsedAnnG.hasAttribute('visibility')) {
+    if (parsedAnnG.getAttribute('visibility') === 'hidden') {
+      dom.annotationLayer.setAttribute('visibility', 'hidden');
+    } else {
+      dom.annotationLayer.removeAttribute('visibility');
+    }
+  }
+  var parsedWmG = doc.getElementById('layer-watermark');
+  if (parsedWmG && parsedWmG.hasAttribute('visibility')) {
+    if (parsedWmG.getAttribute('visibility') === 'hidden') {
+      dom.watermarkLayer.setAttribute('visibility', 'hidden');
+    } else {
+      dom.watermarkLayer.removeAttribute('visibility');
+    }
+  }
+  renderLayerList();
+
+  // Transfer watermark pattern from parsed SVG to live editor
+  var parsedPattern = doc.getElementById('watermark-pattern');
+  if (parsedPattern) {
+    var defs = dom.svg.querySelector('defs');
+    if (defs && !document.getElementById('watermark-pattern')) {
+      defs.appendChild(document.importNode(parsedPattern, true));
+    }
+  }
+
   clearHistory();
   refreshPalette();
   switchTool(state.defaultTool || 'text');
@@ -1268,14 +1296,16 @@ export function generateSVGString() {
   svg += `x="0" y="0" width="${img.naturalWidth}" height="${img.naturalHeight}" `;
   svg += `transform="${imgTransform}" />\n`;
 
-  svg += `<g id="layer-annotation" transform="${imgTransform}">\n`;
+  var annVis = dom.annotationLayer.getAttribute('visibility');
+  svg += `<g id="layer-annotation" transform="${imgTransform}" visibility="${annVis === 'hidden' ? 'hidden' : 'visible'}">\n`;
   for (const el of state.elements) {
     svg += serializeElement(el);
   }
   svg += `</g>\n`;
 
   svg += buildWatermarkDefs();
-  svg += `<g id="layer-watermark" transform="${imgTransform}">\n`;
+  var wmVis = dom.watermarkLayer.getAttribute('visibility');
+  svg += `<g id="layer-watermark" transform="${imgTransform}" visibility="${wmVis === 'hidden' ? 'hidden' : 'visible'}">\n`;
   svg += dom.watermarkLayer.innerHTML;
   svg += `</g>\n`;
 

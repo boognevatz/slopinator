@@ -55,7 +55,7 @@ function initLayerOrder() {
   ];
 }
 
-function renderLayerList() {
+export function renderLayerList() {
   var container = document.getElementById('layer-entries');
   container.innerHTML = '';
 
