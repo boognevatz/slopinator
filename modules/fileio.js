@@ -395,7 +395,7 @@ export function initFileIO() {
     ctx.fillRect(0, 0, w, h);
     const dataURI = canvas.toDataURL('image/png');
     loadImage(dataURI, w, h);
-    switchTool('text');
+    switchTool('select');
     updateFilenameDisplay();
   }
 
@@ -678,7 +678,7 @@ function openImageFile(file) {
     img.onload = () => {
       loadImage(dataURI, img.naturalWidth, img.naturalHeight);
       clearHistory();
-      switchTool('text');
+      switchTool('select');
       updateWatermark();
       
       const maxDim = Math.max(img.naturalWidth, img.naturalHeight);
@@ -727,7 +727,7 @@ function physicallyResizeImage(targetWidth) {
     // Reload image into editor
     loadImage(newDataURI, targetWidth, targetHeight);
     clearHistory();
-    switchTool('text');
+    switchTool('select');
     updateWatermark();
   };
   imgEl.src = state.image.dataURI;
@@ -806,7 +806,7 @@ function resizeImage(newWidth, newHeight) {
     }
 
     clearHistory();
-    switchTool('text');
+    switchTool('select');
     updateWatermark();
   };
   imgEl.src = state.image.dataURI;
@@ -832,7 +832,7 @@ export function openSVGProject(svgText) {
       const dataURI = canvas.toDataURL('image/png');
       loadImage(dataURI, canvas.width, canvas.height);
       clearHistory();
-      switchTool('text');
+      switchTool('select');
       updateWatermark();
       URL.revokeObjectURL(url);
     };
@@ -1272,7 +1272,7 @@ export function openSVGProject(svgText) {
 
   clearHistory();
   refreshPalette();
-  switchTool(state.defaultTool || 'text');
+  switchTool(state.defaultTool || 'select');
   updateWatermark();
 }
 
