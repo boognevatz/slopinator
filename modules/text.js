@@ -156,9 +156,12 @@ export function initText() {
   });
 }
 
-export function activateText() {
+export function activateText(textIdToEdit = null) {
   dom.svg.style.cursor = 'text';
   dom.svg.addEventListener('pointerdown', onMouseDown);
+  if (textIdToEdit) {
+    setTimeout(() => startEditing(textIdToEdit), 0);
+  }
 }
 
 export function deactivateText() {

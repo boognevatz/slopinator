@@ -63,6 +63,13 @@ export function switchTool(tool) {
     if (sel && sel.type === 'line') selectedLineData = sel;
   }
 
+  // Capture selected text id before deactivating (deactivateSelect clears selection)
+  let selectedTextId = null;
+  if (state.selectedId && tool === 'text') {
+    const sel = state.elements.find(el => el.id === state.selectedId);
+    if (sel && sel.type === 'text') selectedTextId = sel.id;
+  }
+
   // Deactivate current
   switch (state.activeTool) {
     case 'select': deactivateSelect(); break;
@@ -89,7 +96,7 @@ export function switchTool(tool) {
   switch (tool) {
     case 'select': activateSelect(); break;
     case 'line': activateLine(selectedLineData); break;
-    case 'text': activateText(); break;
+    case 'text': activateText(selectedTextId); break;
     case 'crop': activateCrop(); break;
     case 'freehand': activateFreehand(); break;
     case 'rectangle': activateRectangle(); break;
