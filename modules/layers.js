@@ -55,6 +55,14 @@ function initLayerOrder() {
   ];
 }
 
+export function setLayerOrder(newOrder) {
+  layerOrder = newOrder;
+}
+
+export function setUserLayerCounter(n) {
+  userLayerCounter = n;
+}
+
 export function renderLayerList() {
   var container = document.getElementById('layer-entries');
   container.innerHTML = '';

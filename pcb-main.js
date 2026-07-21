@@ -9,7 +9,7 @@ import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
-import { initLayers } from './modules/layers.js';
+import { initLayers, initLayerUI } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
@@ -53,6 +53,7 @@ function init() {
   initFreehand();
   initRectangle();
   initLayers();
+  initLayerUI();
   initGrid();
   initSettings();
   initFileIO();

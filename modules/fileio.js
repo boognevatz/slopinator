@@ -12,7 +12,7 @@ import { refreshPalette } from './palette.js';
 import { downloadString, downloadBlob, generateId } from './utils.js';
 import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
-import { isLayerVisible, updateWatermark, renderLayerList } from './layers.js';
+import { isLayerVisible, updateWatermark, renderLayerList, selectLayer, setLayerOrder, setUserLayerCounter } from './layers.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -1078,6 +1078,42 @@ export function openSVGProject(svgText) {
     }
   }
 
+  // ── Extract layer structure from parsed SVG ──
+  var parsedLayers = [];
+  for (var li = 0; li < svgRoot.children.length; li++) {
+    var ch = svgRoot.children[li];
+    if (ch.tagName === 'g' && ch.id) {
+      var lid = ch.id;
+      if (lid === 'layer-image' || lid === 'layer-watermark' || lid === 'layer-grid') continue;
+      parsedLayers.push({
+        id: lid,
+        name: ch.getAttribute('data-layer-name') || lid,
+        visibility: ch.getAttribute('visibility'),
+      });
+    }
+  }
+  if (parsedLayers.length === 0) {
+    parsedLayers.push({ id: 'layer-annotation', name: 'Annotations', visibility: null });
+  }
+
+  // Assign elements to parsed layers via DOM parent walk
+  for (var ei = 0; ei < elements.length; ei++) {
+    var elData = elements[ei];
+    var domEl = doc.getElementById(elData.id);
+    if (domEl) {
+      var p = domEl.parentNode;
+      while (p && p.id && p.id !== 'layer-annotation' && !p.id.startsWith('layer-user-')) {
+        p = p.parentNode;
+      }
+      if (p && p.id) {
+        elData._layerId = p.id;
+      }
+    }
+    if (!elData._layerId) {
+      elData._layerId = 'layer-annotation';
+    }
+  }
+
   // Restore state
   const parsedElements = restoreState({
     dataURI,
@@ -1093,46 +1129,110 @@ export function openSVGProject(svgText) {
     elements,
   });
 
-  // Recreate annotation SVG elements
-  for (const el of parsedElements) {
-    if (el.type === 'line') {
-      addLineElement(el);
-    } else if (el.type === 'text') {
-      addTextElement(el);
-    } else if (el.type === 'freehand') {
-      addFreehandElement(el);
-    } else if (el.type === 'rectangle') {
-      addRectangleElement(el);
-    }
-    state.elements.push(el);
+  // ── Rebuild layer structures ──
+  // Build new layerOrder: system layers + parsed user layers
+  var newLayerOrder = [
+    { id: 'layer-image', name: 'Image', system: true },
+  ];
+  for (var pli = 0; pli < parsedLayers.length; pli++) {
+    newLayerOrder.push({
+      id: parsedLayers[pli].id,
+      name: parsedLayers[pli].name,
+      system: false,
+    });
   }
+  newLayerOrder.push(
+    { id: 'layer-watermark', name: 'Watermark', system: true },
+    { id: 'layer-grid', name: 'Grid', system: true },
+  );
+  setLayerOrder(newLayerOrder);
 
-  // Recreate group structure in DOM
-  var groups = state.elements.filter(function(e) { return e.type === 'group'; });
-  for (var g2 = 0; g2 < groups.length; g2++) {
-    var gData = groups[g2];
-    var existingG = dom.annotationLayer.querySelector('#' + CSS.escape(gData.id));
-    if (!existingG) {
-      var gEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-      gEl.id = gData.id;
-      gEl.setAttribute('data-type', 'group');
-      for (var ci2 = 0; ci2 < gData.childIds.length; ci2++) {
-        var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(gData.childIds[ci2]));
-        if (childSvg) gEl.appendChild(childSvg);
-      }
-      dom.annotationLayer.appendChild(gEl);
+  // Set userLayerCounter to prevent ID conflicts on new layers
+  var maxUserNum = 1;
+  for (var pli = 0; pli < parsedLayers.length; pli++) {
+    var plid = parsedLayers[pli].id;
+    if (plid.startsWith('layer-user-')) {
+      var n = parseInt(plid.replace('layer-user-', ''), 10);
+      if (n > maxUserNum) maxUserNum = n;
     }
   }
+  setUserLayerCounter(maxUserNum);
 
-  // Restore layer visibility from parsed SVG
-  var parsedAnnG = doc.getElementById('layer-annotation');
-  if (parsedAnnG && parsedAnnG.hasAttribute('visibility')) {
-    if (parsedAnnG.getAttribute('visibility') === 'hidden') {
-      dom.annotationLayer.setAttribute('visibility', 'hidden');
+  // Group parsed elements by layer
+  var elsByLayer = {};
+  for (var ei2 = 0; ei2 < parsedElements.length; ei2++) {
+    var el2 = parsedElements[ei2];
+    var lid2 = el2._layerId || 'layer-annotation';
+    if (!elsByLayer[lid2]) elsByLayer[lid2] = [];
+    elsByLayer[lid2].push(el2);
+    delete el2._layerId; // clean up temp property
+  }
+
+  var wmG = document.getElementById('layer-watermark');
+
+  // For each parsed layer (in order), create/clear <g> and insert before watermark
+  for (var pli2 = 0; pli2 < parsedLayers.length; pli2++) {
+    var pl = parsedLayers[pli2];
+    var liveG = document.getElementById(pl.id);
+    if (!liveG) {
+      liveG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      liveG.setAttribute('id', pl.id);
     } else {
-      dom.annotationLayer.removeAttribute('visibility');
+      liveG.innerHTML = '';
+    }
+    if (wmG && wmG.parentNode) {
+      wmG.parentNode.insertBefore(liveG, wmG);
     }
   }
+
+  // Recreate elements per layer
+  state.elements = [];
+  for (var pli3 = 0; pli3 < parsedLayers.length; pli3++) {
+    var pl3 = parsedLayers[pli3];
+    var liveG = document.getElementById(pl3.id);
+    if (!liveG) continue;
+
+    // Set dom.annotationLayer to this layer's <g> so element creators use it
+    dom.annotationLayer = liveG;
+
+    var layerEls = elsByLayer[pl3.id] || [];
+
+    // First pass: non-group, non-child elements
+    for (var ei3 = 0; ei3 < layerEls.length; ei3++) {
+      var el3 = layerEls[ei3];
+      if (el3.type === 'group' || el3.parentId) continue;
+      recreateElement(el3);
+      state.elements.push(el3);
+    }
+
+    // Second pass: groups (move children inside group <g>)
+    for (var gi3 = 0; gi3 < layerEls.length; gi3++) {
+      var gData3 = layerEls[gi3];
+      if (gData3.type !== 'group') continue;
+      var gEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      gEl.id = gData3.id;
+      gEl.setAttribute('data-type', 'group');
+      for (var ci3 = 0; ci3 < gData3.childIds.length; ci3++) {
+        var childDom = liveG.querySelector('#' + CSS.escape(gData3.childIds[ci3]));
+        if (childDom) gEl.appendChild(childDom);
+      }
+      liveG.appendChild(gEl);
+      state.elements.push(gData3);
+    }
+  }
+
+  // Restore visibility from parsed layer data
+  for (var pli4 = 0; pli4 < parsedLayers.length; pli4++) {
+    var pl4 = parsedLayers[pli4];
+    var liveG4 = document.getElementById(pl4.id);
+    if (!liveG4) continue;
+    if (pl4.visibility === 'hidden') {
+      liveG4.setAttribute('visibility', 'hidden');
+    } else if (pl4.visibility) {
+      liveG4.removeAttribute('visibility');
+    }
+  }
+  // Restore visibility for system layers (image, watermark)
   var parsedImgG = doc.getElementById('layer-image');
   if (parsedImgG && parsedImgG.hasAttribute('visibility')) {
     if (parsedImgG.getAttribute('visibility') === 'hidden') {
@@ -1150,6 +1250,16 @@ export function openSVGProject(svgText) {
     }
   }
   renderLayerList();
+
+  // Select first user layer
+  var firstUser = null;
+  for (var fi = 0; fi < parsedLayers.length; fi++) {
+    if (parsedLayers[fi].id !== 'layer-annotation') {
+      firstUser = parsedLayers[fi].id;
+      break;
+    }
+  }
+  selectLayer(firstUser || 'layer-annotation');
 
   // Transfer watermark pattern from parsed SVG to live editor
   var parsedPattern = doc.getElementById('watermark-pattern');
@@ -1362,6 +1472,25 @@ async function renderExportCanvas(targetW, targetH) {
   return { canvas: c };
 }
 
+// ── Layer helpers ────────────────────────────────────────────────
+
+function isElementInLayer(elementId, layerId) {
+  var domEl = document.getElementById(elementId);
+  if (!domEl) return false;
+  var p = domEl.parentNode;
+  while (p && p.id && p.id !== layerId && !p.id.startsWith('layer-')) {
+    p = p.parentNode;
+  }
+  return p && p.id === layerId;
+}
+
+function recreateElement(el) {
+  if (el.type === 'line') addLineElement(el);
+  else if (el.type === 'text') addTextElement(el);
+  else if (el.type === 'freehand') addFreehandElement(el);
+  else if (el.type === 'rectangle') addRectangleElement(el);
+}
+
 // ── Save SVG ────────────────────────────────────────────────────
 
 export function generateSVGString() {
@@ -1387,12 +1516,30 @@ export function generateSVGString() {
   svg += `transform="${imgTransform}" />\n`;
   svg += `</g>\n`;
 
-  var annVis = dom.annotationLayer.getAttribute('visibility');
-  svg += `<g id="layer-annotation" transform="${imgTransform}" visibility="${annVis === 'hidden' ? 'hidden' : 'visible'}">\n`;
-  for (const el of state.elements) {
-    svg += serializeElement(el);
+  // Walk DOM children in order — preserves layer ordering
+  var svgChildren = dom.svg.children;
+  for (var i = 0; i < svgChildren.length; i++) {
+    var child = svgChildren[i];
+    if (child.tagName !== 'g') continue;
+    var layerId = child.id;
+    if (!layerId || layerId === 'layer-image' || layerId === 'layer-watermark' || layerId === 'layer-grid') continue;
+
+    var visibility = child.getAttribute('visibility');
+    var layerName = child.getAttribute('data-layer-name') || layerId;
+    var layerTransform = child.getAttribute('transform') || '';
+
+    svg += `<g id="${layerId}" data-layer-name="${escapeXml(layerName)}" transform="${layerTransform}" visibility="${visibility === 'hidden' ? 'hidden' : 'visible'}">\n`;
+
+    for (var j = 0; j < state.elements.length; j++) {
+      var el = state.elements[j];
+      if (el.parentId) continue;
+      if (isElementInLayer(el.id, layerId)) {
+        svg += serializeElement(el);
+      }
+    }
+
+    svg += `</g>\n`;
   }
-  svg += `</g>\n`;
 
   svg += buildWatermarkDefs();
   var wmVis = dom.watermarkLayer.getAttribute('visibility');
