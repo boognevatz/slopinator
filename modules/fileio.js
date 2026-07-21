@@ -1,6 +1,6 @@
 // ── File I/O module: Open, Save SVG, Export JPG ────────────────
 
-import { state, dom, loadImage, restoreState, getViewBoxDims } from './editor.js';
+import { state, dom, loadImage, restoreState, getViewBoxDims, showLoading, hideLoading } from './editor.js';
 import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLineMarkerSize, normalizeLineDecoration } from './line.js';
 import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
@@ -671,6 +671,7 @@ export function updateFilenameDisplay() {
 }
 
 function openImageFile(file) {
+  showLoading();
   const reader = new FileReader();
   reader.onload = (e) => {
     const dataURI = e.target.result;
@@ -815,6 +816,7 @@ function resizeImage(newWidth, newHeight) {
 // ── Open SVG Project ────────────────────────────────────────────
 
 export function openSVGProject(svgText) {
+  showLoading();
   if (!state.filename) state.filename = 'annotation.svg';
   // Check if it's our annotator project file
   if (!svgText.includes('data-annotator-version')) {
@@ -839,12 +841,17 @@ export function openSVGProject(svgText) {
     img.onerror = () => {
       alert('Failed to load SVG as image.');
       URL.revokeObjectURL(url);
+      hideLoading();
     };
     img.src = url;
     return;
   }
 
-  // Parse the annotator SVG
+  // Defer parsing to next task so the browser paints the loading bar first
+  setTimeout(() => _openAnnotatorProject(svgText), 0);
+}
+
+function _openAnnotatorProject(svgText) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgText, 'image/svg+xml');
   const svgRoot = doc.documentElement;
@@ -878,6 +885,7 @@ export function openSVGProject(svgText) {
     box.appendChild(btnRow);
     dlg.appendChild(box);
     document.body.appendChild(dlg);
+    hideLoading();
     return;
   }
 
@@ -1274,6 +1282,7 @@ export function openSVGProject(svgText) {
   refreshPalette();
   switchTool(state.defaultTool || 'select');
   updateWatermark();
+  hideLoading();
 }
 
 // ── Export render helpers ────────────────────────────────────────

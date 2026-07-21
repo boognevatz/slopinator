@@ -658,7 +658,7 @@ body {
 
 /* ── Empty State ─────────────────────────────────────── */
 
-#resize-notification {
+.notification-strip {
   position: absolute;
   top: 0;
   left: 0;
@@ -672,6 +672,10 @@ body {
   padding: 8px;
   z-index: 30;
   font-size: 13px;
+}
+
+.notification-strip[hidden] {
+  display: none !important;
 }
 
 #resize-notification button {
@@ -697,8 +701,8 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-#resize-notification[hidden] {
-  display: none !important;
+#loading-notification {
+  pointer-events: none;
 }
 
 #empty-state {

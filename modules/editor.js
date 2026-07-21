@@ -116,11 +116,22 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
   // Enable toolbar buttons
   enableImageButtons(true);
   document.dispatchEvent(new CustomEvent('image-loaded'));
+  hideLoading();
 }
 
 /**
  * Update the SVG viewBox and physical dimensions based on image, rotation, and zoom.
  */
+export function showLoading() {
+  var el = document.getElementById('loading-notification');
+  if (el) el.hidden = false;
+}
+
+export function hideLoading() {
+  var el = document.getElementById('loading-notification');
+  if (el) el.hidden = true;
+}
+
 export function updateViewBox() {
   if (!state.hasImage) return;
   const { naturalWidth, naturalHeight, rotation, zoomScale } = state.image;
