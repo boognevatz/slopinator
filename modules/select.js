@@ -766,7 +766,7 @@ function drawLineHandles(data) {
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
 
     const iconSize = 24;
-    const desiredIconSize = Math.max(16, Math.min(36, len * 0.4));
+    const desiredIconSize = Math.max(32, Math.min(72, len * 0.8));
     const iconScale = desiredIconSize / iconSize;
     const actualSize = iconSize * iconScale;
 
@@ -827,10 +827,10 @@ function drawTextHandles(data) {
   });
   handleGroup.appendChild(selBox);
 
-  // 4 corner resize handles, square, 30% of the longest edge
-  const size = Math.min(bw, bh) * 0.3;
-  const hw = size;
-  const hh = size;
+  // 4 corner resize handles, square, same size as line endpoint handles
+  const r = getHandleRadius();
+  const hw = r * 2;
+  const hh = r * 2;
 
   const isRotate = textInteractMode === 'rotate';
 
@@ -854,9 +854,9 @@ function drawTextHandles(data) {
   // Draw the center mode-toggle icon
   const iconSize = 24; // Base size for icon viewBox
   
-  // Scale the icon so it stays visually proportional to the box size (unclamped)
-  // Making it roughly the same size as the corner handles (or slightly larger)
-  const desiredIconSize = Math.min(bw, bh) * 0.4;
+  // Scale the icon so it stays visually proportional to the box size, clamped
+  // Making it roughly twice the corner handles
+  const desiredIconSize = Math.max(32, Math.min(72, Math.min(bw, bh) * 0.8));
   const iconScale = desiredIconSize / iconSize;
   const actualSize = iconSize * iconScale;
 
@@ -938,8 +938,8 @@ function drawRectangleHandles(data) {
   }
 
   const iconSize = 24;
-  const desiredIconSize = Math.min(w, h) * 0.4;
-  const iconScale = Math.max(0.5, Math.min(1.5, desiredIconSize / iconSize));
+  const desiredIconSize = Math.min(w, h) * 0.8;
+  const iconScale = Math.max(1.0, Math.min(3.0, desiredIconSize / iconSize));
   const actualSize = iconSize * iconScale;
 
   const iconG = svgEl('g', {
