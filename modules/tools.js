@@ -70,6 +70,13 @@ export function switchTool(tool) {
     if (sel && sel.type === 'text') selectedTextId = sel.id;
   }
 
+  // Capture selected rectangle id before deactivating
+  let selectedRectId = null;
+  if (state.selectedId && tool === 'rectangle') {
+    const sel = state.elements.find(el => el.id === state.selectedId);
+    if (sel && sel.type === 'rectangle') selectedRectId = sel.id;
+  }
+
   // Deactivate current
   switch (state.activeTool) {
     case 'select': deactivateSelect(); break;
@@ -99,7 +106,7 @@ export function switchTool(tool) {
     case 'text': activateText(selectedTextId); break;
     case 'crop': activateCrop(); break;
     case 'freehand': activateFreehand(); break;
-    case 'rectangle': activateRectangle(); break;
+    case 'rectangle': activateRectangle(selectedRectId); break;
     case 'perspective': activatePerspective(); break;
     case 'color': activateColorCorrection(); break;
     case 'measure': activateMeasure(); break;

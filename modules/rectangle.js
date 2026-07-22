@@ -25,13 +25,15 @@ var CORNERS = ['tl', 'tr', 'br', 'bl'];
 
 export function initRectangle() {}
 
-export function activateRectangle() {
+export function activateRectangle(preSelectId) {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onMouseDown);
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('palette-bgcolor-changed', onPaletteBgChange);
-  if (state.selectedId) {
-    var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  var targetId = preSelectId || state.selectedId;
+  if (targetId) {
+    if (preSelectId) selectElement(preSelectId);
+    var data = state.elements.find(function(el) { return el.id === targetId; });
     if (data && data.type === 'rectangle') {
       drawRectToolCircleHandles(data, activeCorner);
     }
