@@ -38,18 +38,81 @@ export function initSettings() {
   });
 
   document.getElementById('btn-settings-opfs-refresh').addEventListener('click', renderOpfsInfo);
-  document.getElementById('btn-settings-opfs-new-folder').addEventListener('click', async function() {
-    var name = prompt('Enter folder name:');
-    if (!name) return;
-    name = name.trim();
-    if (!name) return;
-    try {
-      var dirHandle = await _opfsGetCurrentDir();
-      await dirHandle.getDirectoryHandle(name, { create: true });
-      renderOpfsInfo();
-    } catch (e) {
-      console.error('OPFS create folder error:', e);
+  var _newFolderBtn = document.getElementById('btn-settings-opfs-new-folder');
+  var _newFolderRow = null;
+  function _resetNewFolderBtn() { _newFolderBtn.textContent = '+ New Folder'; _newFolderRow = null; }
+  function _commitNewFolder(input, tr) {
+    var val = input.value.trim();
+    tr.remove();
+    _resetNewFolderBtn();
+    if (!val) return;
+    (async function() {
+      try {
+        var dirHandle = await _opfsGetCurrentDir();
+        await dirHandle.getDirectoryHandle(val, { create: true });
+        renderOpfsInfo();
+      } catch (e) {
+        console.error('OPFS create folder error:', e);
+        renderOpfsInfo();
+      }
+    })();
+  }
+
+  _newFolderBtn.addEventListener('click', function() {
+    if (_newFolderRow) {
+      var inp = _newFolderRow.querySelector('input');
+      if (inp) _commitNewFolder(inp, _newFolderRow);
+      return;
     }
+    var tbody = document.getElementById('settings-opfs-tbody');
+
+    var tr = document.createElement('tr');
+    tr.id = 'opfs-new-folder-row';
+    _newFolderRow = tr;
+
+    var td0 = document.createElement('td');
+    td0.style.width = '30px';
+    td0.style.textAlign = 'center';
+
+    var tdName = document.createElement('td');
+    tdName.style.padding = '2px 8px';
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Folder name...';
+    input.style.cssText = 'width:100%;font-family:monospace;font-size:11px;background:var(--color-bg-light);color:var(--color-text);border:1px solid var(--color-accent);border-radius:2px;padding:1px 3px;outline:none;box-sizing:border-box;';
+    tdName.appendChild(input);
+
+    var tdSize = document.createElement('td');
+    tdSize.style.textAlign = 'right';
+    tdSize.style.fontFamily = 'monospace';
+    tdSize.style.fontSize = '11px';
+    tdSize.textContent = '\u2014';
+
+    var tdDate = document.createElement('td');
+    tdDate.style.textAlign = 'right';
+    tdDate.style.fontFamily = 'monospace';
+    tdDate.style.fontSize = '11px';
+    tdDate.style.color = '#999';
+    tdDate.textContent = '\u2014';
+
+    tr.appendChild(td0);
+    tr.appendChild(tdName);
+    tr.appendChild(tdSize);
+    tr.appendChild(tdDate);
+
+    var parentRow = tbody.querySelector('tr');
+    if (parentRow) tbody.insertBefore(tr, parentRow);
+    else tbody.appendChild(tr);
+
+    input.focus();
+
+    input.addEventListener('input', function() {
+      _newFolderBtn.textContent = input.value.trim() ? 'Create' : '+ New Folder';
+    });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); _commitNewFolder(input, tr); }
+      if (e.key === 'Escape') { e.preventDefault(); tr.remove(); _resetNewFolderBtn(); }
+    });
   });
   document.getElementById('opfs-select-all').addEventListener('change', toggleSelectAllOpfs);
   document.getElementById('btn-opfs-delete').addEventListener('click', deleteSelectedOpfs);
@@ -321,7 +384,6 @@ function renderLocalStorageInfo() {
 async function renderOpfsInfo() {
   renderBreadcrumb();
   const tbody = document.getElementById('settings-opfs-tbody');
-  tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
   let total = 0;
   let fileCount = 0;
   let dirCount = 0;
