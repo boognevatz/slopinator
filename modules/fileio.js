@@ -1511,7 +1511,7 @@ export function generateSVGString() {
     var child = svgChildren[i];
     if (child.tagName !== 'g') continue;
     var layerId = child.id;
-    if (!layerId || layerId === 'layer-image' || layerId === 'layer-watermark' || layerId === 'layer-grid') continue;
+    if (!layerId || layerId === 'layer-image' || layerId === 'layer-watermark' || layerId === 'layer-grid' || layerId === 'handle-layer') continue;
 
     var visibility = child.getAttribute('visibility');
     var layerName = child.getAttribute('data-layer-name') || layerId;
