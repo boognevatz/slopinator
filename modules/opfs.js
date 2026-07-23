@@ -7,6 +7,7 @@ const BASE_TITLE = document.title || 'Slopinator';
 
 let _dirty = false;
 let _dirtyTime = 0;
+let _lastAutosaveTime = null;
 let _autosaveIntervalId = null;
 
 function getAutosaveFilename() {
@@ -26,6 +27,8 @@ export async function saveToOPFS(data) {
   await writable.write(data);
   await writable.close();
   _dirty = false;
+  var file = await handle.getFile();
+  _lastAutosaveTime = file.lastModified || Date.now();
 }
 
 export async function deleteAutosave(filename) {
@@ -92,7 +95,7 @@ function showNotification(msg, isError) {
 
 function updateDisplay(text) {
   var el = document.getElementById('autosave-status');
-  if (el) el.textContent = 'autosave: ' + text;
+  if (el) el.textContent = text;
 }
 
 function formatRemaining(ms) {
@@ -103,13 +106,29 @@ function formatRemaining(ms) {
   return min + ':' + (sec < 10 ? '0' : '') + sec;
 }
 
+function formatTimeAgo(timestamp) {
+  var diff = Math.floor((Date.now() - timestamp) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff / 60) + ' mins ago';
+  if (diff < 86400) {
+    var h = Math.floor(diff / 3600);
+    return h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+  }
+  var d = Math.floor(diff / 86400);
+  return d + ' day' + (d > 1 ? 's' : '') + ' ago';
+}
+
 function updateAutosaveDisplay() {
-  if (!state.autosaveEnabled || !_dirty) {
-    updateDisplay('--:--');
+  if (_dirty && state.autosaveEnabled) {
+    var remaining = AUTOSAVE_INTERVAL - (Date.now() - _dirtyTime);
+    updateDisplay('autosave in ' + formatRemaining(remaining));
     return;
   }
-  var remaining = AUTOSAVE_INTERVAL - (Date.now() - _dirtyTime);
-  updateDisplay(formatRemaining(remaining));
+  if (_lastAutosaveTime) {
+    updateDisplay('Last autosave ' + formatTimeAgo(_lastAutosaveTime));
+  } else {
+    updateDisplay('No autosave yet');
+  }
 }
 
 function trySave() {
@@ -150,6 +169,8 @@ export async function loadAutosave() {
       }
       updateFilenameDisplay();
       _dirty = false;
+      _lastAutosaveTime = found.file.lastModified || Date.now();
+      updateAutosaveDisplay();
     }
   } catch {}
 }
@@ -190,6 +211,8 @@ export function initAutosave() {
       trySave();
     }
   });
+
+  updateAutosaveDisplay();
 }
 
 export function stopAutosave() {
