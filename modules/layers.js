@@ -13,6 +13,24 @@ var layerOrder = [];
 var userLayerCounter = 0;
 var _selectedRow = null;
 
+export function deleteLayers() {
+  var imageLayer = document.getElementById('layer-image');
+  var handleLayer = document.getElementById('handle-layer');
+  if (!imageLayer || !handleLayer) return;
+  var el = imageLayer.nextElementSibling;
+  while (el && el !== handleLayer) {
+    var next = el.nextElementSibling;
+    el.remove();
+    el = next;
+  }
+  var ids = ['layer-annotation', 'layer-watermark', 'layer-grid'];
+  for (var i = 0; i < ids.length; i++) {
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('id', ids[i]);
+    dom.svg.insertBefore(g, handleLayer);
+  }
+}
+
 export function initLayers() {
   initLayerOrder();
 

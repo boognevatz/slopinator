@@ -1,6 +1,7 @@
 // ── Editor module: SVG setup, viewBox management, image rendering ──
 
 import { svgEl } from './utils.js';
+import { deleteLayers, initLayers } from './layers.js';
 
 const DEFAULT_PALETTE = [
   '#000000', '#ffffff', '#ff0000', '#00aa00', '#0055ff', '#ffdd00',
@@ -91,7 +92,8 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
 
   // Clear previous
   dom.imageLayer.innerHTML = '';
-  dom.annotationLayer.innerHTML = '';
+  deleteLayers();
+  initLayers();
   dom.handleLayer.innerHTML = '';
   state.elements = [];
   state.selectedId = null;
