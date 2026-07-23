@@ -289,15 +289,7 @@ export function startEditing(id) {
   const container = document.getElementById('editor-container');
   const containerRect = container.getBoundingClientRect();
 
-  // Use the SVG coordinate anchor (data.x) for horizontal position via the
-  // annotation layer CTM — more reliable than getBoundingClientRect().left
-  // which can include font-metric padding quirks.
-  const pt = dom.svg.createSVGPoint();
-  pt.x = data.x;
-  pt.y = data.y;
-  const layerCtm = dom.annotationLayer.getScreenCTM();
-  const anchorScreen = layerCtm ? pt.matrixTransform(layerCtm) : { x: textRect.left, y: textRect.top };
-  const relX = anchorScreen.x - containerRect.left;
+  const relX = textRect.left - containerRect.left;
   const relY = textRect.top - containerRect.top;
 
   // Get the true SVG-to-screen scale via the CTM (handles letterboxing correctly)

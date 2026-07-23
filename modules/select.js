@@ -2,6 +2,7 @@
 
 import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
+import { snapToGrid } from './grid.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
 import { refreshPalette } from './palette.js';
@@ -804,11 +805,10 @@ function drawTextHandles(data) {
     return;
   }
 
-  const pad = 4;
-  const bx = bbox.x - pad;
-  const by = bbox.y - pad;
-  const bw = bbox.width + pad * 2;
-  const bh = bbox.height + pad * 2;
+  const bx = bbox.x;
+  const by = bbox.y;
+  const bw = bbox.width;
+  const bh = bbox.height;
 
   // Center of the text
   const cx = bbox.x + bbox.width / 2;
@@ -974,12 +974,86 @@ function getHandleRadius() {
 
 // ── Drag (move) ─────────────────────────────────────────────────
 
+function getBBoxFromData(el) {
+  if (el.type === 'line') {
+    if (el.points && el.points.length) {
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (var pi = 0; pi < el.points.length; pi++) {
+        var p = el.points[pi];
+        if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+      }
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+    var lx1 = Math.min(el.x1, el.x2), lx2 = Math.max(el.x1, el.x2);
+    var ly1 = Math.min(el.y1, el.y2), ly2 = Math.max(el.y1, el.y2);
+    return { x: lx1, y: ly1, width: lx2 - lx1, height: ly2 - ly1 };
+  }
+  if (el.type === 'text') {
+    var textEl = dom.annotationLayer.querySelector('#' + CSS.escape(el.id));
+    if (textEl) {
+      try {
+        var bbox = textEl.getBBox();
+        return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
+      } catch {}
+    }
+    var charCount = (el.content || 'Text').length;
+    return { x: el.x, y: el.y - el.fontSize * 0.9, width: charCount * el.fontSize * 0.6, height: el.fontSize * 1.2 };
+  }
+  if (el.type === 'rectangle') {
+    return { x: el.x, y: el.y, width: el.width || 0, height: el.height || 0 };
+  }
+  if (el.type === 'freehand') {
+    var fxMin = Infinity, fyMin = Infinity, fxMax = -Infinity, fyMax = -Infinity;
+    for (var fi = 0; fi < el.points.length; fi++) {
+      var fp = el.points[fi];
+      if (fp.x < fxMin) fxMin = fp.x; if (fp.y < fyMin) fyMin = fp.y;
+      if (fp.x > fxMax) fxMax = fp.x; if (fp.y > fyMax) fyMax = fp.y;
+    }
+    return { x: fxMin, y: fyMin, width: fxMax - fxMin, height: fyMax - fyMin };
+  }
+  return { x: 0, y: 0, width: 0, height: 0 };
+}
+
 function startDrag(id, startPt) {
   const data = state.elements.find(el => el.id === id);
   if (!data) return;
 
+  // Combined bounding box of all selected elements
+  var ids = state.selectedIds.length ? state.selectedIds : [id];
+  var bbox = null;
+  for (var si = 0; si < ids.length; si++) {
+    var el = state.elements.find(function(e) { return e.id === ids[si]; });
+    if (!el) continue;
+    var eb = getBBoxFromData(el);
+    if (!bbox) bbox = eb;
+    else {
+      var x1 = Math.min(bbox.x, eb.x);
+      var y1 = Math.min(bbox.y, eb.y);
+      var x2 = Math.max(bbox.x + bbox.width, eb.x + eb.width);
+      var y2 = Math.max(bbox.y + bbox.height, eb.y + eb.height);
+      bbox = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+    }
+  }
+  if (!bbox) bbox = { x: startPt.x, y: startPt.y, width: 0, height: 0 };
+
+  // Find closest snap point (4 corners + center)
+  var corners = [
+    { x: bbox.x, y: bbox.y },
+    { x: bbox.x + bbox.width, y: bbox.y },
+    { x: bbox.x, y: bbox.y + bbox.height },
+    { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+    { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 },
+  ];
+  var closest = corners[0];
+  var minDist = Infinity;
+  for (var j = 0; j < corners.length; j++) {
+    var d = Math.hypot(corners[j].x - startPt.x, corners[j].y - startPt.y);
+    if (d < minDist) { minDist = d; closest = corners[j]; }
+  }
+
   isDragging = true;
-  dragStart = { x: startPt.x, y: startPt.y, _time: Date.now() };
+  dragStart = { x: closest.x, y: closest.y, _time: Date.now(), _offX: closest.x - startPt.x, _offY: closest.y - startPt.y };
   dragOriginal = { ...data };
   dragOriginals = state.selectedIds.map(function(sid) {
     var el = state.elements.find(function(e) { return e.id === sid; });
@@ -992,9 +1066,10 @@ function startDrag(id, startPt) {
 
 function onDragMove(e) {
   if (!isDragging) return;
-  const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const dx = pt.x - dragStart.x;
-  const dy = pt.y - dragStart.y;
+  const rawPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  const snappedPt = snapToGrid({ x: rawPt.x + dragStart._offX, y: rawPt.y + dragStart._offY });
+  const dx = snappedPt.x - dragStart.x;
+  const dy = snappedPt.y - dragStart.y;
 
   for (var i = 0; i < dragOriginals.length; i++) {
     var orig = dragOriginals[i];
