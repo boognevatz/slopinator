@@ -1,7 +1,6 @@
 import { generateSVGString, openSVGProject, updateFilenameDisplay } from './fileio.js';
 import { state } from './editor.js';
 
-const AUTOSAVE_FILE = 'autosave.svg';
 const AUTOSAVE_INTERVAL = 5 * 60 * 1000;
 const CHECK_INTERVAL = 10000;
 const BASE_TITLE = document.title || 'Slopinator';
@@ -10,28 +9,29 @@ let _dirty = false;
 let _dirtyTime = 0;
 let _autosaveIntervalId = null;
 
-async function getFileHandle(create) {
+function getAutosaveFilename() {
+  var base = state.filename.replace(/\.svg$/i, '');
+  return 'autosave-' + base + '.svg';
+}
+
+async function getFileHandle(filename, create) {
   const root = await navigator.storage.getDirectory();
-  return root.getFileHandle(AUTOSAVE_FILE, { create });
+  return root.getFileHandle(filename, { create });
 }
 
 export async function saveToOPFS(data) {
-  const handle = await getFileHandle(true);
+  var name = getAutosaveFilename();
+  const handle = await getFileHandle(name, true);
   const writable = await handle.createWritable();
   await writable.write(data);
   await writable.close();
   _dirty = false;
 }
 
-export async function loadFromOPFS() {
-  const handle = await getFileHandle(false);
-  const file = await handle.getFile();
-  return await file.text();
-}
-
-export async function deleteAutosave() {
+export async function deleteAutosave(filename) {
+  var name = filename || getAutosaveFilename();
   const root = await navigator.storage.getDirectory();
-  await root.removeEntry(AUTOSAVE_FILE).catch(function() {});
+  await root.removeEntry(name).catch(function() {});
 }
 
 export async function saveAutosave(showFeedback) {
@@ -121,12 +121,33 @@ function trySave() {
   }
 }
 
+async function findLatestAutosave() {
+  const root = await navigator.storage.getDirectory();
+  var best = null;
+  var bestTime = 0;
+  for await (const [name, handle] of root.entries()) {
+    if (handle.kind !== 'file') continue;
+    if (!name.startsWith('autosave') || !name.endsWith('.svg')) continue;
+    var file = await handle.getFile();
+    var t = file.lastModified || 0;
+    if (t > bestTime) { bestTime = t; best = { name, file }; }
+  }
+  return best;
+}
+
 export async function loadAutosave() {
   try {
-    var svgText = await loadFromOPFS();
+    var found = await findLatestAutosave();
+    if (!found) return;
+    var svgText = await found.file.text();
     if (svgText) {
       openSVGProject(svgText);
-      state.filename = 'autosave.svg';
+      var recovered = found.name;
+      if (recovered === 'autosave.svg') {
+        state.filename = 'annotation.svg';
+      } else {
+        state.filename = recovered.replace(/^autosave-/, '');
+      }
       updateFilenameDisplay();
       _dirty = false;
     }
@@ -146,6 +167,17 @@ export function initAutosave() {
 
   document.addEventListener('delete-autosave', function() {
     deleteAutosave();
+  });
+
+  document.addEventListener('file-renamed', function(e) {
+    var oldName = e.detail.oldName;
+    var newName = e.detail.newName;
+    if (oldName !== newName) {
+      var oldBase = oldName.replace(/\.svg$/i, '');
+      deleteAutosave('autosave-' + oldBase + '.svg');
+      markDirty();
+      trySave();
+    }
   });
 
   _autosaveIntervalId = setInterval(function() {

@@ -320,7 +320,7 @@ export function initFileIO() {
 
     function enterRenameMode() {
       _originalFilename = state.filename;
-      filenameInput.value = state.filename;
+      filenameInput.value = state.filename.replace(/\.svg$/i, '');
       filenameInput.style.borderColor = BORDER_DEFAULT;
       currentFilenameSpan.hidden = true;
       filenameInput.hidden = false;
@@ -333,19 +333,26 @@ export function initFileIO() {
     }
 
     function exitRenameMode(cancel) {
+      var oldName = state.filename;
       if (!cancel) {
         var val = filenameInput.value.trim();
-        if (val) state.filename = val;
+        if (val) state.filename = val.replace(/\.svg$/i, '') + '.svg';
       }
       filenameInput.hidden = true;
       filenameActions.style.display = '';
       filenameActions.hidden = true;
       currentFilenameSpan.hidden = false;
       updateFilenameDisplay();
+      if (!cancel && state.filename !== oldName) {
+        document.dispatchEvent(new CustomEvent('file-renamed', {
+          detail: { oldName, newName: state.filename }
+        }));
+      }
     }
 
     function syncFilenameButtons() {
-      var isDiff = (filenameInput.value !== _originalFilename);
+      var origBase = _originalFilename.replace(/\.svg$/i, '');
+      var isDiff = (filenameInput.value !== origBase);
       filenameInput.style.borderColor = isDiff ? 'var(--color-accent)' : BORDER_DEFAULT;
       btnFilenameSave.disabled = !isDiff;
       btnFilenameCancel.disabled = !isDiff;
@@ -370,7 +377,10 @@ export function initFileIO() {
       setTimeout(syncFilenameButtons, 0);
       e.stopPropagation();
     };
-    filenameInput.oninput = syncFilenameButtons;
+    filenameInput.oninput = function() {
+      this.value = this.value.replace(/[^0-9a-zA-Z_-]/g, '');
+      syncFilenameButtons();
+    };
     filenameInput.onclick = function(e) { e.stopPropagation(); };
   }
 
