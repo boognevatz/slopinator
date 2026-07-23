@@ -55,6 +55,7 @@ export function initSettings() {
   document.getElementById('btn-opfs-delete').addEventListener('click', deleteSelectedOpfs);
   document.getElementById('btn-opfs-copy').addEventListener('click', copySelectedOpfs);
   document.getElementById('btn-opfs-move').addEventListener('click', moveSelectedOpfs);
+  document.getElementById('btn-opfs-rename').addEventListener('click', renameSelectedOpfs);
   document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
   document.getElementById('tab-opfs').addEventListener('click', function() { switchSettingsTab('opfs'); });
 }
@@ -395,15 +396,32 @@ async function renderOpfsInfo() {
         dirCount++;
         tdName.textContent = '\uD83D\uDCC1 ' + name;
         tdName.style.cursor = 'pointer';
-        tdName.addEventListener('click', function(n) {
-          return function() {
-            _opfsPath.push(n);
-            _opfsSelection = new Set();
-            renderOpfsInfo();
-          };
-        }(name));
         tdSize.textContent = '\u2014';
         tdDate.textContent = '\u2014';
+
+        var navTimer = null;
+        function navInto() {
+          _opfsPath.push(name);
+          _opfsSelection = new Set();
+          renderOpfsInfo();
+        }
+
+        tdName.addEventListener('dblclick', function(e) {
+          e.preventDefault();
+          navInto();
+        });
+
+        tdName.addEventListener('mousedown', function(e) {
+          navTimer = setTimeout(navInto, 500);
+        });
+        tdName.addEventListener('mouseup', function() { if (navTimer) { clearTimeout(navTimer); navTimer = null; } });
+        tdName.addEventListener('mouseleave', function() { if (navTimer) { clearTimeout(navTimer); navTimer = null; } });
+
+        tdName.addEventListener('touchstart', function(e) {
+          navTimer = setTimeout(navInto, 500);
+        }, { passive: true });
+        tdName.addEventListener('touchend', function() { if (navTimer) { clearTimeout(navTimer); navTimer = null; } });
+        tdName.addEventListener('touchmove', function() { if (navTimer) { clearTimeout(navTimer); navTimer = null; } }, { passive: true });
       } else {
         var file = await handle.getFile();
         total += file.size;
@@ -413,6 +431,21 @@ async function renderOpfsInfo() {
         tdSize.textContent = formatSize(file.size);
         tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
       }
+
+      // Single click on name toggles checkbox
+      tdName.style.cursor = handle.kind === 'directory' ? 'pointer' : 'default';
+      tdName.addEventListener('click', function(n) {
+        return function() {
+          var checkbox = tr.cells[0].querySelector('input[type="checkbox"]');
+          if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            if (checkbox.checked) _opfsSelection.add(n);
+            else _opfsSelection.delete(n);
+            updateOpfsToolbar();
+            updateSelectAllCheckbox();
+          }
+        };
+      }(name));
 
       tr.dataset.name = name;
       tr.appendChild(td0);
@@ -487,12 +520,15 @@ function renderBreadcrumb() {
 
 function updateOpfsToolbar() {
   var hasSelection = _opfsSelection && _opfsSelection.size > 0;
+  var singleSel = _opfsSelection && _opfsSelection.size === 1;
   var del = document.getElementById('btn-opfs-delete');
   var copy = document.getElementById('btn-opfs-copy');
   var move = document.getElementById('btn-opfs-move');
+  var rename = document.getElementById('btn-opfs-rename');
   if (del) del.disabled = !hasSelection;
   if (copy) copy.disabled = !hasSelection;
   if (move) move.disabled = !hasSelection;
+  if (rename) rename.disabled = !singleSel;
 }
 
 function updateSelectAllCheckbox() {
@@ -594,6 +630,71 @@ async function _opfsCopyItem(srcDir, destDir, name, isDir) {
     var writable = await destFile.createWritable();
     await writable.write(file);
     await writable.close();
+  }
+}
+
+async function renameSelectedOpfs() {
+  if (!_opfsSelection || _opfsSelection.size !== 1) return;
+  var oldName = Array.from(_opfsSelection)[0];
+  var tbody = document.getElementById('settings-opfs-tbody');
+  var tr = Array.from(tbody.querySelectorAll('tr')).find(function(el) { return el.dataset.name === oldName; });
+  if (!tr) return;
+  var nameCell = tr.cells[1];
+  if (!nameCell) return;
+
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.style.cssText = 'width:100%;font-family:monospace;font-size:11px;background:var(--color-bg-light);color:var(--color-text);border:1px solid var(--color-accent);border-radius:2px;padding:1px 3px;outline:none;box-sizing:border-box;';
+  nameCell.textContent = '';
+  nameCell.appendChild(input);
+  input.focus();
+  input.select();
+
+  function commit() {
+    var newName = input.value.trim();
+    if (!newName || newName === oldName) { renderOpfsInfo(); return; }
+    if (newName.includes('/') || newName.includes('\\')) { renderOpfsInfo(); return; }
+    _doRename(oldName, newName);
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); renderOpfsInfo(); }
+  });
+}
+
+async function _doRename(oldName, newName) {
+  try {
+    var dirHandle = await _opfsGetCurrentDir();
+    var exists = await _opfsNameExists(dirHandle, newName);
+    if (exists) {
+      renderOpfsInfo();
+      return;
+    }
+    var isDir = false;
+    try { await dirHandle.getDirectoryHandle(oldName); isDir = true; } catch {}
+    if (isDir) {
+      var newDir = await dirHandle.getDirectoryHandle(newName, { create: true });
+      var oldDir = await dirHandle.getDirectoryHandle(oldName);
+      for await (var [childName, childHandle] of oldDir.entries()) {
+        await _opfsCopyItem(oldDir, newDir, childName, childHandle.kind === 'directory');
+      }
+    } else {
+      var srcFile = await dirHandle.getFileHandle(oldName);
+      var file = await srcFile.getFile();
+      var destFile = await dirHandle.getFileHandle(newName, { create: true });
+      var writable = await destFile.createWritable();
+      await writable.write(file);
+      await writable.close();
+    }
+    await dirHandle.removeEntry(oldName, { recursive: true });
+    _opfsSelection = new Set();
+    renderOpfsInfo();
+  } catch (e) {
+    console.error('OPFS rename error:', e);
+    renderOpfsInfo();
   }
 }
 
