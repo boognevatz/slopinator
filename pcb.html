@@ -349,28 +349,32 @@
           <button id="btn-settings-edit-cancel" style="font-size:11px;padding:2px 8px;cursor:pointer;" disabled>Cancel</button>
         </div>
       </div>
-      <div id="panel-opfs" hidden>
+      <div id="panel-opfs" hidden style="display:flex;flex-direction:column;min-height:0;flex:1;">
+        <div id="opfs-breadcrumb" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:4px 0 2px 4px;font-size:12px;font-family:monospace;color:#aaa;border-bottom:1px solid #444;"></div>
         <div style="overflow-y:auto;border:1px solid #444;border-radius:3px;flex:1;min-height:0;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
               <tr style="background:#3a3a3a;">
-                <th style="text-align:left;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">File</th>
+                <th style="width:30px;text-align:center;padding:4px 2px;color:#aaa;border-bottom:1px solid #555;"><input type="checkbox" id="opfs-select-all" title="Select all"></th>
+                <th style="text-align:left;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Name</th>
                 <th style="text-align:right;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Size</th>
                 <th style="text-align:right;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Modified</th>
-                <th style="text-align:center;padding:4px 8px;color:#aaa;border-bottom:1px solid #555;">Actions</th>
               </tr>
             </thead>
             <tbody id="settings-opfs-tbody"></tbody>
           </table>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px;">
-          <span style="color:#888;" id="settings-opfs-total-items">0 files</span>
+          <span style="color:#888;" id="settings-opfs-total-items">0 items</span>
           <span style="color:#aaa;">Total: <strong id="settings-opfs-total-usage">0 B</strong></span>
         </div>
-        <div style="display:flex;gap:6px;margin-top:4px;">
-          <button id="btn-settings-opfs-refresh" style="font-size:11px;padding:2px 8px;">Refresh</button>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+          <button id="btn-opfs-delete" disabled style="font-size:11px;padding:2px 8px;">Delete</button>
+          <button id="btn-opfs-copy" disabled style="font-size:11px;padding:2px 8px;">Copy</button>
+          <button id="btn-opfs-move" disabled style="font-size:11px;padding:2px 8px;">Move</button>
+          <span style="flex:1;"></span>
           <button id="btn-settings-opfs-new-folder" style="font-size:11px;padding:2px 8px;">New Folder</button>
-          <button id="btn-settings-opfs-clear" style="font-size:11px;padding:2px 8px;" disabled>Delete All</button>
+          <button id="btn-settings-opfs-refresh" style="font-size:11px;padding:2px 8px;">Refresh</button>
         </div>
       </div>
     </div>

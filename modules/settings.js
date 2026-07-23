@@ -38,20 +38,23 @@ export function initSettings() {
   });
 
   document.getElementById('btn-settings-opfs-refresh').addEventListener('click', renderOpfsInfo);
-  document.getElementById('btn-settings-opfs-clear').addEventListener('click', clearOpfsData);
   document.getElementById('btn-settings-opfs-new-folder').addEventListener('click', async function() {
     var name = prompt('Enter folder name:');
     if (!name) return;
     name = name.trim();
     if (!name) return;
     try {
-      const root = await navigator.storage.getDirectory();
-      await root.getDirectoryHandle(name, { create: true });
+      var dirHandle = await _opfsGetCurrentDir();
+      await dirHandle.getDirectoryHandle(name, { create: true });
       renderOpfsInfo();
     } catch (e) {
       console.error('OPFS create folder error:', e);
     }
   });
+  document.getElementById('opfs-select-all').addEventListener('change', toggleSelectAllOpfs);
+  document.getElementById('btn-opfs-delete').addEventListener('click', deleteSelectedOpfs);
+  document.getElementById('btn-opfs-copy').addEventListener('click', copySelectedOpfs);
+  document.getElementById('btn-opfs-move').addEventListener('click', moveSelectedOpfs);
   document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
   document.getElementById('tab-opfs').addEventListener('click', function() { switchSettingsTab('opfs'); });
 }
@@ -125,6 +128,8 @@ export function loadColorPreferences() {
 }
 
 var _opfsRendered = false;
+var _opfsPath = [];
+var _opfsSelection = new Set();
 
 function openSettings() {
   document.getElementById('settings-popup').hidden = false;
@@ -308,108 +313,346 @@ function renderLocalStorageInfo() {
 }
 
 async function renderOpfsInfo() {
+  renderBreadcrumb();
   const tbody = document.getElementById('settings-opfs-tbody');
   tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
   let total = 0;
   let fileCount = 0;
   let dirCount = 0;
   try {
-    const root = await navigator.storage.getDirectory();
+    var dirHandle = await _opfsGetCurrentDir();
     const rows = [];
-    for await (const [name, handle] of root.entries()) {
-      const tr = document.createElement('tr');
-      const tdName = document.createElement('td');
+
+    if (_opfsPath.length > 0) {
+      var tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      var td0 = document.createElement('td');
+      td0.style.width = '30px';
+      td0.style.textAlign = 'center';
+      var tdName = document.createElement('td');
+      tdName.textContent = '\u2191 ..';
       tdName.style.fontFamily = 'monospace';
       tdName.style.fontSize = '11px';
-      const tdSize = document.createElement('td');
+      tdName.addEventListener('click', function() {
+        _opfsPath.pop();
+        _opfsSelection = new Set();
+        renderOpfsInfo();
+      });
+      var tdSize = document.createElement('td');
       tdSize.style.textAlign = 'right';
       tdSize.style.fontFamily = 'monospace';
       tdSize.style.fontSize = '11px';
-      const tdDate = document.createElement('td');
+      var tdDate = document.createElement('td');
+      tdDate.style.textAlign = 'right';
+      tdDate.style.fontFamily = 'monospace';
+      tdDate.style.fontSize = '11px';
+      tr.appendChild(td0);
+      tr.appendChild(tdName);
+      tr.appendChild(tdSize);
+      tr.appendChild(tdDate);
+      rows.push({ tr, isParent: true, name: '..' });
+    }
+
+    for await (const [name, handle] of dirHandle.entries()) {
+      var tr = document.createElement('tr');
+
+      var td0 = document.createElement('td');
+      td0.style.width = '30px';
+      td0.style.textAlign = 'center';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = _opfsSelection.has(name);
+      cb.addEventListener('change', function(n, h) {
+        return function() {
+          if (this.checked) _opfsSelection.add(n);
+          else _opfsSelection.delete(n);
+          updateOpfsToolbar();
+          updateSelectAllCheckbox();
+        };
+      }(name, handle));
+      td0.appendChild(cb);
+
+      var tdName = document.createElement('td');
+      tdName.style.fontFamily = 'monospace';
+      tdName.style.fontSize = '11px';
+      tdName.style.whiteSpace = 'nowrap';
+      tdName.style.overflow = 'hidden';
+      tdName.style.textOverflow = 'ellipsis';
+      tdName.style.maxWidth = '160px';
+
+      var tdSize = document.createElement('td');
+      tdSize.style.textAlign = 'right';
+      tdSize.style.fontFamily = 'monospace';
+      tdSize.style.fontSize = '11px';
+
+      var tdDate = document.createElement('td');
       tdDate.style.textAlign = 'right';
       tdDate.style.fontFamily = 'monospace';
       tdDate.style.fontSize = '11px';
       tdDate.style.color = '#999';
-      const tdActions = document.createElement('td');
-      tdActions.style.textAlign = 'center';
 
       if (handle.kind === 'directory') {
         dirCount++;
         tdName.textContent = '\uD83D\uDCC1 ' + name;
+        tdName.style.cursor = 'pointer';
+        tdName.addEventListener('click', function(n) {
+          return function() {
+            _opfsPath.push(n);
+            _opfsSelection = new Set();
+            renderOpfsInfo();
+          };
+        }(name));
         tdSize.textContent = '\u2014';
         tdDate.textContent = '\u2014';
-        const btn = document.createElement('button');
-        btn.textContent = '\u2716';
-        btn.title = 'Delete folder ' + name;
-        btn.style.fontSize = '11px';
-        btn.style.padding = '1px 6px';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', async function(e) {
-          e.stopPropagation();
-          if (!confirm('Delete folder "' + name + '" and all its contents?')) return;
-          try {
-            const r = await navigator.storage.getDirectory();
-            await r.removeEntry(name, { recursive: true });
-            renderOpfsInfo();
-          } catch (err) {
-            console.error('OPFS delete folder error:', err);
-          }
-        });
-        tdActions.appendChild(btn);
       } else {
-        const file = await handle.getFile();
+        var file = await handle.getFile();
         total += file.size;
         fileCount++;
         tdName.textContent = '\uD83D\uDCC4 ' + name;
+        tdName.title = name;
         tdSize.textContent = formatSize(file.size);
         tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
-        const btn = document.createElement('button');
-        btn.textContent = '\u2193';
-        btn.title = 'Download ' + name;
-        btn.style.fontSize = '11px';
-        btn.style.padding = '1px 6px';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', async function(e) {
-          e.stopPropagation();
-          try {
-            const dlFile = await handle.getFile();
-            const dlUrl = URL.createObjectURL(dlFile);
-            const a = document.createElement('a');
-            a.href = dlUrl;
-            a.download = name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(function() { URL.revokeObjectURL(dlUrl); }, 1000);
-          } catch (dlErr) {
-            console.error('OPFS download error:', dlErr);
-          }
-        });
-        tdActions.appendChild(btn);
       }
 
+      tr.dataset.name = name;
+      tr.appendChild(td0);
       tr.appendChild(tdName);
       tr.appendChild(tdSize);
       tr.appendChild(tdDate);
-      tr.appendChild(tdActions);
-      rows.push({ tr, isDir: handle.kind === 'directory', name });
+      rows.push({ tr, isParent: false, isDir: handle.kind === 'directory', name });
     }
+
     rows.sort(function(a, b) {
+      if (a.isParent) return -1;
+      if (b.isParent) return 1;
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
     tbody.innerHTML = '';
     for (var i = 0; i < rows.length; i++) tbody.appendChild(rows[i].tr);
+
     var itemLabel = fileCount + ' file' + (fileCount !== 1 ? 's' : '');
     if (dirCount > 0) itemLabel += ', ' + dirCount + ' folder' + (dirCount !== 1 ? 's' : '');
     document.getElementById('settings-opfs-total-usage').textContent = formatSize(total);
     document.getElementById('settings-opfs-total-items').textContent = itemLabel;
-    document.getElementById('btn-settings-opfs-clear').disabled = fileCount === 0 && dirCount === 0;
+
+    updateOpfsToolbar();
+    updateSelectAllCheckbox();
   } catch (e) {
+    if (_opfsPath.length > 0) {
+      _opfsPath = [];
+      _opfsSelection = new Set();
+      renderOpfsInfo();
+      return;
+    }
     tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
     document.getElementById('settings-opfs-total-usage').textContent = '0 B';
-    document.getElementById('settings-opfs-total-items').textContent = '0 files';
-    document.getElementById('btn-settings-opfs-clear').disabled = true;
+    document.getElementById('settings-opfs-total-items').textContent = '0 items';
+  }
+}
+
+function renderBreadcrumb() {
+  var el = document.getElementById('opfs-breadcrumb');
+  if (!el) return;
+  var parts = ['Home'];
+  for (var i = 0; i < _opfsPath.length; i++) parts.push(_opfsPath[i]);
+  el.innerHTML = '';
+  for (var i = 0; i < parts.length; i++) {
+    if (i > 0) {
+      var sep = document.createElement('span');
+      sep.textContent = ' \u203A ';
+      sep.style.color = '#555';
+      el.appendChild(sep);
+    }
+    var seg = document.createElement('span');
+    seg.textContent = parts[i];
+    seg.style.cursor = 'pointer';
+    seg.style.color = i === parts.length - 1 ? '#ccc' : '#888';
+    (function(idx) {
+      seg.addEventListener('click', function() {
+        _opfsPath = _opfsPath.slice(0, idx);
+        _opfsSelection = new Set();
+        renderOpfsInfo();
+      });
+      seg.addEventListener('mouseenter', function() {
+        this.style.color = '#fff';
+      });
+      seg.addEventListener('mouseleave', function() {
+        this.style.color = idx === parts.length - 1 ? '#ccc' : '#888';
+      });
+    })(i);
+    el.appendChild(seg);
+  }
+}
+
+function updateOpfsToolbar() {
+  var hasSelection = _opfsSelection && _opfsSelection.size > 0;
+  var del = document.getElementById('btn-opfs-delete');
+  var copy = document.getElementById('btn-opfs-copy');
+  var move = document.getElementById('btn-opfs-move');
+  if (del) del.disabled = !hasSelection;
+  if (copy) copy.disabled = !hasSelection;
+  if (move) move.disabled = !hasSelection;
+}
+
+function updateSelectAllCheckbox() {
+  var cb = document.getElementById('opfs-select-all');
+  if (!cb) return;
+  var tbody = document.getElementById('settings-opfs-tbody');
+  var checkboxes = tbody.querySelectorAll('input[type="checkbox"]');
+  if (checkboxes.length === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+    return;
+  }
+  var checked = 0;
+  for (var i = 0; i < checkboxes.length; i++) {
+    if (checkboxes[i].checked) checked++;
+  }
+  if (checked === 0) {
+    cb.checked = false;
+    cb.indeterminate = false;
+  } else if (checked === checkboxes.length) {
+    cb.checked = true;
+    cb.indeterminate = false;
+  } else {
+    cb.checked = false;
+    cb.indeterminate = true;
+  }
+}
+
+function toggleSelectAllOpfs() {
+  var cb = document.getElementById('opfs-select-all');
+  if (!cb) return;
+  var checked = cb.checked;
+  _opfsSelection = new Set();
+  var tbody = document.getElementById('settings-opfs-tbody');
+  var cbs = tbody.querySelectorAll('input[type="checkbox"]');
+  for (var i = 0; i < cbs.length; i++) {
+    cbs[i].checked = checked;
+    if (checked) {
+      var tr = cbs[i].closest('tr');
+      if (tr && tr.dataset.name) _opfsSelection.add(tr.dataset.name);
+    }
+  }
+  updateOpfsToolbar();
+}
+
+async function _opfsGetCurrentDir() {
+  var handle = await navigator.storage.getDirectory();
+  for (var i = 0; i < _opfsPath.length; i++) {
+    handle = await handle.getDirectoryHandle(_opfsPath[i]);
+  }
+  return handle;
+}
+
+async function _opfsResolvePath(segments, create) {
+  var handle = await navigator.storage.getDirectory();
+  for (var i = 0; i < segments.length; i++) {
+    if (segments[i]) handle = await handle.getDirectoryHandle(segments[i], { create: !!create });
+  }
+  return handle;
+}
+
+async function _opfsNameExists(dirHandle, name) {
+  try {
+    await dirHandle.getFileHandle(name);
+    return true;
+  } catch {
+    try {
+      await dirHandle.getDirectoryHandle(name);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+async function _opfsUniqueName(dirHandle, name) {
+  if (!(await _opfsNameExists(dirHandle, name))) return name;
+  var dotIdx = name.lastIndexOf('.');
+  var stem = dotIdx > 0 ? name.slice(0, dotIdx) : name;
+  var ext = dotIdx > 0 ? name.slice(dotIdx) : '';
+  for (var i = 1; i < 1000; i++) {
+    var candidate = stem + ' (' + i + ')' + ext;
+    if (!(await _opfsNameExists(dirHandle, candidate))) return candidate;
+  }
+  return name;
+}
+
+async function _opfsCopyItem(srcDir, destDir, name, isDir) {
+  if (isDir) {
+    var destSub = await destDir.getDirectoryHandle(name, { create: true });
+    var srcSub = await srcDir.getDirectoryHandle(name);
+    for await (var [childName, childHandle] of srcSub.entries()) {
+      await _opfsCopyItem(srcSub, destSub, childName, childHandle.kind === 'directory');
+    }
+  } else {
+    var srcFile = await srcDir.getFileHandle(name);
+    var file = await srcFile.getFile();
+    var destFile = await destDir.getFileHandle(name, { create: true });
+    var writable = await destFile.createWritable();
+    await writable.write(file);
+    await writable.close();
+  }
+}
+
+async function deleteSelectedOpfs() {
+  if (!_opfsSelection || _opfsSelection.size === 0) return;
+  var names = Array.from(_opfsSelection);
+  if (!confirm('Delete ' + names.length + ' selected item' + (names.length !== 1 ? 's' : '') + '?')) return;
+  try {
+    var dirHandle = await _opfsGetCurrentDir();
+    for (var i = 0; i < names.length; i++) {
+      await dirHandle.removeEntry(names[i], { recursive: true }).catch(function() {});
+    }
+    _opfsSelection = new Set();
+    renderOpfsInfo();
+  } catch (e) {
+    console.error('OPFS delete error:', e);
+  }
+}
+
+async function copySelectedOpfs() {
+  if (!_opfsSelection || _opfsSelection.size === 0) return;
+  var destPath = prompt('Copy to folder path (relative to root):', _opfsPath.join('/') || '');
+  if (!destPath) return;
+  var segments = destPath.split('/').filter(function(s) { return s; });
+  try {
+    var srcDir = await _opfsGetCurrentDir();
+    var destDir = await _opfsResolvePath(segments, true);
+    var names = Array.from(_opfsSelection);
+    for (var i = 0; i < names.length; i++) {
+      var isDir = false;
+      try { await srcDir.getDirectoryHandle(names[i]); isDir = true; } catch {}
+      var uniqueName = await _opfsUniqueName(destDir, names[i]);
+      await _opfsCopyItem(srcDir, destDir, uniqueName, isDir);
+    }
+    renderOpfsInfo();
+  } catch (e) {
+    console.error('OPFS copy error:', e);
+  }
+}
+
+async function moveSelectedOpfs() {
+  if (!_opfsSelection || _opfsSelection.size === 0) return;
+  var destPath = prompt('Move to folder path (relative to root):', _opfsPath.join('/') || '');
+  if (!destPath) return;
+  var segments = destPath.split('/').filter(function(s) { return s; });
+  try {
+    var srcDir = await _opfsGetCurrentDir();
+    var destDir = await _opfsResolvePath(segments, true);
+    var names = Array.from(_opfsSelection);
+    for (var i = 0; i < names.length; i++) {
+      var isDir = false;
+      try { await srcDir.getDirectoryHandle(names[i]); isDir = true; } catch {}
+      await _opfsCopyItem(srcDir, destDir, names[i], isDir);
+      await srcDir.removeEntry(names[i], { recursive: true }).catch(function() {});
+    }
+    _opfsSelection = new Set();
+    renderOpfsInfo();
+  } catch (e) {
+    console.error('OPFS move error:', e);
   }
 }
 
@@ -424,6 +667,8 @@ async function clearOpfsData() {
     for (const name of names) {
       await root.removeEntry(name, { recursive: true }).catch(() => {});
     }
+    _opfsPath = [];
+    _opfsSelection = new Set();
   } catch (e) {
     console.error('OPFS clear error:', e);
   }
