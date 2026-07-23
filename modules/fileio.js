@@ -1473,7 +1473,7 @@ function isElementInLayer(elementId, layerId) {
   return p && p.id === layerId;
 }
 
-function recreateElement(el) {
+export function recreateElement(el) {
   if (el.type === 'line') addLineElement(el);
   else if (el.type === 'text') addTextElement(el);
   else if (el.type === 'freehand') addFreehandElement(el);

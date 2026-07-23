@@ -947,3 +947,12 @@ body {
   color: #fff !important;
   border-bottom-color: var(--color-accent) !important;
 }
+
+/* ── Library Symbol Browser ────────────────────────── */
+
+.lib-entry:hover {
+  background: var(--color-bg-hover);
+}
+.lib-entry.selected {
+  background: rgba(var(--color-accent-rgb), 0.2);
+}

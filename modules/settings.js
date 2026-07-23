@@ -51,6 +51,7 @@ export function initSettings() {
         var dirHandle = await _opfsGetCurrentDir();
         await dirHandle.getDirectoryHandle(val, { create: true });
         renderOpfsInfo();
+        document.dispatchEvent(new CustomEvent('opfs-changed'));
       } catch (e) {
         console.error('OPFS create folder error:', e);
         renderOpfsInfo();
@@ -825,6 +826,7 @@ async function _doRename(oldName, newName) {
     await dirHandle.removeEntry(oldName, { recursive: true });
     _opfsSelection = new Set();
     renderOpfsInfo();
+    document.dispatchEvent(new CustomEvent('opfs-changed'));
   } catch (e) {
     console.error('OPFS rename error:', e);
     renderOpfsInfo();
@@ -853,6 +855,7 @@ async function confirmDeleteOpfs() {
     }
     _opfsSelection = new Set();
     renderOpfsInfo();
+    document.dispatchEvent(new CustomEvent('opfs-changed'));
   } catch (e) {
     console.error('OPFS delete error:', e);
     renderOpfsInfo();
@@ -895,6 +898,7 @@ async function pasteOpfs() {
     }
     _opfsClipboard = null;
     renderOpfsInfo();
+    document.dispatchEvent(new CustomEvent('opfs-changed'));
   } catch (e) {
     console.error('OPFS paste error:', e);
     alert('Paste failed: ' + e.message);
