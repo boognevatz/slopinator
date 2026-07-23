@@ -116,6 +116,8 @@ export function initSettings() {
   });
   document.getElementById('opfs-select-all').addEventListener('change', toggleSelectAllOpfs);
   document.getElementById('btn-opfs-delete').addEventListener('click', deleteSelectedOpfs);
+  document.getElementById('btn-opfs-delete-confirm').addEventListener('click', confirmDeleteOpfs);
+  document.getElementById('btn-opfs-delete-cancel').addEventListener('click', cancelDeleteOpfs);
   document.getElementById('btn-opfs-copy').addEventListener('click', copySelectedOpfs);
   document.getElementById('btn-opfs-move').addEventListener('click', moveSelectedOpfs);
   document.getElementById('btn-opfs-rename').addEventListener('click', renameSelectedOpfs);
@@ -198,6 +200,7 @@ var _opfsRendered = false;
 var _opfsPath = [];
 var _opfsSelection = new Set();
 var _opfsClipboard = null; // { mode: 'copy'|'move', items: [names], sourcePath: [...] }
+var _opfsDeleteConfirm = false;
 var _opfsSelectionKinds = {}; // { name: 'file'|'directory' } synced from render
 
 function openSettings() {
@@ -383,6 +386,7 @@ function renderLocalStorageInfo() {
 
 async function renderOpfsInfo() {
   renderBreadcrumb();
+  _opfsDeleteConfirm = false;
   const tbody = document.getElementById('settings-opfs-tbody');
   let total = 0;
   let fileCount = 0;
@@ -615,9 +619,23 @@ function updateOpfsToolbar() {
 
   var normal = document.getElementById('opfs-toolbar-normal');
   var clipboard = document.getElementById('opfs-toolbar-clipboard');
+  var deleteConfirm = document.getElementById('opfs-toolbar-delete-confirm');
+
+  if (_opfsDeleteConfirm) {
+    if (normal) normal.style.display = 'none';
+    if (clipboard) clipboard.style.display = 'none';
+    if (deleteConfirm) deleteConfirm.style.display = 'flex';
+    var msg = document.getElementById('opfs-delete-confirm-msg');
+    if (msg) {
+      msg.textContent = 'Delete ' + _opfsSelection.size + ' item' + (_opfsSelection.size !== 1 ? 's' : '') + '?';
+    }
+    return;
+  }
+
   if (_opfsClipboard) {
     if (normal) normal.style.display = 'none';
     if (clipboard) clipboard.style.display = 'flex';
+    if (deleteConfirm) deleteConfirm.style.display = 'none';
     var status = document.getElementById('opfs-clipboard-status');
     if (status) {
       var mode = _opfsClipboard.mode === 'copy' ? 'Copying' : 'Moving';
@@ -629,6 +647,7 @@ function updateOpfsToolbar() {
   }
   if (normal) normal.style.display = 'flex';
   if (clipboard) clipboard.style.display = 'none';
+  if (deleteConfirm) deleteConfirm.style.display = 'none';
   var hasSelection = _opfsSelection && _opfsSelection.size > 0;
   var singleSel = _opfsSelection && _opfsSelection.size === 1;
   var singleFile = singleSel && _opfsSelectionKinds[Array.from(_opfsSelection)[0]] === 'file';
@@ -811,10 +830,21 @@ async function _doRename(oldName, newName) {
   }
 }
 
-async function deleteSelectedOpfs() {
+function deleteSelectedOpfs() {
   if (!_opfsSelection || _opfsSelection.size === 0) return;
+  _opfsDeleteConfirm = true;
+  updateOpfsToolbar();
+}
+
+function cancelDeleteOpfs() {
+  _opfsDeleteConfirm = false;
+  updateOpfsToolbar();
+}
+
+async function confirmDeleteOpfs() {
+  if (!_opfsSelection || _opfsSelection.size === 0) { _opfsDeleteConfirm = false; updateOpfsToolbar(); return; }
   var names = Array.from(_opfsSelection);
-  if (!confirm('Delete ' + names.length + ' selected item' + (names.length !== 1 ? 's' : '') + '?')) return;
+  _opfsDeleteConfirm = false;
   try {
     var dirHandle = await _opfsGetCurrentDir();
     for (var i = 0; i < names.length; i++) {
@@ -824,6 +854,7 @@ async function deleteSelectedOpfs() {
     renderOpfsInfo();
   } catch (e) {
     console.error('OPFS delete error:', e);
+    renderOpfsInfo();
   }
 }
 
