@@ -399,6 +399,7 @@ async function renderOpfsInfo() {
         dirCount++;
         tdName.textContent = '\uD83D\uDCC1 ' + name;
         tdName.style.cursor = 'pointer';
+        tdName.title = 'Double-click to open';
         tdSize.textContent = '\u2014';
         tdDate.textContent = '\u2014';
 
@@ -457,6 +458,11 @@ async function renderOpfsInfo() {
             else _opfsSelection.delete(n);
             updateOpfsToolbar();
             updateSelectAllCheckbox();
+          }
+
+          if (handle.kind === 'directory' && !inClipboard) {
+            tr.style.background = 'rgba(var(--color-accent-rgb), 0.2)';
+            setTimeout(function() { tr.style.background = ''; }, 250);
           }
         };
       }(name));
