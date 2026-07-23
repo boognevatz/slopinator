@@ -13,6 +13,7 @@ import { initLayers, initLayerUI } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
+import { checkLibrary } from './modules/symbols.js';
 import { groupSelected, ungroupSelected } from './modules/group.js';
 
 import { dom } from './modules/editor.js';
@@ -61,6 +62,11 @@ function init() {
   initAutosave();
   loadAutosave();
   document.getElementById('btn-save-internal').addEventListener('click', function() { saveAutosave(true); });
+
+  checkLibrary().then(function(count) {
+    var el = document.getElementById('library-content');
+    if (el) el.textContent = count ? 'Library has ' + count + ' symbol' + (count > 1 ? 's' : '') : 'Library is empty';
+  });
 
   function positionMobileDropdown(content, btn) {
     if (window.innerWidth < 768) {
