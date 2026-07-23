@@ -14,7 +14,7 @@ import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initPerspective } from './modules/perspective.js';
 import { initColorCorrection } from './modules/colorcorrection.js';
-import { initLayers } from './modules/layers.js';
+import { initLayers, initLayerUI } from './modules/layers.js';
 import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
@@ -64,6 +64,7 @@ function init() {
   initPerspective();
   initColorCorrection();
   initLayers();
+  initLayerUI();
   initGrid();
   initSettings();
   initFileIO();

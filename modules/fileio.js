@@ -1072,7 +1072,7 @@ function _openAnnotatorProject(svgText) {
     var ch = svgRoot.children[li];
     if (ch.tagName === 'g' && ch.id) {
       var lid = ch.id;
-      if (lid === 'layer-image' || lid === 'layer-watermark' || lid === 'layer-grid') continue;
+      if (lid === 'layer-image' || lid === 'layer-watermark' || lid === 'layer-grid' || lid === 'handle-layer') continue;
       parsedLayers.push({
         id: lid,
         name: ch.getAttribute('data-layer-name') || lid,

@@ -24,9 +24,11 @@ export function deleteLayers() {
     el = next;
   }
   var ids = ['layer-annotation', 'layer-watermark', 'layer-grid'];
+  var names = ['Annotations', 'Watermark', 'Grid'];
   for (var i = 0; i < ids.length; i++) {
     var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('id', ids[i]);
+    g.setAttribute('data-layer-name', names[i]);
     dom.svg.insertBefore(g, handleLayer);
   }
 }
@@ -38,14 +40,20 @@ export function initLayers() {
   userLayerCounter = 1;
   layerOrder.splice(1, 0, { id: 'layer-annotation', name: 'Annotations', system: false });
   dom.annotationLayer = document.getElementById('layer-annotation');
+  if (dom.annotationLayer) dom.annotationLayer.setAttribute('data-layer-name', 'Annotations');
 
   // Watermark hidden by default
   var wmLayer = document.getElementById('layer-watermark');
   if (wmLayer) wmLayer.setAttribute('visibility', 'hidden');
 
+  dom.watermarkLayer = document.getElementById('layer-watermark');
+  dom.gridLayer = document.getElementById('layer-grid');
+
   renderLayerList();
   selectLayer('layer-annotation');
+}
 
+export function initLayerUI() {
   // Toggle right panel
   var rightPanel = document.getElementById('right-panel');
   var layersIndicator = document.getElementById('layers-indicator');
@@ -121,6 +129,8 @@ export function renderLayerList() {
         function commit() {
           var val = input.value.trim() || currentName;
           entry.name = val;
+          var g = document.getElementById(entry.id);
+          if (g) g.setAttribute('data-layer-name', val);
           renderLayerList();
           selectLayer(entry.id);
         }
@@ -177,6 +187,7 @@ function getLayerData(el) {
 }
 
 export function selectLayer(id) {
+  if (id === 'handle-layer') return;
   layerOrder.forEach(function(l) { l._selected = l.id === id; });
   var entry = layerOrder.find(function(l) { return l.id === id; });
   if (entry && !entry.system) {
@@ -209,6 +220,7 @@ function addLayer() {
   var watermarkG = document.getElementById('layer-watermark');
   var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   g.setAttribute('id', id);
+  g.setAttribute('data-layer-name', name);
   if (watermarkG && watermarkG.parentNode) {
     watermarkG.parentNode.insertBefore(g, watermarkG);
   }
@@ -273,6 +285,7 @@ function removeLayer() {
       newG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       newG.setAttribute('id', 'layer-annotation');
     }
+    newG.setAttribute('data-layer-name', 'Annotations');
     var watermarkG = document.getElementById('layer-watermark');
     if (watermarkG && watermarkG.parentNode) {
       watermarkG.parentNode.insertBefore(newG, watermarkG);
