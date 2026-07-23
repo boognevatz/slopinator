@@ -1188,7 +1188,7 @@ function _openAnnotatorProject(svgText) {
     // First pass: non-group, non-child elements
     for (var ei3 = 0; ei3 < layerEls.length; ei3++) {
       var el3 = layerEls[ei3];
-      if (el3.type === 'group' || el3.parentId) continue;
+      if (el3.type === 'group') continue;
       recreateElement(el3);
       state.elements.push(el3);
     }
