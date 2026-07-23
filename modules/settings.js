@@ -39,6 +39,19 @@ export function initSettings() {
 
   document.getElementById('btn-settings-opfs-refresh').addEventListener('click', renderOpfsInfo);
   document.getElementById('btn-settings-opfs-clear').addEventListener('click', clearOpfsData);
+  document.getElementById('btn-settings-opfs-new-folder').addEventListener('click', async function() {
+    var name = prompt('Enter folder name:');
+    if (!name) return;
+    name = name.trim();
+    if (!name) return;
+    try {
+      const root = await navigator.storage.getDirectory();
+      await root.getDirectoryHandle(name, { create: true });
+      renderOpfsInfo();
+    } catch (e) {
+      console.error('OPFS create folder error:', e);
+    }
+  });
   document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
   document.getElementById('tab-opfs').addEventListener('click', function() { switchSettingsTab('opfs'); });
 }
@@ -298,70 +311,100 @@ async function renderOpfsInfo() {
   const tbody = document.getElementById('settings-opfs-tbody');
   tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#666;font-style:italic;">Loading...</td></tr>';
   let total = 0;
-  let count = 0;
+  let fileCount = 0;
+  let dirCount = 0;
   try {
     const root = await navigator.storage.getDirectory();
     const rows = [];
     for await (const [name, handle] of root.entries()) {
-      if (handle.kind !== 'file') continue;
-      const file = await handle.getFile();
-      total += file.size;
-      count++;
       const tr = document.createElement('tr');
       const tdName = document.createElement('td');
-      tdName.textContent = name;
       tdName.style.fontFamily = 'monospace';
       tdName.style.fontSize = '11px';
       const tdSize = document.createElement('td');
       tdSize.style.textAlign = 'right';
       tdSize.style.fontFamily = 'monospace';
       tdSize.style.fontSize = '11px';
-      tdSize.textContent = formatSize(file.size);
       const tdDate = document.createElement('td');
       tdDate.style.textAlign = 'right';
       tdDate.style.fontFamily = 'monospace';
       tdDate.style.fontSize = '11px';
       tdDate.style.color = '#999';
-      tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
       const tdActions = document.createElement('td');
       tdActions.style.textAlign = 'center';
-      const btn = document.createElement('button');
-      btn.textContent = '↓';
-      btn.title = 'Download ' + name;
-      btn.style.fontSize = '11px';
-      btn.style.padding = '1px 6px';
-      btn.style.cursor = 'pointer';
-      btn.addEventListener('click', async function(e) {
-        e.stopPropagation();
-        try {
-          const dlFile = await handle.getFile();
-          const dlUrl = URL.createObjectURL(dlFile);
-          const a = document.createElement('a');
-          a.href = dlUrl;
-          a.download = name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(function() { URL.revokeObjectURL(dlUrl); }, 1000);
-        } catch (dlErr) {
-          console.error('OPFS download error:', dlErr);
-        }
-      });
-      tdActions.appendChild(btn);
+
+      if (handle.kind === 'directory') {
+        dirCount++;
+        tdName.textContent = '\uD83D\uDCC1 ' + name;
+        tdSize.textContent = '\u2014';
+        tdDate.textContent = '\u2014';
+        const btn = document.createElement('button');
+        btn.textContent = '\u2716';
+        btn.title = 'Delete folder ' + name;
+        btn.style.fontSize = '11px';
+        btn.style.padding = '1px 6px';
+        btn.style.cursor = 'pointer';
+        btn.addEventListener('click', async function(e) {
+          e.stopPropagation();
+          if (!confirm('Delete folder "' + name + '" and all its contents?')) return;
+          try {
+            const r = await navigator.storage.getDirectory();
+            await r.removeEntry(name, { recursive: true });
+            renderOpfsInfo();
+          } catch (err) {
+            console.error('OPFS delete folder error:', err);
+          }
+        });
+        tdActions.appendChild(btn);
+      } else {
+        const file = await handle.getFile();
+        total += file.size;
+        fileCount++;
+        tdName.textContent = '\uD83D\uDCC4 ' + name;
+        tdSize.textContent = formatSize(file.size);
+        tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
+        const btn = document.createElement('button');
+        btn.textContent = '\u2193';
+        btn.title = 'Download ' + name;
+        btn.style.fontSize = '11px';
+        btn.style.padding = '1px 6px';
+        btn.style.cursor = 'pointer';
+        btn.addEventListener('click', async function(e) {
+          e.stopPropagation();
+          try {
+            const dlFile = await handle.getFile();
+            const dlUrl = URL.createObjectURL(dlFile);
+            const a = document.createElement('a');
+            a.href = dlUrl;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(dlUrl); }, 1000);
+          } catch (dlErr) {
+            console.error('OPFS download error:', dlErr);
+          }
+        });
+        tdActions.appendChild(btn);
+      }
+
       tr.appendChild(tdName);
       tr.appendChild(tdSize);
       tr.appendChild(tdDate);
       tr.appendChild(tdActions);
-      rows.push(tr);
+      rows.push({ tr, isDir: handle.kind === 'directory', name });
     }
     rows.sort(function(a, b) {
-      return a.firstChild.textContent.localeCompare(b.firstChild.textContent);
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      return a.name.localeCompare(b.name);
     });
     tbody.innerHTML = '';
-    for (var i = 0; i < rows.length; i++) tbody.appendChild(rows[i]);
+    for (var i = 0; i < rows.length; i++) tbody.appendChild(rows[i].tr);
+    var itemLabel = fileCount + ' file' + (fileCount !== 1 ? 's' : '');
+    if (dirCount > 0) itemLabel += ', ' + dirCount + ' folder' + (dirCount !== 1 ? 's' : '');
     document.getElementById('settings-opfs-total-usage').textContent = formatSize(total);
-    document.getElementById('settings-opfs-total-items').textContent = count + ' file' + (count !== 1 ? 's' : '');
-    document.getElementById('btn-settings-opfs-clear').disabled = count === 0;
+    document.getElementById('settings-opfs-total-items').textContent = itemLabel;
+    document.getElementById('btn-settings-opfs-clear').disabled = fileCount === 0 && dirCount === 0;
   } catch (e) {
     tbody.innerHTML = '<tr><td colspan="4" style="padding:8px;text-align:center;color:#c66;font-style:italic;">OPFS unavailable</td></tr>';
     document.getElementById('settings-opfs-total-usage').textContent = '0 B';
@@ -371,15 +414,15 @@ async function renderOpfsInfo() {
 }
 
 async function clearOpfsData() {
-  if (!confirm('Delete all files from browser file system?')) return;
+  if (!confirm('Delete all files and folders from browser file system?')) return;
   try {
     const root = await navigator.storage.getDirectory();
     const names = [];
-    for await (const [name, handle] of root.entries()) {
-      if (handle.kind === 'file') names.push(name);
+    for await (const [name] of root.entries()) {
+      names.push(name);
     }
     for (const name of names) {
-      await root.removeEntry(name).catch(() => {});
+      await root.removeEntry(name, { recursive: true }).catch(() => {});
     }
   } catch (e) {
     console.error('OPFS clear error:', e);
