@@ -396,7 +396,10 @@
         </div>
       </div>
       <div id="panel-opfs" style="display:flex;flex-direction:column;min-height:0;flex:1;">
-        <div id="opfs-breadcrumb" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;padding:4px 0 2px 4px;font-size:12px;font-family:monospace;color:#aaa;border-bottom:1px solid #444;"></div>
+        <div style="display:flex;align-items:center;gap:4px;padding:4px 0 2px 4px;border-bottom:1px solid #444;">
+          <div id="opfs-breadcrumb" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;flex:1;font-size:12px;font-family:monospace;color:#aaa;"></div>
+          <button id="btn-settings-opfs-new-folder" style="font-size:11px;padding:2px 6px;flex-shrink:0;">+ New Folder</button>
+        </div>
         <div style="overflow-y:auto;border:1px solid #444;border-radius:3px;flex:1;min-height:0;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead>
@@ -419,8 +422,8 @@
           <button id="btn-opfs-rename" disabled style="font-size:11px;padding:2px 8px;">Rename</button>
           <button id="btn-opfs-copy" disabled style="font-size:11px;padding:2px 8px;">Copy</button>
           <button id="btn-opfs-move" disabled style="font-size:11px;padding:2px 8px;">Move</button>
+          <button id="btn-opfs-download" disabled style="font-size:11px;padding:2px 8px;">Download</button>
           <span style="flex:1;"></span>
-          <button id="btn-settings-opfs-new-folder" style="font-size:11px;padding:2px 8px;">New Folder</button>
           <button id="btn-settings-opfs-refresh" style="font-size:11px;padding:2px 8px;">Refresh</button>
         </div>
         <div id="opfs-toolbar-clipboard" style="display:none;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">

@@ -56,6 +56,7 @@ export function initSettings() {
   document.getElementById('btn-opfs-copy').addEventListener('click', copySelectedOpfs);
   document.getElementById('btn-opfs-move').addEventListener('click', moveSelectedOpfs);
   document.getElementById('btn-opfs-rename').addEventListener('click', renameSelectedOpfs);
+  document.getElementById('btn-opfs-download').addEventListener('click', downloadSelectedOpfs);
   document.getElementById('btn-opfs-paste').addEventListener('click', pasteOpfs);
   document.getElementById('btn-opfs-cancel-clipboard').addEventListener('click', cancelOpfsClipboard);
   document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
@@ -134,6 +135,7 @@ var _opfsRendered = false;
 var _opfsPath = [];
 var _opfsSelection = new Set();
 var _opfsClipboard = null; // { mode: 'copy'|'move', items: [names], sourcePath: [...] }
+var _opfsSelectionKinds = {}; // { name: 'file'|'directory' } synced from render
 
 function openSettings() {
   document.getElementById('settings-popup').hidden = false;
@@ -366,6 +368,7 @@ async function renderOpfsInfo() {
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = _opfsSelection.has(name);
+      _opfsSelectionKinds[name] = handle.kind;
       cb.addEventListener('change', function(n, h) {
         return function() {
           if (this.checked) _opfsSelection.add(n);
@@ -566,14 +569,17 @@ function updateOpfsToolbar() {
   if (clipboard) clipboard.style.display = 'none';
   var hasSelection = _opfsSelection && _opfsSelection.size > 0;
   var singleSel = _opfsSelection && _opfsSelection.size === 1;
+  var singleFile = singleSel && _opfsSelectionKinds[Array.from(_opfsSelection)[0]] === 'file';
   var del = document.getElementById('btn-opfs-delete');
   var copy = document.getElementById('btn-opfs-copy');
   var move = document.getElementById('btn-opfs-move');
   var rename = document.getElementById('btn-opfs-rename');
+  var download = document.getElementById('btn-opfs-download');
   if (del) del.disabled = !hasSelection;
   if (copy) copy.disabled = !hasSelection;
   if (move) move.disabled = !hasSelection;
   if (rename) rename.disabled = !singleSel;
+  if (download) download.disabled = !singleFile;
 }
 
 function updateSelectAllCheckbox() {
@@ -805,6 +811,27 @@ function cancelOpfsClipboard() {
   _opfsClipboard = null;
   updateOpfsToolbar();
   renderOpfsInfo();
+}
+
+async function downloadSelectedOpfs() {
+  if (!_opfsSelection || _opfsSelection.size !== 1) return;
+  var name = Array.from(_opfsSelection)[0];
+  if (_opfsSelectionKinds[name] !== 'file') return;
+  try {
+    var dirHandle = await _opfsGetCurrentDir();
+    var fileHandle = await dirHandle.getFileHandle(name);
+    var file = await fileHandle.getFile();
+    var url = URL.createObjectURL(file);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  } catch (e) {
+    console.error('OPFS download error:', e);
+  }
 }
 
 async function clearOpfsData() {
