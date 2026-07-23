@@ -84,6 +84,8 @@ export function deactivateCrop() {
   // Clean up UI
   const overlay = dom.handleLayer.querySelector('#crop-overlay-group');
   if (overlay) overlay.remove();
+  
+  cropBox = null;
 }
 
 function drawCropOverlay() {
@@ -120,9 +122,12 @@ function drawCropOverlay() {
   });
   group.appendChild(selBox);
 
-  // 4 corner handles
-  const size = Math.min(width, height) * 0.1; // 10% is good for crop, 30% is too big for full screen
-  const hw = Math.max(10, size); // min 10px in image coords
+  // 4 corner handles — zoom-aware so they stay consistent visual size
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox && viewBox.width > 0 && svgRect
+    ? viewBox.width / svgRect.width : 1;
+  const hw = Math.max(6, 12 * scale);
   const hh = hw;
 
   const corners = [
@@ -154,7 +159,7 @@ function drawCropOverlay() {
     'text-anchor': 'middle',
     'dominant-baseline': 'middle',
     fill: 'white',
-    'font-size': Math.max(16, height * 0.1) + 'px',
+    'font-size': Math.max(14, 16 * scale) + 'px',
     'font-family': 'sans-serif',
     'font-weight': 'bold',
     'pointer-events': 'none',
