@@ -56,6 +56,8 @@ export function initSettings() {
   document.getElementById('btn-opfs-copy').addEventListener('click', copySelectedOpfs);
   document.getElementById('btn-opfs-move').addEventListener('click', moveSelectedOpfs);
   document.getElementById('btn-opfs-rename').addEventListener('click', renameSelectedOpfs);
+  document.getElementById('btn-opfs-paste').addEventListener('click', pasteOpfs);
+  document.getElementById('btn-opfs-cancel-clipboard').addEventListener('click', cancelOpfsClipboard);
   document.getElementById('tab-localstorage').addEventListener('click', function() { switchSettingsTab('localstorage'); });
   document.getElementById('tab-opfs').addEventListener('click', function() { switchSettingsTab('opfs'); });
 }
@@ -131,6 +133,7 @@ export function loadColorPreferences() {
 var _opfsRendered = false;
 var _opfsPath = [];
 var _opfsSelection = new Set();
+var _opfsClipboard = null; // { mode: 'copy'|'move', items: [names], sourcePath: [...] }
 
 function openSettings() {
   document.getElementById('settings-popup').hidden = false;
@@ -432,8 +435,19 @@ async function renderOpfsInfo() {
         tdDate.textContent = file.lastModified ? formatRelativeTime(file.lastModified) : '-';
       }
 
+      // Clipboard highlight
+      var samePath = _opfsClipboard && _opfsClipboard.sourcePath.join('/') === _opfsPath.join('/');
+      var inClipboard = samePath && _opfsClipboard.items.indexOf(name) !== -1;
+      if (inClipboard) {
+        tr.style.opacity = '0.4';
+        var icon = _opfsClipboard.mode === 'copy' ? '\uD83D\uDCCB' : '\u2702';
+        tdName.textContent = icon + ' ' + name;
+        if (handle.kind === 'directory') tdName.style.cursor = 'pointer';
+        else tdName.style.cursor = 'default';
+      }
+
       // Single click on name toggles checkbox
-      tdName.style.cursor = handle.kind === 'directory' ? 'pointer' : 'default';
+      tdName.style.cursor = !inClipboard && handle.kind === 'directory' ? 'pointer' : 'default';
       tdName.addEventListener('click', function(n) {
         return function() {
           var checkbox = tr.cells[0].querySelector('input[type="checkbox"]');
@@ -519,6 +533,31 @@ function renderBreadcrumb() {
 }
 
 function updateOpfsToolbar() {
+  var settingsInner = document.querySelector('#settings-popup > div');
+  if (settingsInner) {
+    var w = settingsInner.offsetWidth;
+    if (w > 0) {
+      var mw = parseInt(settingsInner.style.minWidth) || 0;
+      if (w > mw) settingsInner.style.minWidth = w + 'px';
+    }
+  }
+
+  var normal = document.getElementById('opfs-toolbar-normal');
+  var clipboard = document.getElementById('opfs-toolbar-clipboard');
+  if (_opfsClipboard) {
+    if (normal) normal.style.display = 'none';
+    if (clipboard) clipboard.style.display = 'flex';
+    var status = document.getElementById('opfs-clipboard-status');
+    if (status) {
+      var mode = _opfsClipboard.mode === 'copy' ? 'Copying' : 'Moving';
+      status.textContent = mode + ' ' + _opfsClipboard.items.length + ' item' + (_opfsClipboard.items.length !== 1 ? 's' : '');
+      var hint = document.getElementById('opfs-clipboard-hint');
+      if (hint) hint.textContent = mode === 'Copying' ? '\uD83D\uDCCB' : '\u2702';
+    }
+    return;
+  }
+  if (normal) normal.style.display = 'flex';
+  if (clipboard) clipboard.style.display = 'none';
   var hasSelection = _opfsSelection && _opfsSelection.size > 0;
   var singleSel = _opfsSelection && _opfsSelection.size === 1;
   var del = document.getElementById('btn-opfs-delete');
@@ -716,45 +755,50 @@ async function deleteSelectedOpfs() {
 
 async function copySelectedOpfs() {
   if (!_opfsSelection || _opfsSelection.size === 0) return;
-  var destPath = prompt('Copy to folder path (relative to root):', _opfsPath.join('/') || '');
-  if (!destPath) return;
-  var segments = destPath.split('/').filter(function(s) { return s; });
-  try {
-    var srcDir = await _opfsGetCurrentDir();
-    var destDir = await _opfsResolvePath(segments, true);
-    var names = Array.from(_opfsSelection);
-    for (var i = 0; i < names.length; i++) {
-      var isDir = false;
-      try { await srcDir.getDirectoryHandle(names[i]); isDir = true; } catch {}
-      var uniqueName = await _opfsUniqueName(destDir, names[i]);
-      await _opfsCopyItem(srcDir, destDir, uniqueName, isDir);
-    }
-    renderOpfsInfo();
-  } catch (e) {
-    console.error('OPFS copy error:', e);
-  }
+  _opfsClipboard = { mode: 'copy', items: Array.from(_opfsSelection), sourcePath: _opfsPath.slice() };
+  _opfsSelection = new Set();
+  updateOpfsToolbar();
+  renderOpfsInfo();
 }
 
 async function moveSelectedOpfs() {
   if (!_opfsSelection || _opfsSelection.size === 0) return;
-  var destPath = prompt('Move to folder path (relative to root):', _opfsPath.join('/') || '');
-  if (!destPath) return;
-  var segments = destPath.split('/').filter(function(s) { return s; });
+  _opfsClipboard = { mode: 'move', items: Array.from(_opfsSelection), sourcePath: _opfsPath.slice() };
+  _opfsSelection = new Set();
+  updateOpfsToolbar();
+  renderOpfsInfo();
+}
+
+async function pasteOpfs() {
+  if (!_opfsClipboard) return;
   try {
-    var srcDir = await _opfsGetCurrentDir();
-    var destDir = await _opfsResolvePath(segments, true);
-    var names = Array.from(_opfsSelection);
+    var destDir = await _opfsGetCurrentDir();
+    var srcDir = await _opfsResolvePath(_opfsClipboard.sourcePath, false);
+    var names = _opfsClipboard.items;
     for (var i = 0; i < names.length; i++) {
       var isDir = false;
       try { await srcDir.getDirectoryHandle(names[i]); isDir = true; } catch {}
-      await _opfsCopyItem(srcDir, destDir, names[i], isDir);
-      await srcDir.removeEntry(names[i], { recursive: true }).catch(function() {});
+      var uniqueName = names[i];
+      if (_opfsClipboard.mode === 'copy' || _opfsClipboard.sourcePath.join('/') !== _opfsPath.join('/')) {
+        uniqueName = await _opfsUniqueName(destDir, names[i]);
+      }
+      await _opfsCopyItem(srcDir, destDir, uniqueName, isDir);
+      if (_opfsClipboard.mode === 'move') {
+        await srcDir.removeEntry(names[i], { recursive: true }).catch(function() {});
+      }
     }
-    _opfsSelection = new Set();
+    _opfsClipboard = null;
     renderOpfsInfo();
   } catch (e) {
-    console.error('OPFS move error:', e);
+    console.error('OPFS paste error:', e);
+    alert('Paste failed: ' + e.message);
   }
+}
+
+function cancelOpfsClipboard() {
+  _opfsClipboard = null;
+  updateOpfsToolbar();
+  renderOpfsInfo();
 }
 
 async function clearOpfsData() {
