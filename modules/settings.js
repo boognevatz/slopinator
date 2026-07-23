@@ -518,9 +518,10 @@ async function renderOpfsInfo() {
 
       // Single click on name toggles checkbox
       tdName.style.cursor = !inClipboard && handle.kind === 'directory' ? 'pointer' : 'default';
-      tdName.addEventListener('click', function(n) {
+      tdName.addEventListener('click', function(n, h) {
         return function() {
-          var checkbox = tr.cells[0].querySelector('input[type="checkbox"]');
+          var row = this.parentNode;
+          var checkbox = row.cells[0].querySelector('input[type="checkbox"]');
           if (checkbox) {
             checkbox.checked = !checkbox.checked;
             if (checkbox.checked) _opfsSelection.add(n);
@@ -529,12 +530,12 @@ async function renderOpfsInfo() {
             updateSelectAllCheckbox();
           }
 
-          if (handle.kind === 'directory' && !inClipboard) {
-            tr.style.background = 'rgba(var(--color-accent-rgb), 0.2)';
-            setTimeout(function() { tr.style.background = ''; }, 250);
+          if (h.kind === 'directory' && !inClipboard) {
+            row.style.background = 'rgba(var(--color-accent-rgb), 0.2)';
+            setTimeout(function() { row.style.background = ''; }, 250);
           }
         };
-      }(name));
+      }(name, handle));
 
       tr.dataset.name = name;
       tr.appendChild(td0);
