@@ -529,7 +529,10 @@ export function initFileIO() {
       const widthOpt = e.target.dataset.width;
       resizeNotification.hidden = true;
       if (widthOpt !== 'original') {
-        physicallyResizeImage(parseInt(widthOpt));
+        var targetW = parseInt(widthOpt);
+        var ratio = targetW / state.image.naturalWidth;
+        var targetH = Math.round(state.image.naturalHeight * ratio);
+        resizeImage(targetW, targetH);
       }
     });
   });
@@ -710,39 +713,6 @@ function openImageFile(file) {
 }
 
 // ── Resize Original Image ───────────────────────────────────────
-
-function physicallyResizeImage(targetWidth) {
-  if (!state.hasImage) return;
-
-  const currentW = state.image.naturalWidth;
-  const currentH = state.image.naturalHeight;
-
-  // Don't upscale
-  if (targetWidth >= currentW) return;
-
-  const targetHeight = Math.round((targetWidth / currentW) * currentH);
-
-  const imgEl = new Image();
-  imgEl.onload = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
-    const ctx = canvas.getContext('2d');
-    
-    // Draw scaled down
-    ctx.drawImage(imgEl, 0, 0, targetWidth, targetHeight);
-    
-    // Convert back to base64
-    const newDataURI = canvas.toDataURL('image/jpeg', 0.92);
-    
-    // Reload image into editor
-    loadImage(newDataURI, targetWidth, targetHeight);
-    clearHistory();
-    switchTool('select');
-    updateWatermark();
-  };
-  imgEl.src = state.image.dataURI;
-}
 
 function resizeImage(newWidth, newHeight) {
   if (!state.hasImage) return;
