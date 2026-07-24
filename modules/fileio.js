@@ -13,6 +13,7 @@ import { downloadString, downloadBlob, generateId } from './utils.js';
 import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
 import { isLayerVisible, updateWatermark, renderLayerList, selectLayer, setLayerOrder, setUserLayerCounter } from './layers.js';
+import { captureAllElementsState, captureElementState } from './dom-utils.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -392,7 +393,6 @@ export function initFileIO() {
     fileMenu.hidden = true;
     dom.annotationLayer.innerHTML = '';
     dom.handleLayer.innerHTML = '';
-    state.elements = [];
     state.selectedId = null;
     clearHistory();
 
@@ -726,7 +726,8 @@ function resizeImage(newWidth, newHeight) {
   const uniformScale = Math.min(scaleX, scaleY);
 
   // Save and scale elements before loadImage destroys them
-  const savedElements = state.elements.map(el => {
+  var allEls = captureAllElementsState();
+  const savedElements = allEls.map(el => {
     if (el.type === 'line') {
       return {
         ...el,
@@ -783,7 +784,6 @@ function resizeImage(newWidth, newHeight) {
       } else if (el.type === 'rectangle') {
         addRectangleElement(el);
       }
-      state.elements.push(el);
     }
 
     clearHistory();
@@ -1174,7 +1174,6 @@ function _openAnnotatorProject(svgText) {
   }
 
   // Recreate elements per layer
-  state.elements = [];
   for (var pli3 = 0; pli3 < parsedLayers.length; pli3++) {
     var pl3 = parsedLayers[pli3];
     var liveG = document.getElementById(pl3.id);
@@ -1185,12 +1184,11 @@ function _openAnnotatorProject(svgText) {
 
     var layerEls = elsByLayer[pl3.id] || [];
 
-    // First pass: non-group, non-child elements
+    // First pass: non-group elements
     for (var ei3 = 0; ei3 < layerEls.length; ei3++) {
       var el3 = layerEls[ei3];
       if (el3.type === 'group') continue;
       recreateElement(el3);
-      state.elements.push(el3);
     }
 
     // Second pass: groups (move children inside group <g>)
@@ -1205,7 +1203,6 @@ function _openAnnotatorProject(svgText) {
         if (childDom) gEl.appendChild(childDom);
       }
       liveG.appendChild(gEl);
-      state.elements.push(gData3);
     }
   }
 
@@ -1276,12 +1273,14 @@ function getLayerElementIds(layerId) {
 }
 
 function serializeElement(el, withinGroup) {
-  if (!withinGroup && el.parentId) return '';
   if (el.type === 'group') {
     var g = `<g id="${el.id}" data-type="group">\n`;
-    for (var ci = 0; ci < el.childIds.length; ci++) {
-      var child = state.elements.find(function(e) { return e.id === el.childIds[ci]; });
-      if (child) g += serializeElement(child, true);
+    var groupDom = document.getElementById(el.id);
+    if (groupDom) {
+      for (var ci = 0; ci < groupDom.children.length; ci++) {
+        var childData = captureElementState(groupDom.children[ci].id);
+        if (childData) g += serializeElement(childData, true);
+      }
     }
     g += `</g>\n`;
     return g;
@@ -1364,12 +1363,15 @@ function buildLayerExportSvg(layerId, targetW, targetH) {
     svg += dom.watermarkLayer.innerHTML;
     svg += '</g>\n';
   } else {
-    var ids = getLayerElementIds(layerId);
+    var layerEl = document.getElementById(layerId);
     svg += '<g transform="' + imgTransform + '">\n';
-    for (var ei = 0; ei < state.elements.length; ei++) {
-      var el = state.elements[ei];
-      if (ids.has(el.id)) {
-        svg += serializeElement(el);
+    if (layerEl) {
+      var topEls = layerEl.querySelectorAll(':scope > g[id], :scope > text[id]');
+      for (var ei = 0; ei < topEls.length; ei++) {
+        var domEl = topEls[ei];
+        if (!domEl.id) continue;
+        var elData = captureElementState(domEl.id);
+        if (elData) svg += serializeElement(elData);
       }
     }
     svg += '</g>\n';
@@ -1519,12 +1521,12 @@ export function generateSVGString() {
 
     svg += `<g id="${layerId}" data-layer-name="${escapeXml(layerName)}" transform="${layerTransform}" visibility="${visibility === 'hidden' ? 'hidden' : 'visible'}">\n`;
 
-    for (var j = 0; j < state.elements.length; j++) {
-      var el = state.elements[j];
-      if (el.parentId) continue;
-      if (isElementInLayer(el.id, layerId)) {
-        svg += serializeElement(el);
-      }
+    var topEls = child.querySelectorAll(':scope > g[id], :scope > text[id]');
+    for (var j = 0; j < topEls.length; j++) {
+      var domEl = topEls[j];
+      if (!domEl.id) continue;
+      var elData = captureElementState(domEl.id);
+      if (elData) svg += serializeElement(elData);
     }
 
     svg += `</g>\n`;
@@ -1666,16 +1668,18 @@ export async function exportPDF(widthOption, pageSize) {
 
 function findActualSizeMarker() {
   var re = /^(?:actual_size|real_size)_([\d_]+)\s*(mm|cm|in)$|^(?:actual-size|real-size)-([\d_]+)\s*(mm|cm|in)$/i;
-  for (var i = 0; i < state.elements.length; i++) {
-    var el = state.elements[i];
-    if (el.type !== 'line') continue;
-    var m = re.exec(el.id);
+  var lineEls = dom.annotationLayer.querySelectorAll('g[data-type="line"]');
+  for (var i = 0; i < lineEls.length; i++) {
+    var lineG = lineEls[i];
+    var elData = captureElementState(lineG.id);
+    if (!elData) continue;
+    var m = re.exec(elData.id);
     if (!m) continue;
     var realValue = parseFloat((m[1] || m[3]).replace(/_/g, '.'));
     var unit = (m[2] || m[4]).toLowerCase();
     if (unit === 'cm') realValue *= 10;
     else if (unit === 'in') realValue *= 25.4;
-    var pts = el.points || [{x: el.x1, y: el.y1}, {x: el.x2, y: el.y2}];
+    var pts = elData.points || [{x: elData.x1, y: elData.y1}, {x: elData.x2, y: elData.y2}];
     var dx = pts[pts.length - 1].x - pts[0].x;
     var dy = pts[pts.length - 1].y - pts[0].y;
     var pixelLen = Math.sqrt(dx * dx + dy * dy);

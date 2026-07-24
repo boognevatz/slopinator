@@ -404,7 +404,4 @@ function _insertElements(elements) {
     newElements.push(el);
   }
 
-  for (var i = 0; i < newElements.length; i++) {
-    state.elements.push(newElements[i]);
-  }
 }

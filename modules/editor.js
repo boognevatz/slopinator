@@ -22,7 +22,6 @@ export const state = {
     fitScale: 1.0,
     dpi: 300,
   },
-  elements: [],         // { id, type, ...props }
   selectedId: null,
   selectedIds: [],
   activeTool: 'select', // 'select' | 'line' | 'text'
@@ -95,7 +94,6 @@ export function loadImage(dataURI, naturalWidth, naturalHeight) {
   deleteLayers();
   initLayers();
   dom.handleLayer.innerHTML = '';
-  state.elements = [];
   state.selectedId = null;
 
   // Create <image> element
@@ -272,7 +270,6 @@ export function restoreState(parsed) {
   dom.imageLayer.innerHTML = '';
   dom.annotationLayer.innerHTML = '';
   dom.handleLayer.innerHTML = '';
-  state.elements = [];
   state.selectedId = null;
 
   // Recreate image

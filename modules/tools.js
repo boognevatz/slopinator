@@ -2,6 +2,7 @@
 
 import { state } from './editor.js';
 import { activateSelect, deactivateSelect, selectElement } from './select.js';
+import { captureElementState } from './dom-utils.js';
 import { activateLine, deactivateLine, getPendingPolylineId } from './line.js';
 import { activateText, deactivateText } from './text.js';
 import { activateCrop, deactivateCrop } from './crop.js';
@@ -59,21 +60,21 @@ export function switchTool(tool) {
   // Capture selected line data before deactivating (deactivateSelect clears selection)
   let selectedLineData = null;
   if (state.selectedId && tool === 'line') {
-    const sel = state.elements.find(el => el.id === state.selectedId);
+    const sel = captureElementState(state.selectedId);
     if (sel && sel.type === 'line') selectedLineData = sel;
   }
 
   // Capture selected text id before deactivating (deactivateSelect clears selection)
   let selectedTextId = null;
   if (state.selectedId && tool === 'text') {
-    const sel = state.elements.find(el => el.id === state.selectedId);
+    const sel = captureElementState(state.selectedId);
     if (sel && sel.type === 'text') selectedTextId = sel.id;
   }
 
   // Capture selected rectangle id before deactivating
   let selectedRectId = null;
   if (state.selectedId && tool === 'rectangle') {
-    const sel = state.elements.find(el => el.id === state.selectedId);
+    const sel = captureElementState(state.selectedId);
     if (sel && sel.type === 'rectangle') selectedRectId = sel.id;
   }
 
@@ -114,8 +115,8 @@ export function switchTool(tool) {
 
   // If switching from line to select, select the just-finalized polyline
   if (pendingLineId) {
-    const sel = state.elements.find(el => el.id === pendingLineId);
-    if (sel) selectElement(sel.id);
+    var el = document.getElementById(pendingLineId);
+    if (el) selectElement(pendingLineId);
   }
 }
 

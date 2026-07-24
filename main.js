@@ -177,8 +177,8 @@ function init() {
 
     // Tab / Shift+Tab — cycle through group children
     if (e.key === 'Tab' && state.selectedId) {
-      var _sel = state.elements.find(function(el) { return el.id === state.selectedId; });
-      if (_sel && _sel.parentId) {
+      var _selEl = document.getElementById(state.selectedId);
+      if (_selEl && _selEl.parentElement && _selEl.parentElement.dataset.type === 'group') {
         e.preventDefault();
         cycleGroupSelection(e.shiftKey ? -1 : 1);
         return;
@@ -274,10 +274,9 @@ function init() {
           break;
         case 'escape':
           if (!handlePolylineEscape()) {
-            var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
-            if (selData && selData.parentId) {
-              var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-              if (groupData) { clearTempUngroup(); selectElement(groupData.id, false); break; }
+            var selEl = document.getElementById(state.selectedId);
+            if (selEl && selEl.parentElement && selEl.parentElement.dataset.type === 'group') {
+              clearTempUngroup(); selectElement(selEl.parentElement.id, false); break;
             }
             clearSelection();
           }

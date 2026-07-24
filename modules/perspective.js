@@ -5,6 +5,7 @@ import { addLineElement } from './line.js';
 import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
 import { addRectangleElement } from './rectangle.js';
+import { captureAllElementsState } from './dom-utils.js';
 
 let corners = [];
 let isDrawing = false;
@@ -372,7 +373,7 @@ function applyTransform() {
     const oldDataURI = state.image.dataURI;
     const oldW = imgW;
     const oldH = imgH;
-    const oldElements = JSON.parse(JSON.stringify(state.elements));
+    const oldElements = captureAllElementsState();
 
     const newDataURI = canvas.toDataURL('image/jpeg', 0.92);
     const imgEl = new Image();
@@ -384,14 +385,12 @@ function applyTransform() {
           for (const el of oldElements) {
             addElement(el);
           }
-          state.elements.push(...oldElements);
         },
         undoFn: () => {
           loadImage(oldDataURI, oldW, oldH);
           for (const el of oldElements) {
             addElement(el);
           }
-          state.elements.push(...oldElements);
         },
       });
 
@@ -399,7 +398,6 @@ function applyTransform() {
       for (const el of oldElements) {
         addElement(el);
       }
-      state.elements.push(...oldElements);
       cleanup();
     };
     imgEl.src = newDataURI;
