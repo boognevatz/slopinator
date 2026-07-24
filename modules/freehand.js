@@ -21,12 +21,24 @@ export function initFreehand() {
 
       // Re-simplify selected freehand element in real-time
       if (state.selectedId) {
-        const data = state.elements.find(el => el.id === state.selectedId);
-        if (data && data.type === 'freehand') {
-          const sourcePoints = data.rawPoints || data.points;
-          data.epsilon = state.activeFreehandEpsilon;
-          data.points = simplifyPolyline(sourcePoints, data.epsilon);
-          updateFreehandElement(data);
+        const id = state.selectedId;
+        const el = document.getElementById(id);
+        if (el && el.dataset.type === 'freehand') {
+          const epsilon = state.activeFreehandEpsilon;
+          el.setAttribute('data-epsilon', epsilon);
+          const polyline = el.querySelector('polyline');
+          if (polyline) {
+            const ptsAttr = polyline.getAttribute('points');
+            const points = ptsAttr ? ptsAttr.trim().split(/\s+/).map(p => {
+              const [x, y] = p.split(',').map(Number);
+              return { x, y };
+            }) : [];
+            const simplified = simplifyPolyline(points, epsilon);
+            const ptsStr = simplified.map(p => `${p.x},${p.y}`).join(' ');
+            polyline.setAttribute('points', ptsStr);
+            const hitArea = el.querySelector('.line-hit-area');
+            if (hitArea) hitArea.setAttribute('points', ptsStr);
+          }
         }
       }
     });

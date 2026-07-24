@@ -2,6 +2,7 @@ import { state, dom } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { selectElement, clearSelection } from './select.js';
+import { captureElementState, readRectGeometry } from './dom-utils.js';
 
 let isDrawing = false;
 let startPt = null;
@@ -33,7 +34,7 @@ export function activateRectangle(preSelectId) {
   var targetId = preSelectId || state.selectedId;
   if (targetId) {
     if (preSelectId) selectElement(preSelectId);
-    var data = state.elements.find(function(el) { return el.id === targetId; });
+    var data = captureElementState(targetId);
     if (data && data.type === 'rectangle') {
       drawRectToolCircleHandles(data, activeCorner);
     }
@@ -52,7 +53,7 @@ export function deactivateRectangle() {
 
 function onPaletteBgChange() {
   if (state.selectedId) {
-    var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+    var data = captureElementState(state.selectedId);
     if (data && data.type === 'rectangle') {
       drawRectToolCircleHandles(data, activeCorner);
     }
@@ -83,7 +84,7 @@ function onKeyDown(e) {
   var tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (!state.selectedId) return;
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
 
   if (e.key === 'Tab') {
@@ -164,12 +165,14 @@ function onMouseDown(e) {
     if (parentG) foundId = parentG.id;
   }
   if (!foundId) {
-    for (var i = state.elements.length - 1; i >= 0; i--) {
-      var el = state.elements[i];
-      if (el.type !== 'rectangle') continue;
-      if (pt.x >= el.x && pt.x <= el.x + el.width &&
-          pt.y >= el.y && pt.y <= el.y + el.height) {
-        foundId = el.id;
+    var allRects = dom.annotationLayer.querySelectorAll('g[data-type="rectangle"]');
+    for (var i = allRects.length - 1; i >= 0; i--) {
+      var gEl = allRects[i];
+      var geom = readRectGeometry(gEl);
+      if (!geom) continue;
+      if (pt.x >= geom.x && pt.x <= geom.x + geom.width &&
+          pt.y >= geom.y && pt.y <= geom.y + geom.height) {
+        foundId = gEl.id;
         break;
       }
     }
@@ -181,15 +184,15 @@ function onMouseDown(e) {
       activeCorner = -1;
     } else {
       selectElement(foundId);
-      var data = state.elements.find(function(el) { return el.id === foundId; });
+      var data = captureElementState(foundId);
       if (data) drawRectToolCircleHandles(data, activeCorner);
     }
     return;
   }
 
   if (state.selectedId) {
-    var selEl = state.elements.find(function(el) { return el.id === state.selectedId; });
-    if (selEl && selEl.type === 'rectangle') {
+    var selEl = document.getElementById(state.selectedId);
+    if (selEl && selEl.dataset.type === 'rectangle') {
       clearSelection();
       activeCorner = -1;
       return;
@@ -285,7 +288,7 @@ function startHandleDrag(idx, pt) {
   dragStartPt = { x: pt.x, y: pt.y };
   isPreparingDrag = true;
 
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  var data = captureElementState(state.selectedId);
   if (data) drawRectToolCircleHandles(data, activeCorner);
 
   document.addEventListener('pointermove', onDragPrepare);
@@ -314,7 +317,7 @@ function onDragCancel(e) {
 
 function startResizeRect(idx, pt) {
   activeCorner = idx;
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
+  var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
 
   var anchorMap = {
@@ -337,8 +340,7 @@ function startResizeRect(idx, pt) {
 function onResizeMove(e) {
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!data || data.type !== 'rectangle') return;
+  if (!state.selectedId) return;
 
   var ax = resizeAnchor.x;
   var ay = resizeAnchor.y;
@@ -350,13 +352,24 @@ function onResizeMove(e) {
   if (nw < 5) nw = 5;
   if (nh < 5) nh = 5;
 
-  data.x = nx;
-  data.y = ny;
-  data.width = nw;
-  data.height = nh;
+  var el = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+  if (!el) return;
+  var fillRect = el.querySelector('.rect-fill');
+  var strokeRect = el.querySelector('.rect-stroke');
+  if (fillRect) {
+    fillRect.setAttribute('x', nx);
+    fillRect.setAttribute('y', ny);
+    fillRect.setAttribute('width', nw);
+    fillRect.setAttribute('height', nh);
+  }
+  if (strokeRect) {
+    strokeRect.setAttribute('x', nx);
+    strokeRect.setAttribute('y', ny);
+    strokeRect.setAttribute('width', nw);
+    strokeRect.setAttribute('height', nh);
+  }
 
-  updateRectangleElement(data);
-  drawRectToolCircleHandles(data, activeCorner);
+  drawRectToolCircleHandles({ x: nx, y: ny, width: nw, height: nh }, activeCorner);
 }
 
 function onResizeEnd(e) {
@@ -365,28 +378,44 @@ function onResizeEnd(e) {
   if (!isResizing) return;
   isResizing = false;
 
-  var data = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!data) return;
+  var id = state.selectedId;
+  if (!id) return;
 
   var orig = resizeOrig;
-  var final = { x: data.x, y: data.y, width: data.width, height: data.height };
+  var finalData = captureElementState(id);
+  if (!finalData) return;
+  var final = { x: finalData.x, y: finalData.y, width: finalData.width, height: finalData.height };
   var cornerIdx = activeCorner;
 
   if (orig.x !== final.x || orig.y !== final.y || orig.width !== final.width || orig.height !== final.height) {
     pushAction({
       description: 'Resize rectangle',
       doFn: function() {
-        data.x = final.x; data.y = final.y; data.width = final.width; data.height = final.height;
-        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+        var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
+        if (!el) return;
+        var fr = el.querySelector('.rect-fill'), sr = el.querySelector('.rect-stroke');
+        [fr, sr].forEach(function(r) {
+          if (!r) return;
+          r.setAttribute('x', final.x); r.setAttribute('y', final.y);
+          r.setAttribute('width', final.width); r.setAttribute('height', final.height);
+        });
+        drawRectToolCircleHandles(final, cornerIdx);
       },
       undoFn: function() {
-        data.x = orig.x; data.y = orig.y; data.width = orig.width; data.height = orig.height;
-        updateRectangleElement(data); drawRectToolCircleHandles(data, cornerIdx);
+        var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
+        if (!el) return;
+        var fr = el.querySelector('.rect-fill'), sr = el.querySelector('.rect-stroke');
+        [fr, sr].forEach(function(r) {
+          if (!r) return;
+          r.setAttribute('x', orig.x); r.setAttribute('y', orig.y);
+          r.setAttribute('width', orig.width); r.setAttribute('height', orig.height);
+        });
+        drawRectToolCircleHandles(orig, cornerIdx);
       },
     });
   }
 
-  drawRectToolCircleHandles(data, activeCorner);
+  drawRectToolCircleHandles(final, activeCorner);
 }
 
 function cancelDraw() {

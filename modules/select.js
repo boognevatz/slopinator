@@ -50,37 +50,40 @@ export function initSelect() {
   });
   document.addEventListener('palette-bgcolor-changed', (e) => {
     if (!state.selectedId) return;
-    const data = state.elements.find(el => el.id === state.selectedId);
-    if (!data) return;
+    const id = state.selectedId;
+    const oldState = captureElementState(id);
+    if (!oldState) return;
     const color = e.detail.color;
-    const oldFill = data.fill;
+    const oldFill = oldState.fill;
     if (oldFill === color) return;
-    if (data.type === 'text') {
-      data.fill = color;
-      updateTextSVG(data);
-      drawHandles(data);
+    if (oldState.type === 'text') {
+      const newState = { ...oldState, fill: color };
+      updateTextSVG(newState);
+      drawHandles();
       pushAction({
         description: 'Change text fill color',
-        doFn: () => { data.fill = color; updateTextSVG(data); drawHandles(data); },
-        undoFn: () => { data.fill = oldFill; updateTextSVG(data); drawHandles(data); },
+        doFn: () => { updateTextSVG(newState); drawHandles(); },
+        undoFn: () => { updateTextSVG(oldState); drawHandles(); },
       });
-    } else if (data.type === 'rectangle') {
-      data.fill = color === 'transparent' ? 'none' : color;
-      updateRectangleElement(data);
-      drawHandles(data);
+    } else if (oldState.type === 'rectangle') {
+      const newFill = color === 'transparent' ? 'none' : color;
+      const newState = { ...oldState, fill: newFill };
+      updateRectangleElement(newState);
+      drawHandles();
       pushAction({
         description: 'Change rectangle fill color',
-        doFn: () => { data.fill = color; updateRectangleElement(data); drawHandles(data); },
-        undoFn: () => { data.fill = oldFill; updateRectangleElement(data); drawHandles(data); },
+        doFn: () => { updateRectangleElement(newState); drawHandles(); },
+        undoFn: () => { updateRectangleElement(oldState); drawHandles(); },
       });
-    } else if (data.type === 'line' && data.closed) {
-      data.fill = color === 'transparent' ? 'none' : color;
-      updateLineSVG(data);
-      drawHandles(data);
+    } else if (oldState.type === 'line' && oldState.closed) {
+      const newFill = color === 'transparent' ? 'none' : color;
+      const newState = { ...oldState, fill: newFill };
+      updateLineSVG(newState);
+      drawHandles();
       pushAction({
         description: 'Change polygon fill color',
-        doFn: () => { data.fill = color; updateLineSVG(data); drawHandles(data); },
-        undoFn: () => { data.fill = oldFill; updateLineSVG(data); drawHandles(data); },
+        doFn: () => { updateLineSVG(newState); drawHandles(); },
+        undoFn: () => { updateLineSVG(oldState); drawHandles(); },
       });
     }
   });
@@ -134,67 +137,51 @@ export function initSelect() {
         idInput.value = targetId;
         return;
       }
-      var data = state.elements.find(function (e) { return e.id === targetId; });
-      if (!data) return;
-      var dup = state.elements.find(function (e) { return e.id === sanitized; });
-      if (dup && dup !== data) {
+      var targetEl = document.getElementById(targetId);
+      if (!targetEl) return;
+      if (document.getElementById(sanitized) && sanitized !== targetId) {
         idInput.value = targetId;
         return;
       }
-      var oldId = data.id;
+      var oldId = targetId;
+      var type = targetEl.dataset.type;
 
       // Find longest common prefix between old group ID and child IDs
       var prefix = oldId;
-      if (data.type === 'group' && data.childIds) {
-        for (var ci = 0; ci < data.childIds.length; ci++) {
-          while (data.childIds[ci].indexOf(prefix) !== 0 && prefix.length > 0) {
+      if (type === 'group') {
+        for (var ci = 0; ci < targetEl.children.length; ci++) {
+          var childId = targetEl.children[ci].id;
+          while (childId.indexOf(prefix) !== 0 && prefix.length > 0) {
             prefix = prefix.slice(0, -1);
           }
           if (prefix.length === 0) break;
         }
       }
 
-      data.id = sanitized;
+      targetEl.id = sanitized;
 
-      if (data.type === 'group') {
-        // Extra suffix on the group ID beyond the common prefix (e.g. "-group")
+      if (type === 'group') {
         var extraSuffix = prefix.length > 0 ? oldId.slice(prefix.length) : '';
-        // Derive base name for children (strip same extra suffix if it matches)
         var newBase = (extraSuffix && sanitized.endsWith(extraSuffix)) ? sanitized.slice(0, -extraSuffix.length) : sanitized;
 
-        var oldToNew = {};
-        for (var ci = 0; ci < data.childIds.length; ci++) {
-          var oldChildId = data.childIds[ci];
-          var child = state.elements.find(function(e) { return e.id === oldChildId; });
-          if (!child) continue;
-          child.parentId = sanitized;
+        for (var ci = 0; ci < targetEl.children.length; ci++) {
+          var oldChildId = targetEl.children[ci].id;
           if (prefix.length > 0 && oldChildId.indexOf(prefix) === 0) {
             var newChildId = newBase + oldChildId.slice(prefix.length);
-            if (!state.elements.some(function(e) { return e.id === newChildId; }) || newChildId === oldChildId) {
-              child.id = newChildId;
-              var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(oldChildId));
-              if (childSvg) childSvg.id = newChildId;
-              oldToNew[oldChildId] = newChildId;
+            if (!document.getElementById(newChildId) || newChildId === oldChildId) {
+              targetEl.children[ci].id = newChildId;
             }
           }
         }
-        // Update childIds array
-        for (var ci = 0; ci < data.childIds.length; ci++) {
-          if (oldToNew[data.childIds[ci]]) {
-            data.childIds[ci] = oldToNew[data.childIds[ci]];
-          }
-        }
-      } else if (data.parentId) {
-        var parentGroup = state.elements.find(function(e) { return e.id === data.parentId && e.type === 'group'; });
-        if (parentGroup) {
-          var pci = parentGroup.childIds.indexOf(oldId);
-          if (pci !== -1) parentGroup.childIds[pci] = sanitized;
-        }
       }
-      var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(oldId));
-      if (svgEl) svgEl.id = sanitized;
+      // For non-group elements inside a group, no parent group childIds array to update
       if (state.selectedId === oldId) {
         state.selectedId = sanitized;
+      }
+      for (var si = 0; si < state.selectedIds.length; si++) {
+        if (state.selectedIds[si] === oldId) {
+          state.selectedIds[si] = sanitized;
+        }
       }
       _renameTargetId = sanitized;
       idInput.value = sanitized;
@@ -256,13 +243,15 @@ function setLineEditMode(mode) {
     moveBtn.classList.toggle('active', mode === 'move');
     changeBtn.classList.toggle('active', mode === 'change-end');
   }
-  const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
   if (mode === 'change-end') {
     selectedLineEndpoint = null;
   }
   refreshSelection();
-  if (data) {
-    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: data.id, data } }));
+  if (state.selectedId) {
+    var selData = captureElementState(state.selectedId);
+    if (selData) {
+      document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: selData.id, data: selData } }));
+    }
   }
 }
 
@@ -330,8 +319,8 @@ function onMouseDown(e) {
     }
 
     if (state.selectedId) {
-      const selected = state.elements.find(el => el.id === state.selectedId);
-      if (selected && selected.type === 'line' && lineEditMode === 'change-end') {
+      var selEl = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+      if (selEl && selEl.dataset.type === 'line' && lineEditMode === 'change-end') {
         if (handleEl.dataset.handle === 'p1' || handleEl.dataset.handle === 'p2') {
           setSelectedLineEndpoint(handleEl.dataset.handle === 'p1' ? 'start' : 'end');
           refreshSelection();
@@ -350,7 +339,7 @@ function onMouseDown(e) {
     e.preventDefault();
     const id = annotGroup.id;
 
-    const data = state.elements.find(el => el.id === id);
+    const annotType = annotGroup.dataset ? annotGroup.dataset.type : null;
 
     // Double-click on text → edit (defer to next frame so mousedown
     // processing completes and doesn't steal focus from the textarea)
@@ -359,7 +348,7 @@ function onMouseDown(e) {
     _lastClickTime = now;
     _lastClickId = id;
     if (isDblClick) {
-      if (annotGroup.dataset && annotGroup.dataset.type === 'group') {
+      if (annotType === 'group') {
         var actualAnnot = findActualAnnotation(target);
         if (actualAnnot) {
           _tempUngrouped = true;
@@ -367,7 +356,7 @@ function onMouseDown(e) {
           return;
         }
       }
-      if (data && data.type === 'text') {
+      if (annotType === 'text') {
         setTimeout(() => startEditing(id), 0);
         return;
       }
@@ -380,12 +369,12 @@ function onMouseDown(e) {
 
     if (state.selectedIds.includes(id) && state.selectedIds.length > 1) {
       state.selectedId = id;
-      drawHandles(data);
+      drawHandles();
     } else {
       selectElement(id, false);
     }
 
-    if (data && data.type === 'line' && lineEditMode === 'change-end') {
+    if (annotType === 'line' && lineEditMode === 'change-end') {
       return;
     }
     startDrag(id, pt);
@@ -439,7 +428,7 @@ function onKeyDown(e) {
 
   for (var si = 0; si < state.selectedIds.length; si++) {
     var sid = state.selectedIds[si];
-    var data = state.elements.find(function(el) { return el.id === sid; });
+    var data = captureElementState(sid);
     if (!data) continue;
 
     if (data.type === 'line') {
@@ -473,8 +462,7 @@ function onKeyDown(e) {
     }
   }
 
-  var primary = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (primary) drawHandles(primary);
+  drawHandles();
 }
 
 function findAnnotationParent(target) {
@@ -511,46 +499,63 @@ export function clearTempUngroup() {
   _tempUngrouped = false;
 }
 
+function getGroupChildIds(id) {
+  var el = document.getElementById(id);
+  if (!el || el.dataset.type !== 'group') return null;
+  var ids = [];
+  for (var ci = 0; ci < el.children.length; ci++) {
+    ids.push(el.children[ci].id);
+  }
+  return ids;
+}
+
+function hasParentGroup(id) {
+  var el = document.getElementById(id);
+  if (!el) return false;
+  return el.parentElement && el.parentElement.dataset.type === 'group';
+}
+
 export function selectElement(id, addToSelection) {
-  var groupData = state.elements.find(function(el) { return el.id === id && el.type === 'group'; });
-  if (groupData) {
+  var groupChildIds = getGroupChildIds(id);
+  if (groupChildIds) {
     _tempUngrouped = false;
     if (addToSelection) {
       var allSelected = true;
-      for (var gg = 0; gg < groupData.childIds.length; gg++) {
-        if (state.selectedIds.indexOf(groupData.childIds[gg]) === -1) {
+      for (var gg = 0; gg < groupChildIds.length; gg++) {
+        if (state.selectedIds.indexOf(groupChildIds[gg]) === -1) {
           allSelected = false;
           break;
         }
       }
       if (allSelected) {
-        for (var gg2 = 0; gg2 < groupData.childIds.length; gg2++) {
-          var idx = state.selectedIds.indexOf(groupData.childIds[gg2]);
+        for (var gg2 = 0; gg2 < groupChildIds.length; gg2++) {
+          var idx = state.selectedIds.indexOf(groupChildIds[gg2]);
           if (idx !== -1) state.selectedIds.splice(idx, 1);
         }
         if (state.selectedIds.length === 0) { clearSelection(); return; }
         state.selectedId = state.selectedIds[state.selectedIds.length - 1];
-        var rem = state.elements.find(function(el) { return el.id === state.selectedId; });
-        if (rem) { drawHandles(rem); document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: rem.id, data: rem } })); }
+        drawHandles();
+        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
+        document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: state.selectedId, data: captureElementState(state.selectedId) } }));
         return;
       }
-      for (var gg3 = 0; gg3 < groupData.childIds.length; gg3++) {
-        if (state.selectedIds.indexOf(groupData.childIds[gg3]) === -1) {
-          state.selectedIds.push(groupData.childIds[gg3]);
+      for (var gg3 = 0; gg3 < groupChildIds.length; gg3++) {
+        if (state.selectedIds.indexOf(groupChildIds[gg3]) === -1) {
+          state.selectedIds.push(groupChildIds[gg3]);
         }
       }
     } else {
       clearSelection();
-      state.selectedIds = groupData.childIds.slice();
+      state.selectedIds = groupChildIds.slice();
     }
-    state.selectedId = groupData.childIds[groupData.childIds.length - 1];
-    var primChild = state.elements.find(function(el) { return el.id === state.selectedId; });
-    if (primChild) drawHandles(primChild);
+    state.selectedId = groupChildIds[groupChildIds.length - 1];
+    drawHandles();
     document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
-    document.getElementById('element-id-input').value = groupData.id;
-    _renameTargetId = groupData.id;
+    document.getElementById('element-id-input').value = id;
+    _renameTargetId = id;
     renderGroupChildrenPreview();
-    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: groupData } }));
+    var groupEl = document.getElementById(id);
+    document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id, data: { id, type: 'group', childIds: groupChildIds } } }));
     var groupBtn = document.getElementById('btn-group');
     if (groupBtn) groupBtn.disabled = true;
     updateUngroupButton();
@@ -559,8 +564,7 @@ export function selectElement(id, addToSelection) {
   }
 
   if (!addToSelection) {
-    var _selEl = state.elements.find(function(e) { return e.id === id; });
-    var _keepUngroup = _tempUngrouped && _selEl && _selEl.parentId;
+    var _keepUngroup = _tempUngrouped && hasParentGroup(id);
     clearSelection();
     _tempUngrouped = _keepUngroup;
   }
@@ -576,13 +580,13 @@ export function selectElement(id, addToSelection) {
         return;
       }
       state.selectedId = state.selectedIds[state.selectedIds.length - 1];
-      var remaining = state.elements.find(function(el) { return el.id === state.selectedId; });
-      if (remaining) {
-        drawHandles(remaining);
+      var remainingData = captureElementState(state.selectedId);
+      if (remainingData) {
+        drawHandles();
         document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
         var inp = document.getElementById('element-id-input');
-        if (inp) { inp.value = remaining.id; _renameTargetId = remaining.id; renderGroupChildrenPreview(); }
-        document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remaining.id, data: remaining } }));
+        if (inp) { inp.value = remainingData.id; _renameTargetId = remainingData.id; renderGroupChildrenPreview(); }
+        document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remainingData.id, data: remainingData } }));
       }
       return;
     }
@@ -591,7 +595,7 @@ export function selectElement(id, addToSelection) {
     state.selectedIds = [id];
   }
 
-  const data = state.elements.find(el => el.id === id);
+  const data = captureElementState(id);
   if (!data) return;
 
   // Switch to the layer this element belongs to
@@ -639,7 +643,7 @@ export function selectElement(id, addToSelection) {
     document.getElementById('corner-radius-input').value = data.rx || 0;
   }
 
-  drawHandles(data);
+  drawHandles();
   document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
   refreshPalette();
 
@@ -661,8 +665,8 @@ function updateGroupButton() {
   if (!btn) return;
   if (state.selectedIds.length < 2) { btn.disabled = true; return; }
   for (var gi = 0; gi < state.selectedIds.length; gi++) {
-    var el = state.elements.find(function(e) { return e.id === state.selectedIds[gi]; });
-    if (el && el.parentId) { btn.disabled = true; return; }
+    var el = document.getElementById(state.selectedIds[gi]);
+    if (el && el.parentElement && el.parentElement.dataset.type === 'group') { btn.disabled = true; return; }
   }
   btn.disabled = false;
 }
@@ -673,26 +677,32 @@ export function updateUngroupButton() {
   if (state.selectedIds.length < 2) { btn.disabled = true; return; }
   var pid = null;
   for (var ui = 0; ui < state.selectedIds.length; ui++) {
-    var el = state.elements.find(function(e) { return e.id === state.selectedIds[ui]; });
-    if (!el || !el.parentId) { btn.disabled = true; return; }
-    if (ui === 0) pid = el.parentId;
-    else if (el.parentId !== pid) { btn.disabled = true; return; }
+    var el = document.getElementById(state.selectedIds[ui]);
+    if (!el || !el.parentElement || el.parentElement.dataset.type !== 'group') { btn.disabled = true; return; }
+    if (ui === 0) pid = el.parentElement.id;
+    else if (el.parentElement.id !== pid) { btn.disabled = true; return; }
   }
-  var gd = state.elements.find(function(e) { return e.id === pid && e.type === 'group'; });
-  if (!gd || gd.childIds.length !== state.selectedIds.length) { btn.disabled = true; return; }
+  if (!pid) { btn.disabled = true; return; }
+  var parentG = document.getElementById(pid);
+  if (!parentG || parentG.dataset.type !== 'group') { btn.disabled = true; return; }
+  if (parentG.children.length !== state.selectedIds.length) { btn.disabled = true; return; }
   btn.disabled = false;
 }
 
 export function cycleGroupSelection(direction) {
   if (!state.selectedId) return;
-  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!selData || !selData.parentId) return;
-  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-  if (!groupData || !groupData.childIds.length) return;
-  var idx = groupData.childIds.indexOf(state.selectedId);
+  var selEl = document.getElementById(state.selectedId);
+  if (!selEl || !selEl.parentElement || selEl.parentElement.dataset.type !== 'group') return;
+  var parentG = selEl.parentElement;
+  var childIds = [];
+  for (var ci = 0; ci < parentG.children.length; ci++) {
+    childIds.push(parentG.children[ci].id);
+  }
+  if (!childIds.length) return;
+  var idx = childIds.indexOf(state.selectedId);
   if (idx === -1) return;
-  var newIdx = (idx + direction + groupData.childIds.length) % groupData.childIds.length;
-  selectElement(groupData.childIds[newIdx], false);
+  var newIdx = (idx + direction + childIds.length) % childIds.length;
+  selectElement(childIds[newIdx], false);
 }
 
 export function clearSelection() {
@@ -1079,14 +1089,14 @@ function getBBoxFromData(el) {
 }
 
 function startDrag(id, startPt) {
-  const data = state.elements.find(el => el.id === id);
+  var data = captureElementState(id);
   if (!data) return;
 
   // Combined bounding box of all selected elements
   var ids = state.selectedIds.length ? state.selectedIds : [id];
   var bbox = null;
   for (var si = 0; si < ids.length; si++) {
-    var el = state.elements.find(function(e) { return e.id === ids[si]; });
+    var el = captureElementState(ids[si]);
     if (!el) continue;
     var eb = getBBoxFromData(el);
     if (!bbox) bbox = eb;
@@ -1119,7 +1129,7 @@ function startDrag(id, startPt) {
   dragStart = { x: closest.x, y: closest.y, _time: Date.now(), _offX: closest.x - startPt.x, _offY: closest.y - startPt.y };
   dragOriginal = { ...data };
   dragOriginals = state.selectedIds.map(function(sid) {
-    var el = state.elements.find(function(e) { return e.id === sid; });
+    var el = captureElementState(sid);
     return el ? { id: sid, x: el.x, y: el.y, x1: el.x1, y1: el.y1, x2: el.x2, y2: el.y2, points: el.points ? el.points.map(function(p) { return { x: p.x, y: p.y }; }) : null, rawPoints: el.rawPoints ? el.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null } : null;
   }).filter(Boolean);
 
@@ -1136,42 +1146,42 @@ function onDragMove(e) {
 
   for (var i = 0; i < dragOriginals.length; i++) {
     var orig = dragOriginals[i];
-    var el = state.elements.find(function(e) { return e.id === orig.id; });
-    if (!el) continue;
+    var el = { ...orig };
+    if (orig.points) el.points = orig.points.map(function(p) { return { x: p.x, y: p.y }; });
+    if (orig.rawPoints) el.rawPoints = orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; });
 
     if (el.type === 'line') {
       if (el.points) {
-        el.points = orig.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+        el.points = el.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
         el.x1 = el.points[0].x;
         el.y1 = el.points[0].y;
         el.x2 = el.points[el.points.length - 1].x;
         el.y2 = el.points[el.points.length - 1].y;
       } else {
-        el.x1 = orig.x1 + dx;
-        el.y1 = orig.y1 + dy;
-        el.x2 = orig.x2 + dx;
-        el.y2 = orig.y2 + dy;
+        el.x1 = el.x1 + dx;
+        el.y1 = el.y1 + dy;
+        el.x2 = el.x2 + dx;
+        el.y2 = el.y2 + dy;
       }
       updateLineSVG(el);
     } else if (el.type === 'text') {
-      el.x = orig.x + dx;
-      el.y = orig.y + dy;
+      el.x = el.x + dx;
+      el.y = el.y + dy;
       updateTextSVG(el);
     } else if (el.type === 'freehand') {
-      el.points = orig.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+      el.points = el.points.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
       if (el.rawPoints) {
-        el.rawPoints = orig.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
+        el.rawPoints = el.rawPoints.map(function(p) { return { x: p.x + dx, y: p.y + dy }; });
       }
       updateFreehandElement(el);
     } else if (el.type === 'rectangle') {
-      el.x = orig.x + dx;
-      el.y = orig.y + dy;
+      el.x = el.x + dx;
+      el.y = el.y + dy;
       updateRectangleElement(el);
     }
   }
 
-  var primary = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (primary) drawHandles(primary);
+  drawHandles();
 }
 
 function onDragEnd() {
@@ -1181,15 +1191,15 @@ function onDragEnd() {
   if (!isDragging) return;
   isDragging = false;
 
-  var primaryData = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!primaryData) { dragOriginal = null; dragOriginals = null; return; }
+  var primaryFinal = captureElementState(state.selectedId);
+  if (!primaryFinal) { dragOriginal = null; dragOriginals = null; return; }
 
   // Single-element special behaviors: long-press text edit, mode-toggle click
   if (dragOriginals.length === 1) {
     const orig = { ...dragOriginal };
-    const final = { ...primaryData };
+    const final = { ...primaryFinal };
 
-    if (primaryData.type === 'text' && dragStart && dragStart._time) {
+    if (primaryFinal.type === 'text' && dragStart && dragStart._time) {
       const elapsed = Date.now() - dragStart._time;
       if (elapsed >= 400 && orig.x === final.x && orig.y === final.y) {
         dragOriginal = null; dragOriginals = null;
@@ -1200,7 +1210,7 @@ function onDragEnd() {
 
     if (dragStart && dragStart._dragSource === 'mode-toggle') {
       let dx, dy;
-      if (primaryData.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
+      if (primaryFinal.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
       else { dx = (final.x || 0) - (orig.x || 0); dy = (final.y || 0) - (orig.y || 0); }
       if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
         dragOriginal = null; dragOriginals = null;
@@ -1216,26 +1226,25 @@ function onDragEnd() {
   var moved = false;
   for (var i = 0; i < dragOriginals.length; i++) {
     var orig = dragOriginals[i];
-    var el = state.elements.find(function(e) { return e.id === orig.id; });
-    if (!el) continue;
-    var dx = el.x != null ? el.x - orig.x : 0;
-    var dy = el.y != null ? el.y - orig.y : 0;
-    if (el.type === 'line') {
-      dx = el.x1 - orig.x1;
-      dy = el.y1 - orig.y1;
+    var final = captureElementState(orig.id);
+    if (!final) continue;
+    var dx = final.x != null ? final.x - orig.x : 0;
+    var dy = final.y != null ? final.y - orig.y : 0;
+    if (final.type === 'line') {
+      dx = final.x1 - orig.x1;
+      dy = final.y1 - orig.y1;
     }
     if (Math.abs(dx) > 0 || Math.abs(dy) > 0) moved = true;
     snapshots.push({ id: orig.id, orig: { x: orig.x, y: orig.y, x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, points: orig.points ? orig.points.map(function(p) { return { x: p.x, y: p.y }; }) : null, rawPoints: orig.rawPoints ? orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null }, final: null });
-    // Capture final positions
     var snap = snapshots[snapshots.length - 1];
-    if (el.type === 'line') {
-      snap.final = { x1: el.x1, y1: el.y1, x2: el.x2, y2: el.y2, points: el.points ? el.points.map(function(p) { return { x: p.x, y: p.y }; }) : null };
-    } else if (el.type === 'text') {
-      snap.final = { x: el.x, y: el.y };
-    } else if (el.type === 'freehand') {
-      snap.final = { points: el.points.map(function(p) { return { x: p.x, y: p.y }; }), rawPoints: el.rawPoints ? el.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null };
-    } else if (el.type === 'rectangle') {
-      snap.final = { x: el.x, y: el.y };
+    if (final.type === 'line') {
+      snap.final = { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, points: final.points ? final.points.map(function(p) { return { x: p.x, y: p.y }; }) : null };
+    } else if (final.type === 'text') {
+      snap.final = { x: final.x, y: final.y };
+    } else if (final.type === 'freehand') {
+      snap.final = { points: final.points.map(function(p) { return { x: p.x, y: p.y }; }), rawPoints: final.rawPoints ? final.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null };
+    } else if (final.type === 'rectangle') {
+      snap.final = { x: final.x, y: final.y };
     }
   }
 
@@ -1245,34 +1254,32 @@ function onDragEnd() {
       doFn: function() {
         for (var j = 0; j < snapshots.length; j++) {
           var s = snapshots[j];
-          var e = state.elements.find(function(el2) { return el2.id === s.id; });
-          if (!e) continue;
-          if (e.type === 'line') {
-            e.x1 = s.final.x1; e.y1 = s.final.y1; e.x2 = s.final.x2; e.y2 = s.final.y2;
-            if (s.final.points) e.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; });
-            updateLineSVG(e);
-          } else if (e.type === 'text') { e.x = s.final.x; e.y = s.final.y; updateTextSVG(e); }
-          else if (e.type === 'freehand') { e.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.final.rawPoints) e.rawPoints = s.final.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(e); }
-          else if (e.type === 'rectangle') { e.x = s.final.x; e.y = s.final.y; updateRectangleElement(e); }
+          var data = captureElementState(s.id);
+          if (!data) continue;
+          if (data.type === 'line') {
+            data.x1 = s.final.x1; data.y1 = s.final.y1; data.x2 = s.final.x2; data.y2 = s.final.y2;
+            if (s.final.points) data.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; });
+            updateLineSVG(data);
+          } else if (data.type === 'text') { data.x = s.final.x; data.y = s.final.y; updateTextSVG(data); }
+          else if (data.type === 'freehand') { data.points = s.final.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.final.rawPoints) data.rawPoints = s.final.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(data); }
+          else if (data.type === 'rectangle') { data.x = s.final.x; data.y = s.final.y; updateRectangleElement(data); }
         }
-        var prim = state.elements.find(function(el2) { return el2.id === state.selectedId; });
-        if (prim) drawHandles(prim);
+        drawHandles();
       },
       undoFn: function() {
         for (var j = 0; j < snapshots.length; j++) {
           var s = snapshots[j];
-          var e = state.elements.find(function(el2) { return el2.id === s.id; });
-          if (!e) continue;
-          if (e.type === 'line') {
-            e.x1 = s.orig.x1; e.y1 = s.orig.y1; e.x2 = s.orig.x2; e.y2 = s.orig.y2;
-            if (s.orig.points) e.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; });
-            updateLineSVG(e);
-          } else if (e.type === 'text') { e.x = s.orig.x; e.y = s.orig.y; updateTextSVG(e); }
-          else if (e.type === 'freehand') { e.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.orig.rawPoints) e.rawPoints = s.orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(e); }
-          else if (e.type === 'rectangle') { e.x = s.orig.x; e.y = s.orig.y; updateRectangleElement(e); }
+          var data = captureElementState(s.id);
+          if (!data) continue;
+          if (data.type === 'line') {
+            data.x1 = s.orig.x1; data.y1 = s.orig.y1; data.x2 = s.orig.x2; data.y2 = s.orig.y2;
+            if (s.orig.points) data.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; });
+            updateLineSVG(data);
+          } else if (data.type === 'text') { data.x = s.orig.x; data.y = s.orig.y; updateTextSVG(data); }
+          else if (data.type === 'freehand') { data.points = s.orig.points.map(function(p) { return { x: p.x, y: p.y }; }); if (s.orig.rawPoints) data.rawPoints = s.orig.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }); updateFreehandElement(data); }
+          else if (data.type === 'rectangle') { data.x = s.orig.x; data.y = s.orig.y; updateRectangleElement(data); }
         }
-        var prim = state.elements.find(function(el2) { return el2.id === state.selectedId; });
-        if (prim) drawHandles(prim);
+        drawHandles();
       },
     });
   }
@@ -1283,11 +1290,13 @@ function onDragEnd() {
 
 // ── Resize ──────────────────────────────────────────────────────
 
+let dragCurrent = null;
+
 function startResize(handleEl, startPt, e) {
   e.preventDefault();
   const handleType = handleEl.dataset.handle;
 
-  const data = state.elements.find(el => el.id === state.selectedId);
+  const data = captureElementState(state.selectedId);
   if (!data) return;
 
   // Mode-toggle: start drag (move). _dragSource flags for click detection
@@ -1301,15 +1310,16 @@ function startResize(handleEl, startPt, e) {
   resizeHandle = handleType;
   dragStart = startPt;
   dragOriginal = { ...data };
+  dragCurrent = { ...data };
 
   if (data.type === 'line' && (handleType === 'p1' || handleType === 'p2') && textInteractMode === 'rotate') {
-    const cx = (data.x1 + data.x2) / 2;
-    const cy = (data.y1 + data.y2) / 2;
-    origRotation = data.rotation || 0;
+    const cx = (dragCurrent.x1 + dragCurrent.x2) / 2;
+    const cy = (dragCurrent.y1 + dragCurrent.y2) / 2;
+    origRotation = dragCurrent.rotation || 0;
     rotationCenter = { x: cx, y: cy };
     dragStart.angle = Math.atan2(startPt.y - cy, startPt.x - cx) * 180 / Math.PI;
   } else if (data.type === 'text' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
-    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(dragCurrent.id)}`);
     if (textEl) {
       try {
         const bb = textEl.getBBox();
@@ -1319,25 +1329,22 @@ function startResize(handleEl, startPt, e) {
           width: bb.width + pad * 2, height: bb.height + pad * 2,
         };
       } catch {
-        origBbox = { x: data.x, y: data.y - data.fontSize, width: data.fontSize * 4, height: data.fontSize };
+        origBbox = { x: dragCurrent.x, y: dragCurrent.y - dragCurrent.fontSize, width: dragCurrent.fontSize * 4, height: dragCurrent.fontSize };
       }
     }
 
-    origRotation = data.rotation || 0;
+    origRotation = dragCurrent.rotation || 0;
     rotationCenter = {
       x: origBbox.x + origBbox.width / 2,
       y: origBbox.y + origBbox.height / 2
     };
 
     if (textInteractMode === 'rotate') {
-      // Calculate original angle from center to mouse
       dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
     } else {
-      // Baseline offset relative to bbox top-left
-      origBaselineOffX = data.x - origBbox.x;
-      origBaselineOffY = data.y - origBbox.y;
+      origBaselineOffX = dragCurrent.x - origBbox.x;
+      origBaselineOffY = dragCurrent.y - origBbox.y;
 
-      // Anchor = opposite corner of the bounding box
       const anchorMap = {
         tl: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
         tr: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
@@ -1346,7 +1353,6 @@ function startResize(handleEl, startPt, e) {
       };
       resizeAnchor = anchorMap[handleType];
 
-      // Original diagonal length (anchor to dragged corner)
       const draggedCornerMap = {
         tl: { x: origBbox.x,                  y: origBbox.y },
         tr: { x: origBbox.x + origBbox.width, y: origBbox.y },
@@ -1362,23 +1368,23 @@ function startResize(handleEl, startPt, e) {
         : { x: 1, y: 1 };
     }
   } else if (data.type === 'rectangle') {
-    origRotation = data.rotation || 0;
+    origRotation = dragCurrent.rotation || 0;
     rotationCenter = {
-      x: data.x + data.width / 2,
-      y: data.y + data.height / 2
+      x: dragCurrent.x + dragCurrent.width / 2,
+      y: dragCurrent.y + dragCurrent.height / 2
     };
 
     if (textInteractMode === 'rotate') {
       dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
     } else if (handleType === 'tl' || handleType === 'br') {
       const anchorMap = {
-        tl: { x: data.x + data.width, y: data.y + data.height },
-        br: { x: data.x, y: data.y },
+        tl: { x: dragCurrent.x + dragCurrent.width, y: dragCurrent.y + dragCurrent.height },
+        br: { x: dragCurrent.x, y: dragCurrent.y },
       };
       resizeAnchor = anchorMap[handleType];
       const dc = handleType === 'tl'
-        ? { x: data.x, y: data.y }
-        : { x: data.x + data.width, y: data.y + data.height };
+        ? { x: dragCurrent.x, y: dragCurrent.y }
+        : { x: dragCurrent.x + dragCurrent.width, y: dragCurrent.y + dragCurrent.height };
       const dx = dc.x - resizeAnchor.x;
       const dy = dc.y - resizeAnchor.y;
       origDiagLen = Math.sqrt(dx * dx + dy * dy);
@@ -1387,8 +1393,8 @@ function startResize(handleEl, startPt, e) {
         : { x: 1, y: 1 };
     } else if (handleType === 'bl' || handleType === 'tr') {
       resizeAnchor = {
-        x: handleType === 'bl' ? data.x : data.x + data.width,
-        y: handleType === 'bl' ? data.y + data.height : data.y,
+        x: handleType === 'bl' ? dragCurrent.x : dragCurrent.x + dragCurrent.width,
+        y: handleType === 'bl' ? dragCurrent.y + dragCurrent.height : dragCurrent.y,
       };
     }
   }
@@ -1400,7 +1406,7 @@ function startResize(handleEl, startPt, e) {
 function onResizeMove(e) {
   if (!isResizing) return;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const data = state.elements.find(el => el.id === state.selectedId);
+  const data = dragCurrent;
   if (!data) return;
 
   if (data.type === 'line') {
@@ -1428,17 +1434,11 @@ function onResizeMove(e) {
       const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
       const angleDiff = currentAngle - dragStart.angle;
       let newRot = origRotation + angleDiff;
-      
-      // Snap to 5 degrees
       newRot = Math.round(newRot / 5) * 5;
-      
-      // Keep it 0-360
       newRot = ((newRot % 360) + 360) % 360;
-      
       data.rotation = newRot;
       updateTextSVG(data);
     } else if (resizeAnchor) {
-      // Un-rotate mouse point so it matches the unrotated bounding box space
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
       const sinA = Math.sin(angleRad);
@@ -1447,36 +1447,27 @@ function onResizeMove(e) {
       const unrotatedPtX = rotationCenter.x + dxMouse * cosA - dyMouse * sinA;
       const unrotatedPtY = rotationCenter.y + dxMouse * sinA + dyMouse * cosA;
 
-      // Project unrotated mouse vector onto original diagonal to get signed scale
       const mx = unrotatedPtX - resizeAnchor.x;
       const my = unrotatedPtY - resizeAnchor.y;
       const projLen = mx * origDiagVec.x + my * origDiagVec.y;
       const scaleFactor = origDiagLen > 0 ? projLen / origDiagLen : 1;
 
-      // Clamp to minimum size
       const newSize = Math.max(8, Math.round(dragOriginal.fontSize * Math.abs(scaleFactor)));
       const s = newSize / dragOriginal.fontSize;
 
       data.fontSize = newSize;
 
-      // Reposition so the anchor corner stays fixed.
-      // New bbox top-left = anchor - (anchor_to_origTopLeft) * s
-      // But which component depends on which corner is anchored.
       const handle = resizeHandle;
       if (handle === 'br') {
-        // anchor = original top-left of bbox
         data.x = resizeAnchor.x + origBaselineOffX * s;
         data.y = resizeAnchor.y + origBaselineOffY * s;
       } else if (handle === 'bl') {
-        // anchor = original top-right → new top-left = anchor.x - newWidth
         data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
         data.y = resizeAnchor.y + origBaselineOffY * s;
       } else if (handle === 'tr') {
-        // anchor = original bottom-left → new top-left.y = anchor.y - newHeight
         data.x = resizeAnchor.x + origBaselineOffX * s;
         data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
       } else if (handle === 'tl') {
-        // anchor = original bottom-right
         data.x = resizeAnchor.x - origBbox.width * s + origBaselineOffX * s;
         data.y = resizeAnchor.y - origBbox.height * s + origBaselineOffY * s;
       }
@@ -1516,7 +1507,7 @@ function onResizeMove(e) {
         data.y = resizeAnchor.y;
         data.width = newW;
         data.height = newH;
-      } else { // tl
+      } else {
         data.x = resizeAnchor.x - newW;
         data.y = resizeAnchor.y - newH;
         data.width = newW;
@@ -1554,7 +1545,7 @@ function onResizeMove(e) {
     }
   }
 
-  drawHandles(data);
+  drawHandles();
 }
 
 function onResizeEnd() {
@@ -1566,7 +1557,7 @@ function onResizeEnd() {
   if (!isResizing) return;
   isResizing = false;
 
-  const data = state.elements.find(el => el.id === state.selectedId);
+  const data = dragCurrent;
   if (!data) return;
 
   const orig = { ...dragOriginal };
@@ -1576,27 +1567,71 @@ function onResizeEnd() {
     const desc = textInteractMode === 'rotate' ? 'Rotate line' : 'Resize line';
     const changed = orig.rotation !== final.rotation || orig.x1 !== final.x1 || orig.y1 !== final.y1 || orig.x2 !== final.x2 || orig.y2 !== final.y2;
     if (changed) {
+      var sid = state.selectedId;
       pushAction({
         description: desc,
-        doFn: () => { Object.assign(data, { x1: final.x1, y1: final.y1, x2: final.x2, y2: final.y2, rotation: final.rotation, points: final.points ? final.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
-        undoFn: () => { Object.assign(data, { x1: orig.x1, y1: orig.y1, x2: orig.x2, y2: orig.y2, rotation: orig.rotation, points: orig.points ? orig.points.map(p => ({...p})) : undefined }); updateLineSVG(data); drawHandles(data); },
+        doFn: () => {
+          var d = captureElementState(sid);
+          if (!d) return;
+          d.x1 = final.x1; d.y1 = final.y1; d.x2 = final.x2; d.y2 = final.y2;
+          d.rotation = final.rotation;
+          if (final.points) d.points = final.points.map(p => ({...p}));
+          updateLineSVG(d);
+          drawHandles();
+        },
+        undoFn: () => {
+          var d = captureElementState(sid);
+          if (!d) return;
+          d.x1 = orig.x1; d.y1 = orig.y1; d.x2 = orig.x2; d.y2 = orig.y2;
+          d.rotation = orig.rotation;
+          if (orig.points) d.points = orig.points.map(p => ({...p}));
+          updateLineSVG(d);
+          drawHandles();
+        },
       });
     }
   } else if (data.type === 'text' && (orig.fontSize !== final.fontSize || orig.x !== final.x || orig.y !== final.y || orig.rotation !== final.rotation)) {
+    var sid = state.selectedId;
     pushAction({
       description: textInteractMode === 'rotate' ? 'Rotate text' : 'Resize text',
-      doFn: () => { data.fontSize = final.fontSize; data.x = final.x; data.y = final.y; data.rotation = final.rotation; updateTextSVG(data); drawHandles(data); },
-      undoFn: () => { data.fontSize = orig.fontSize; data.x = orig.x; data.y = orig.y; data.rotation = orig.rotation; updateTextSVG(data); drawHandles(data); },
+      doFn: () => {
+        var d = captureElementState(sid);
+        if (!d) return;
+        d.fontSize = final.fontSize; d.x = final.x; d.y = final.y; d.rotation = final.rotation;
+        updateTextSVG(d);
+        drawHandles();
+      },
+      undoFn: () => {
+        var d = captureElementState(sid);
+        if (!d) return;
+        d.fontSize = orig.fontSize; d.x = orig.x; d.y = orig.y; d.rotation = orig.rotation;
+        updateTextSVG(d);
+        drawHandles();
+      },
     });
   } else if (data.type === 'rectangle' && (orig.width !== final.width || orig.height !== final.height || orig.x !== final.x || orig.y !== final.y || orig.rx !== final.rx || orig.rotation !== final.rotation)) {
+    var sid = state.selectedId;
     pushAction({
       description: textInteractMode === 'rotate' ? 'Rotate rectangle' : 'Resize rectangle',
-      doFn: () => { Object.assign(data, final); updateRectangleElement(data); drawHandles(data); },
-      undoFn: () => { Object.assign(data, orig); updateRectangleElement(data); drawHandles(data); },
+      doFn: () => {
+        var d = captureElementState(sid);
+        if (!d) return;
+        Object.assign(d, final);
+        updateRectangleElement(d);
+        drawHandles();
+      },
+      undoFn: () => {
+        var d = captureElementState(sid);
+        if (!d) return;
+        Object.assign(d, orig);
+        updateRectangleElement(d);
+        drawHandles();
+      },
     });
   }
 
   dragOriginal = null;
+  dragCurrent = null;
   resizeAnchor = null;
   origBbox = null;
 }
@@ -1887,62 +1922,43 @@ export function duplicateSelected() {
 
 export function moveInGroup(direction) {
   if (!state.selectedId) return;
-  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!selData || !selData.parentId) return;
-  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-  if (!groupData) return;
-  var idx = groupData.childIds.indexOf(state.selectedId);
+  var selEl = document.getElementById(state.selectedId);
+  if (!selEl || !selEl.parentElement || selEl.parentElement.dataset.type !== 'group') return;
+  var parentG = selEl.parentElement;
+  var idx = Array.prototype.indexOf.call(parentG.children, selEl);
   if (idx === -1) return;
   var newIdx = idx + direction;
-  if (newIdx < 0 || newIdx >= groupData.childIds.length) return;
-  groupData.childIds[idx] = groupData.childIds[newIdx];
-  groupData.childIds[newIdx] = state.selectedId;
-  var parentG = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
-  if (parentG) {
-    var childEl = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
-    var refEl = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[idx]));
-    if (childEl && refEl) {
-      if (direction === -1) parentG.insertBefore(childEl, refEl);
-      else parentG.insertBefore(childEl, refEl.nextSibling);
-    }
-  }
+  if (newIdx < 0 || newIdx >= parentG.children.length) return;
+  var refEl = parentG.children[newIdx];
+  if (direction === -1) parentG.insertBefore(selEl, refEl);
+  else parentG.insertBefore(selEl, refEl.nextSibling);
   updateMoveButtons();
   pushAction({
     description: 'Move ' + (direction === -1 ? 'up' : 'down') + ' in group',
     doFn: function() {
-      var ci = groupData.childIds.indexOf(state.selectedId);
+      var ce = document.getElementById(state.selectedId);
+      if (!ce || !ce.parentElement || ce.parentElement.dataset.type !== 'group') return;
+      var pg = ce.parentElement;
+      var ci = Array.prototype.indexOf.call(pg.children, ce);
       if (ci === -1) return;
       var ni = ci + direction;
-      if (ni < 0 || ni >= groupData.childIds.length) return;
-      groupData.childIds[ci] = groupData.childIds[ni];
-      groupData.childIds[ni] = state.selectedId;
-      var pg = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
-      if (pg) {
-        var ce = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
-        var re = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[ci]));
-        if (ce && re) {
-          if (direction === -1) pg.insertBefore(ce, re);
-          else pg.insertBefore(ce, re.nextSibling);
-        }
-      }
+      if (ni < 0 || ni >= pg.children.length) return;
+      var re = pg.children[ni];
+      if (direction === -1) pg.insertBefore(ce, re);
+      else pg.insertBefore(ce, re.nextSibling);
     },
     undoFn: function() {
-      var ci = groupData.childIds.indexOf(state.selectedId);
+      var ce = document.getElementById(state.selectedId);
+      if (!ce || !ce.parentElement || ce.parentElement.dataset.type !== 'group') return;
+      var pg = ce.parentElement;
+      var ci = Array.prototype.indexOf.call(pg.children, ce);
       if (ci === -1) return;
       var revDir = direction === -1 ? 1 : -1;
       var ni = ci + revDir;
-      if (ni < 0 || ni >= groupData.childIds.length) return;
-      groupData.childIds[ci] = groupData.childIds[ni];
-      groupData.childIds[ni] = state.selectedId;
-      var pg = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.id));
-      if (pg) {
-        var ce = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
-        var re = dom.annotationLayer.querySelector('#' + CSS.escape(groupData.childIds[ci]));
-        if (ce && re) {
-          if (revDir === -1) pg.insertBefore(ce, re);
-          else pg.insertBefore(ce, re.nextSibling);
-        }
-      }
+      if (ni < 0 || ni >= pg.children.length) return;
+      var re = pg.children[ni];
+      if (revDir === -1) pg.insertBefore(ce, re);
+      else pg.insertBefore(ce, re.nextSibling);
     },
   });
 }
@@ -1954,14 +1970,13 @@ export function updateMoveButtons() {
   upBtn.disabled = true;
   downBtn.disabled = true;
   if (!state.selectedId || !_tempUngrouped) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
-  var selData = state.elements.find(function(el) { return el.id === state.selectedId; });
-  if (!selData || !selData.parentId) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
-  var groupData = state.elements.find(function(el) { return el.id === selData.parentId && el.type === 'group'; });
-  if (!groupData) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
-  var idx = groupData.childIds.indexOf(state.selectedId);
+  var selEl = document.getElementById(state.selectedId);
+  if (!selEl || !selEl.parentElement || selEl.parentElement.dataset.type !== 'group') { setMoveBtnVisibility(upBtn, downBtn, false); return; }
+  var parentG = selEl.parentElement;
+  var idx = Array.prototype.indexOf.call(parentG.children, selEl);
   if (idx === -1) { setMoveBtnVisibility(upBtn, downBtn, false); return; }
   setMoveBtnVisibility(upBtn, downBtn, true);
-  if (idx < groupData.childIds.length - 1) upBtn.disabled = false;
+  if (idx < parentG.children.length - 1) upBtn.disabled = false;
   if (idx > 0) downBtn.disabled = false;
 }
 
@@ -2035,6 +2050,14 @@ function updateTextSVG(data) {
   }
 }
 
+function applyElementState(data) {
+  if (!data) return;
+  if (data.type === 'line') updateLineSVG(data);
+  else if (data.type === 'text') updateTextSVG(data);
+  else if (data.type === 'freehand') updateFreehandElement(data);
+  else if (data.type === 'rectangle') updateRectangleElement(data);
+}
+
 // ── Rotation Tooltip ────────────────────────────────────────────
 
 function showRotationTooltip(e, angle) {
@@ -2059,132 +2082,101 @@ function hideRotationTooltip() {
 
 function applyColorToSelected(color) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data) return;
-
-  const oldColor = data.type === 'text' ? data.stroke : data.stroke;
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState) return;
+  const oldColor = oldState.stroke;
   if (oldColor === color) return;
-
-  if (data.type === 'line') {
-    data.stroke = color;
-    updateLineSVG(data);
-  } else if (data.type === 'text') {
-    data.stroke = color;
-    updateTextSVG(data);
-  } else if (data.type === 'freehand') {
-    data.stroke = color;
-    updateFreehandElement(data);
-  } else if (data.type === 'rectangle') {
-    data.stroke = color;
-    updateRectangleElement(data);
-  }
-
+  const newState = { ...oldState, stroke: color };
+  applyElementState(newState);
+  drawHandles();
   pushAction({
     description: 'Change color',
-    doFn: () => {
-      if (data.type === 'line') { data.stroke = color; updateLineSVG(data); }
-      else if (data.type === 'text') { data.stroke = color; updateTextSVG(data); }
-      else if (data.type === 'freehand') { data.stroke = color; updateFreehandElement(data); }
-      else if (data.type === 'rectangle') { data.stroke = color; updateRectangleElement(data); }
-    },
-    undoFn: () => {
-      if (data.type === 'line') { data.stroke = oldColor; updateLineSVG(data); }
-      else if (data.type === 'text') { data.stroke = oldColor; updateTextSVG(data); }
-      else if (data.type === 'freehand') { data.stroke = oldColor; updateFreehandElement(data); }
-      else if (data.type === 'rectangle') { data.stroke = oldColor; updateRectangleElement(data); }
-    },
+    doFn: () => { applyElementState(newState); drawHandles(); },
+    undoFn: () => { applyElementState(oldState); drawHandles(); },
   });
 }
 
 function applyThicknessToSelected(thickness) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || (data.type !== 'line' && data.type !== 'freehand' && data.type !== 'rectangle' && data.type !== 'text')) return;
-
-  const oldThickness = data.strokeWidth;
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState || (oldState.type !== 'line' && oldState.type !== 'freehand' && oldState.type !== 'rectangle' && oldState.type !== 'text')) return;
+  const oldThickness = oldState.strokeWidth;
   if (oldThickness === thickness) return;
-
-  data.strokeWidth = thickness;
-  if (data.type === 'line') {
-    updateLineSVG(data);
-  } else if (data.type === 'rectangle') {
-    updateRectangleElement(data);
-  } else if (data.type === 'text') {
-    updateTextSVG(data);
-  } else {
-    updateFreehandElement(data);
-  }
-
+  const newState = { ...oldState, strokeWidth: thickness };
+  applyElementState(newState);
+  drawHandles();
   pushAction({
     description: 'Change thickness',
-    doFn: () => { data.strokeWidth = thickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else if (data.type === 'text') updateTextSVG(data); else updateFreehandElement(data); },
-    undoFn: () => { data.strokeWidth = oldThickness; if (data.type === 'line') updateLineSVG(data); else if (data.type === 'rectangle') updateRectangleElement(data); else if (data.type === 'text') updateTextSVG(data); else updateFreehandElement(data); },
+    doFn: () => { applyElementState(newState); drawHandles(); },
+    undoFn: () => { applyElementState(oldState); drawHandles(); },
   });
 }
 
 function applyLineMarkerSizeToSelected(size) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || data.type !== 'line') return;
-
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState || oldState.type !== 'line') return;
   const newSize = normalizeLineMarkerSize(size);
 
   if (lineEditMode === 'change-end') {
     if (!selectedLineEndpoint) return;
     const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
-    const oldSize = data[sizeKey];
-    const normOld = normalizeLineMarkerSize(oldSize ?? data.lineMarkerSize);
+    const oldVal = oldState[sizeKey] ?? oldState.lineMarkerSize;
+    const normOld = normalizeLineMarkerSize(oldVal);
     if (normOld === newSize) return;
-
-    const oldStartSize = data.startDecorationSize;
-    const oldEndSize = data.endDecorationSize;
-
-    data[sizeKey] = newSize;
-    updateLineSVG(data);
-
+    const newState = { ...oldState };
+    newState.startDecorationSize = oldState.startDecorationSize;
+    newState.endDecorationSize = oldState.endDecorationSize;
+    newState[sizeKey] = newSize;
+    updateLineSVG(newState);
+    drawHandles();
     pushAction({
       description: 'Change line end marker size',
-      doFn: () => { data[sizeKey] = newSize; updateLineSVG(data); },
-      undoFn: () => {
-        data.startDecorationSize = oldStartSize;
-        data.endDecorationSize = oldEndSize;
-        updateLineSVG(data);
+      doFn: () => {
+        var cur = captureElementState(id);
+        if (!cur) return;
+        cur.startDecorationSize = cur.startDecorationSize ?? cur.lineMarkerSize;
+        cur.endDecorationSize = cur.endDecorationSize ?? cur.lineMarkerSize;
+        cur[sizeKey] = newSize;
+        updateLineSVG(cur); drawHandles();
       },
+      undoFn: () => { updateLineSVG(oldState); drawHandles(); },
     });
     return;
   }
 
-  const oldSize = normalizeLineMarkerSize(data.lineMarkerSize);
-  const oldStartSize = data.startDecorationSize;
-  const oldEndSize = data.endDecorationSize;
+  const oldSize = normalizeLineMarkerSize(oldState.lineMarkerSize);
   if (oldSize === newSize) return;
-
-  data.lineMarkerSize = newSize;
-  data.startDecorationSize = newSize;
-  data.endDecorationSize = newSize;
-  updateLineSVG(data);
-
+  const newState = {
+    ...oldState,
+    lineMarkerSize: newSize,
+    startDecorationSize: newSize,
+    endDecorationSize: newSize,
+  };
+  updateLineSVG(newState);
+  drawHandles();
   pushAction({
     description: 'Change line marker size',
     doFn: () => {
-      data.lineMarkerSize = newSize;
-      data.startDecorationSize = newSize;
-      data.endDecorationSize = newSize;
-      updateLineSVG(data);
+      var cur = captureElementState(id);
+      if (!cur) return;
+      cur.lineMarkerSize = newSize;
+      cur.startDecorationSize = newSize;
+      cur.endDecorationSize = newSize;
+      updateLineSVG(cur); drawHandles();
     },
-    undoFn: () => {
-      data.lineMarkerSize = oldSize;
-      data.startDecorationSize = oldStartSize;
-      data.endDecorationSize = oldEndSize;
-      updateLineSVG(data);
-    },
+    undoFn: () => { updateLineSVG(oldState); drawHandles(); },
   });
 }
 
 function applyLineStyleToSelected(style) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || data.type !== 'line') return;
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState || oldState.type !== 'line') return;
 
   const newStyle = normalizeLineStyle(style);
   const newDecor = styleToDecoration(newStyle);
@@ -2193,136 +2185,90 @@ function applyLineStyleToSelected(style) {
     if (!selectedLineEndpoint) return;
     const decorKey = selectedLineEndpoint === 'start' ? 'startDecoration' : 'endDecoration';
     const sizeKey = selectedLineEndpoint === 'start' ? 'startDecorationSize' : 'endDecorationSize';
-    const oldDecor = normalizeLineDecoration(data[decorKey]);
-    const oldSize = data[sizeKey];
+    const oldDecor = normalizeLineDecoration(oldState[decorKey]);
     if (oldDecor === newDecor) return;
-
-    const oldStartDecor = data.startDecoration;
-    const oldEndDecor = data.endDecoration;
-    const oldStartSize = data.startDecorationSize;
-    const oldEndSize = data.endDecorationSize;
-
-    data[decorKey] = newDecor;
-    data[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
-    updateLineSVG(data);
-
+    const newState = { ...oldState };
+    newState[decorKey] = newDecor;
+    newState[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
+    updateLineSVG(newState);
+    drawHandles();
     pushAction({
       description: 'Change line end decoration',
       doFn: () => {
-        data[decorKey] = newDecor;
-        data[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
-        updateLineSVG(data);
+        var cur = captureElementState(id);
+        if (!cur) return;
+        cur[decorKey] = newDecor;
+        cur[sizeKey] = normalizeLineMarkerSize(state.activeLineMarkerSize);
+        updateLineSVG(cur); drawHandles();
       },
-      undoFn: () => {
-        data.startDecoration = oldStartDecor;
-        data.endDecoration = oldEndDecor;
-        data.startDecorationSize = oldStartSize;
-        data.endDecorationSize = oldEndSize;
-        updateLineSVG(data);
-      },
+      undoFn: () => { updateLineSVG(oldState); drawHandles(); },
     });
     return;
   }
 
-  const oldStyle = data.lineStyle;
-  const oldStartDecor = data.startDecoration;
-  const oldEndDecor = data.endDecoration;
-  const oldStartDecorSize = data.startDecorationSize;
-  const oldEndDecorSize = data.endDecorationSize;
-
+  const oldStateClone = { ...oldState };
+  const startHas = oldStateClone.startDecoration && oldStateClone.startDecoration !== 'none';
+  const endHas = oldStateClone.endDecoration && oldStateClone.endDecoration !== 'none';
   const targetDecor = styleToDecoration(newStyle);
-  const startHas = data.startDecoration && data.startDecoration !== 'none';
 
+  var newState;
   if (targetDecor === 'none') {
-    data.lineStyle = 'normal';
-    data.startDecoration = 'none';
-    data.endDecoration = 'none';
+    newState = { ...oldStateClone, lineStyle: 'normal', startDecoration: 'none', endDecoration: 'none' };
   } else if (!startHas && !endHas) {
     const decors = legacyStyleToDecorations(newStyle, state.activeLineMarkerSize);
-    data.lineStyle = newStyle;
-    data.startDecoration = decors.startDecoration;
-    data.endDecoration = decors.endDecoration;
-    data.startDecorationSize = decors.startDecorationSize;
-    data.endDecorationSize = decors.endDecorationSize;
+    newState = { ...oldStateClone, lineStyle: newStyle, ...decors };
   } else {
-    data.lineStyle = newStyle;
+    newState = { ...oldStateClone, lineStyle: newStyle };
     if (startHas) {
-      data.startDecoration = targetDecor;
-      data.startDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
+      newState.startDecoration = targetDecor;
+      newState.startDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
     }
     if (endHas) {
-      data.endDecoration = targetDecor;
-      data.endDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
+      newState.endDecoration = targetDecor;
+      newState.endDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize);
     }
   }
-  updateLineSVG(data);
-
+  updateLineSVG(newState);
+  drawHandles();
   pushAction({
     description: 'Change line style',
-    doFn: () => {
-      data.lineStyle = newStyle;
-      if (targetDecor === 'none') {
-        data.startDecoration = 'none';
-        data.endDecoration = 'none';
-      } else if (!startHas && !endHas) {
-        const d = legacyStyleToDecorations(newStyle, state.activeLineMarkerSize);
-        data.startDecoration = d.startDecoration;
-        data.endDecoration = d.endDecoration;
-        data.startDecorationSize = d.startDecorationSize;
-        data.endDecorationSize = d.endDecorationSize;
-      } else {
-        if (startHas) { data.startDecoration = targetDecor; data.startDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize); }
-        if (endHas) { data.endDecoration = targetDecor; data.endDecorationSize = normalizeLineMarkerSize(state.activeLineMarkerSize); }
-      }
-      updateLineSVG(data);
-    },
-    undoFn: () => {
-      data.lineStyle = oldStyle;
-      data.startDecoration = oldStartDecor;
-      data.endDecoration = oldEndDecor;
-      data.startDecorationSize = oldStartDecorSize;
-      data.endDecorationSize = oldEndDecorSize;
-      updateLineSVG(data);
-    },
+    doFn: () => { updateLineSVG(newState); drawHandles(); },
+    undoFn: () => { updateLineSVG(oldStateClone); drawHandles(); },
   });
 }
 
 function applyFontSizeToSelected(fontSize) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || data.type !== 'text') return;
-
-  const oldSize = data.fontSize;
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState || oldState.type !== 'text') return;
+  const oldSize = oldState.fontSize;
   if (oldSize === fontSize) return;
-
-  data.fontSize = fontSize;
-  updateTextSVG(data);
-  drawHandles(data);
-
+  const newState = { ...oldState, fontSize };
+  updateTextSVG(newState);
+  drawHandles();
   pushAction({
     description: 'Change font size',
-    doFn: () => { data.fontSize = fontSize; updateTextSVG(data); },
-    undoFn: () => { data.fontSize = oldSize; updateTextSVG(data); },
+    doFn: () => { updateTextSVG(newState); drawHandles(); },
+    undoFn: () => { updateTextSVG(oldState); drawHandles(); },
   });
 }
 
 function applyCornerRadiusToSelected(radius) {
   if (!state.selectedId) return;
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data || data.type !== 'rectangle') return;
-
-  const oldRadius = data.rx || 0;
+  const id = state.selectedId;
+  const oldState = captureElementState(id);
+  if (!oldState || oldState.type !== 'rectangle') return;
+  const oldRadius = oldState.rx || 0;
   if (oldRadius === radius) return;
-
-  const clampedRadius = Math.min(radius, Math.min(data.width, data.height) / 2);
-  data.rx = clampedRadius;
-  updateRectangleElement(data);
-  drawHandles(data);
-
+  const clampedRadius = Math.min(radius, Math.min(oldState.width, oldState.height) / 2);
+  const newState = { ...oldState, rx: clampedRadius };
+  updateRectangleElement(newState);
+  drawHandles();
   pushAction({
     description: 'Change corner radius',
-    doFn: () => { data.rx = clampedRadius; updateRectangleElement(data); drawHandles(data); },
-    undoFn: () => { data.rx = oldRadius; updateRectangleElement(data); drawHandles(data); },
+    doFn: () => { updateRectangleElement(newState); drawHandles(); },
+    undoFn: () => { updateRectangleElement(oldState); drawHandles(); },
   });
 }
 

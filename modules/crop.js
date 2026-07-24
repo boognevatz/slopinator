@@ -4,6 +4,7 @@ import { state, dom, updateViewBox, updateImageTransform } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction, clearHistory } from './history.js';
 import { switchTool } from './tools.js';
+import { captureAllElementsState } from './dom-utils.js';
 
 let isCropping = false;
 let isDragging = false;
@@ -492,7 +493,7 @@ function applyCrop() {
   const oldH = state.image.naturalHeight;
   
   // Clone current elements because their coordinates will shift
-  const oldElements = JSON.parse(JSON.stringify(state.elements));
+  const oldElements = captureAllElementsState();
 
   const imgEl = new Image();
   imgEl.onload = () => {
@@ -558,8 +559,6 @@ function executeCrop(dataURI, w, h, elements) {
   dom.imageEl.setAttribute('href', dataURI);
   dom.imageEl.setAttribute('width', w);
   dom.imageEl.setAttribute('height', h);
-  
-  state.elements = elements;
   
   dom.annotationLayer.innerHTML = '';
   dom.handleLayer.innerHTML = '';

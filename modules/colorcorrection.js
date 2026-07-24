@@ -4,6 +4,7 @@ import { addLineElement } from './line.js';
 import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
 import { addRectangleElement } from './rectangle.js';
+import { captureAllElementsState } from './dom-utils.js';
 
 let originalDataURI = null;
 let origW = 0;
@@ -631,25 +632,22 @@ function applyCorrection() {
   const newURI = currentResultURI;
   const newW = origW;
   const newH = origH;
-  const oldElements = JSON.parse(JSON.stringify(state.elements));
+  const oldElements = captureAllElementsState();
 
   pushAction({
     description: 'Color correction',
     doFn: () => {
       loadImage(newURI, newW, newH);
       for (const el of oldElements) addElement(el);
-      state.elements.push(...oldElements);
     },
     undoFn: () => {
       loadImage(oldURI, oldW, oldH);
       for (const el of oldElements) addElement(el);
-      state.elements.push(...oldElements);
     },
   });
 
   loadImage(newURI, newW, newH);
   for (const el of oldElements) addElement(el);
-  state.elements.push(...oldElements);
 
   originalDataURI = newURI;
   hasApplied = true;
