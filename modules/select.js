@@ -1129,8 +1129,7 @@ function startDrag(id, startPt) {
   dragStart = { x: closest.x, y: closest.y, _time: Date.now(), _offX: closest.x - startPt.x, _offY: closest.y - startPt.y };
   dragOriginal = { ...data };
   dragOriginals = state.selectedIds.map(function(sid) {
-    var el = captureElementState(sid);
-    return el ? { id: sid, x: el.x, y: el.y, x1: el.x1, y1: el.y1, x2: el.x2, y2: el.y2, points: el.points ? el.points.map(function(p) { return { x: p.x, y: p.y }; }) : null, rawPoints: el.rawPoints ? el.rawPoints.map(function(p) { return { x: p.x, y: p.y }; }) : null } : null;
+    return captureElementState(sid);
   }).filter(Boolean);
 
   document.addEventListener('pointermove', onDragMove);
@@ -1656,7 +1655,7 @@ export function deleteSelected() {
     el.remove();
   }
 
-  // Clean up empty groups (walk DOM instead of state.elements)
+  // Clean up empty groups
   var groupEls = dom.annotationLayer.querySelectorAll('[data-type="group"]');
   for (var gi = 0; gi < groupEls.length; gi++) {
     if (groupEls[gi].children.length === 0) {
