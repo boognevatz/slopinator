@@ -1494,6 +1494,7 @@ function onResizeMove(e) {
       newRot = ((newRot % 360) + 360) % 360;
       data.rotation = newRot;
       updateTextSVG(data);
+      showRotationTooltip(e, newRot);
     } else if (resizeAnchor) {
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
