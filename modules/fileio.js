@@ -168,6 +168,7 @@ export function initFileIO() {
   const fileInput = document.getElementById('file-input');
   const btnOpen = document.getElementById('btn-open');
   const btnOpenEmpty = document.getElementById('btn-open-empty');
+  const btnOpenInternal = document.getElementById('btn-open-internal');
   const btnSaveSvg = document.getElementById('btn-save-svg');
   const btnFileDropdown = document.getElementById('btn-file-dropdown-btn');
   const fileMenu = document.getElementById('file-menu');
@@ -306,8 +307,161 @@ export function initFileIO() {
 
   btnSaveSvg.addEventListener('click', saveSVG);
 
-  // ── Filename rename UI ──────────────────────────────────
+  // ── Open internally (from OPFS) ──────────────────────────
   var _cancelFilenameRename = null;
+  function _formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  const opfsOpenPopup = document.getElementById('opfs-open-popup');
+  const opfsOpenList = document.getElementById('opfs-open-list');
+  const opfsOpenEmpty = document.getElementById('opfs-open-empty');
+  const opfsOpenBreadcrumb = document.getElementById('opfs-open-breadcrumb');
+
+  var _opfsOpenPath = [];
+
+  async function _getDirHandle(path) {
+    var h = await navigator.storage.getDirectory();
+    for (var i = 0; i < path.length; i++) h = await h.getDirectoryHandle(path[i]);
+    return h;
+  }
+
+  function _renderBreadcrumb() {
+    var parts = ['Home'].concat(_opfsOpenPath);
+    opfsOpenBreadcrumb.innerHTML = '';
+    for (var i = 0; i < parts.length; i++) {
+      if (i > 0) {
+        var sep = document.createElement('span');
+        sep.textContent = ' \u203A ';
+        sep.style.color = '#555';
+        opfsOpenBreadcrumb.appendChild(sep);
+      }
+      var seg = document.createElement('span');
+      seg.textContent = parts[i];
+      seg.style.cursor = 'pointer';
+      seg.style.color = i === parts.length - 1 ? '#ccc' : '#888';
+      (function(idx) {
+        seg.addEventListener('click', function() {
+          _opfsOpenPath = _opfsOpenPath.slice(0, idx - 1);
+          _renderOpfsOpenDir();
+        });
+        seg.addEventListener('mouseenter', function() { this.style.color = '#fff'; });
+        seg.addEventListener('mouseleave', function() { this.style.color = idx === parts.length - 1 ? '#ccc' : '#888'; });
+      })(i);
+      opfsOpenBreadcrumb.appendChild(seg);
+    }
+  }
+
+  async function _renderOpfsOpenDir() {
+    opfsOpenList.innerHTML = '<div style="color:#888;padding:8px;text-align:center;font-size:12px;">Loading...</div>';
+    opfsOpenEmpty.style.display = 'none';
+
+    try {
+      var dirHandle = await _getDirHandle(_opfsOpenPath);
+      var entries = [];
+
+      for await (var entry of dirHandle.entries()) {
+        entries.push(entry);
+      }
+
+      opfsOpenList.innerHTML = '';
+
+      if (_opfsOpenPath.length > 0) {
+        var parentEl = document.createElement('div');
+        parentEl.style.cssText = 'padding:5px 8px;cursor:pointer;font-size:13px;color:#aaa;border-radius:3px;border-bottom:1px solid #3a3a3a;';
+        parentEl.textContent = '\u2191 ..';
+        parentEl.addEventListener('click', function() {
+          _opfsOpenPath.pop();
+          _renderOpfsOpenDir();
+        });
+        parentEl.addEventListener('mouseenter', function() { parentEl.style.background = 'rgba(255,255,255,0.05)'; });
+        parentEl.addEventListener('mouseleave', function() { parentEl.style.background = ''; });
+        opfsOpenList.appendChild(parentEl);
+      }
+
+      var dirs = [];
+      var files = [];
+      for (var i = 0; i < entries.length; i++) {
+        var name = entries[i][0];
+        var handle = entries[i][1];
+        if (handle.kind === 'directory') {
+          dirs.push(name);
+        } else if (name.toLowerCase().endsWith('.svg')) {
+          var file = await handle.getFile();
+          files.push({ name, file, mtime: file.lastModified || 0 });
+        }
+      }
+      dirs.sort();
+      files.sort(function(a, b) { return b.mtime - a.mtime; });
+
+      dirs.forEach(function(name) {
+        var el = document.createElement('div');
+        el.style.cssText = 'padding:5px 8px;cursor:pointer;font-size:13px;color:#ccc;border-radius:3px;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:6px;';
+        el.innerHTML = '\uD83D\uDCC1 ' + name;
+        el.addEventListener('mouseenter', function() { el.style.background = 'rgba(255,255,255,0.05)'; });
+        el.addEventListener('mouseleave', function() { el.style.background = ''; });
+        (function(dirName) {
+          el.addEventListener('click', function() {
+            _opfsOpenPath.push(dirName);
+            _renderOpfsOpenDir();
+          });
+        })(name);
+        opfsOpenList.appendChild(el);
+      });
+
+      if (files.length === 0 && dirs.length === 0 && _opfsOpenPath.length === 0) {
+        opfsOpenEmpty.style.display = 'block';
+      }
+
+      files.forEach(function(item) {
+        var el = document.createElement('div');
+        el.style.cssText = 'padding:5px 8px;cursor:pointer;font-size:13px;color:#ccc;border-radius:3px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #3a3a3a;';
+        el.innerHTML = '<span>\uD83D\uDCC4 ' + item.name + '</span><span style="font-size:11px;color:#888;">' + _formatSize(item.file.size) + '</span>';
+        el.addEventListener('mouseenter', function() { el.style.background = 'rgba(255,255,255,0.05)'; });
+        el.addEventListener('mouseleave', function() { el.style.background = ''; });
+        (function(fileItem) {
+          el.addEventListener('click', async function() {
+            opfsOpenPopup.hidden = true;
+            _opfsOpenPath = [];
+            var svgText = await fileItem.file.text();
+            state.filename = fileItem.name;
+            openSVGProject(svgText);
+            updateFilenameDisplay();
+          });
+        })(item);
+        opfsOpenList.appendChild(el);
+      });
+
+      _renderBreadcrumb();
+    } catch (err) {
+      opfsOpenList.innerHTML = '<div style="color:#c66;padding:8px;text-align:center;font-size:12px;">Error: ' + err.message + '</div>';
+    }
+  }
+
+  btnOpenInternal.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (_cancelFilenameRename) _cancelFilenameRename();
+    fileMenu.hidden = true;
+    _opfsOpenPath = [];
+    opfsOpenPopup.hidden = false;
+    _renderOpfsOpenDir();
+  });
+
+  document.getElementById('btn-opfs-open-close').addEventListener('click', function() {
+    opfsOpenPopup.hidden = true;
+  });
+
+  opfsOpenPopup.addEventListener('click', function(e) {
+    if (e.target === opfsOpenPopup) opfsOpenPopup.hidden = true;
+  });
+
+  opfsOpenPopup.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') opfsOpenPopup.hidden = true;
+  });
+
+  // ── Filename rename UI ──────────────────────────────────
   _setupFilenameRename();
 
   function _setupFilenameRename() {
