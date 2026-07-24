@@ -925,8 +925,9 @@ export function addLineElement(data) {
   }
 
   if (data.rotation) {
-    const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-    const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
   }
 
@@ -964,8 +965,9 @@ export function updateLineElement(data) {
   group.dataset.startDecorationSize = lineState.startDecorationSize;
   group.dataset.endDecorationSize = lineState.endDecorationSize;
   if (data.rotation) {
-    const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
-    const cy = (pts[0].y + pts[pts.length - 1].y) / 2;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of pts) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     group.setAttribute('transform', `rotate(${data.rotation}, ${cx}, ${cy})`);
   } else {
     group.removeAttribute('transform');
@@ -1084,6 +1086,7 @@ export function applyLineStyle(el, style) {
   const norm = normalizeLineStyle(style);
   el.setAttribute('data-line-style', norm);
   el.setAttribute('stroke-linecap', 'round');
+  el.setAttribute('stroke-linejoin', 'round');
   el.removeAttribute('marker-start');
   el.removeAttribute('marker-end');
 }

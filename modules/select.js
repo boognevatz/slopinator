@@ -17,7 +17,7 @@ let isResizing = false;
 let dragStart = null;
 let dragOriginal = null;
 let dragOriginals = null;
-let resizeHandle = null; // 'p1' | 'p2' for line endpoints, 'tl'|'tr'|'bl'|'br' for text corners
+let resizeHandle = null; // 'tl'|'tr'|'bl'|'br' for corner handles
 let resizeAnchor = null; // { x, y } — the fixed corner during text resize
 let origBbox = null;     // original text bounding box at resize start
 let origBaselineOffY = 0; // data.y - bbox.y at resize start
@@ -313,8 +313,8 @@ function onMouseDown(e) {
     
     // Toggle interact mode for center icon
     if (handleEl.dataset.handle === 'mode-toggle') {
-      // Start drag immediately; onResizeEnd will detect if it was a click
-      startResize(handleEl, pt, e);
+      textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
+      refreshSelection();
       return;
     }
 
@@ -784,8 +784,9 @@ export function drawHandles(_data) {
 
     var type = svgEl.dataset.type;
     if (type === 'line') {
-      var lineData = buildLineDataFromEl(svgEl);
-      if (lineData) drawLineHandles(lineData);
+      var rotAttr = svgEl.getAttribute('transform');
+      var rot = parseFloat(rotAttr ? rotAttr.match(/rotate\(([^,)]+)/)[1] : 0);
+      drawLineHandles({ id: _sid, rotation: rot || 0 });
     } else if (type === 'text') {
       var rotAttr = svgEl.getAttribute('transform');
       var rot = parseFloat(rotAttr ? rotAttr.match(/rotate\(([^,)]+)/)[1] : 0);
@@ -801,68 +802,80 @@ export function drawHandles(_data) {
 }
 
 function drawLineHandles(data) {
-  const r = getHandleRadius();
-  const startActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'start';
-  const endActive = lineEditMode === 'change-end' && selectedLineEndpoint === 'end';
-  const startUnselected = lineEditMode === 'change-end' && !startActive;
-  const endUnselected = lineEditMode === 'change-end' && !endActive;
-  const isRotateMode = textInteractMode === 'rotate';
+  const el = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
+  if (!el) return;
 
-  const cursorStyle = isRotateMode ? 'cursor: grab;' : '';
-  const cx = (data.x1 + data.x2) / 2;
-  const cy = (data.y1 + data.y2) / 2;
+  const lineEl = el.querySelector('.annotation-line');
+  if (!lineEl) return;
+
+  let bbox;
+  try { bbox = lineEl.getBBox(); } catch { return; }
+
+  const sw = parseFloat(lineEl.getAttribute('stroke-width')) || 1;
+  const hsw = sw / 2;
+  const bx = bbox.x - hsw, by = bbox.y - hsw, bw = bbox.width + sw, bh = bbox.height + sw;
+  const cx = bx + bw / 2, cy = by + bh / 2;
+  const r = getHandleRadius();
+  const hw = r * 2, hh = r * 2;
+  const isRotate = textInteractMode === 'rotate';
 
   const handleGroup = svgEl('g', {
-    transform: data.rotation ? `rotate(${data.rotation}, ${cx}, ${cy})` : ''
+    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
   });
 
-  const h1 = svgEl('circle', {
-    cx: data.x1, cy: data.y1, r,
-    class: 'handle handle-endpoint' + (startActive ? ' active' : '') + (startUnselected ? ' unselected' : ''),
-    'data-handle': 'p1',
-    style: cursorStyle,
-  });
-  const h2 = svgEl('circle', {
-    cx: data.x2, cy: data.y2, r,
-    class: 'handle handle-endpoint' + (endActive ? ' active' : '') + (endUnselected ? ' unselected' : ''),
-    'data-handle': 'p2',
-    style: cursorStyle,
-  });
+  handleGroup.appendChild(svgEl('rect', {
+    x: bx, y: by, width: bw, height: bh,
+    class: 'selection-box',
+  }));
 
-  handleGroup.appendChild(h1);
-  handleGroup.appendChild(h2);
+  handleGroup.appendChild(svgEl('rect', {
+    x: bx, y: by, width: bw, height: bh,
+    class: 'handle',
+    'data-handle': 'move',
+    style: 'fill: transparent; cursor: move;',
+  }));
 
-  if (lineEditMode === 'move') {
-    const mx = cx;
-    const my = cy;
-    const dx = data.x2 - data.x1;
-    const dy = data.y2 - data.y1;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const corners = [
+    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
+  ];
 
-    const iconSize = 24;
-    const desiredIconSize = Math.max(32, Math.min(72, len * 0.8));
-    const iconScale = desiredIconSize / iconSize;
-    const actualSize = iconSize * iconScale;
-
-    const iconG = svgEl('g', {
-      class: 'handle handle-icon',
-      'data-handle': 'mode-toggle',
-      transform: `translate(${mx - actualSize / 2}, ${my - actualSize / 2}) scale(${iconScale})`,
-    });
-
-    iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
-
-    const movePath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
-    const rotatePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
-
-    iconG.appendChild(svgEl('path', {
-      d: isRotateMode ? rotatePath : movePath,
-      fill: '#fff',
+  for (const c of corners) {
+    handleGroup.appendChild(svgEl('rect', {
+      x: c.x, y: c.y, width: hw, height: hh,
+      class: 'handle handle-resize-corner',
+      'data-handle': c.handle,
+      style: `cursor: ${c.cursor}`,
     }));
-
-    handleGroup.appendChild(iconG);
   }
 
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox && svgRect.width ? viewBox.width / svgRect.width : 1;
+  const iconScreenPx = 32;
+  const iconSVGSize = iconScreenPx * scale;
+  const iconScale = iconSVGSize / 24;
+  const actualSize = iconSVGSize;
+
+  const iconG = svgEl('g', {
+    class: 'handle handle-icon',
+    'data-handle': 'mode-toggle',
+    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+  });
+
+  iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
+
+  const movePath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
+  const rotatePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+
+  iconG.appendChild(svgEl('path', {
+    d: isRotate ? rotatePath : movePath,
+    fill: '#fff',
+  }));
+
+  handleGroup.appendChild(iconG);
   dom.handleLayer.appendChild(handleGroup);
 }
 
@@ -925,13 +938,13 @@ function drawTextHandles(data) {
   }
 
   // Draw the center mode-toggle icon
-  const iconSize = 24; // Base size for icon viewBox
-  
-  // Scale the icon so it stays visually proportional to the box size, clamped
-  // Making it roughly twice the corner handles
-  const desiredIconSize = Math.max(32, Math.min(72, Math.min(bw, bh) * 0.8));
-  const iconScale = desiredIconSize / iconSize;
-  const actualSize = iconSize * iconScale;
+  const viewBox = dom.svg.viewBox.baseVal;
+  const svgRect = dom.svg.getBoundingClientRect();
+  const scale = viewBox && svgRect.width ? viewBox.width / svgRect.width : 1;
+  const iconScreenPx = 32;
+  const iconSVGSize = iconScreenPx * scale;
+  const iconScale = iconSVGSize / 24;
+  const actualSize = iconSVGSize;
 
   const iconG = svgEl('g', {
     class: 'handle handle-icon',
@@ -1010,10 +1023,10 @@ function drawRectangleHandles(data) {
     handleGroup.appendChild(h);
   }
 
-  const iconSize = 24;
-  const desiredIconSize = Math.min(w, h) * 0.8;
-  const iconScale = Math.max(1.0, Math.min(3.0, desiredIconSize / iconSize));
-  const actualSize = iconSize * iconScale;
+  const iconScreenPx = 32;
+  const iconSVGSize = iconScreenPx * scale;
+  const iconScale = iconSVGSize / 24;
+  const actualSize = iconSVGSize;
 
   const iconG = svgEl('g', {
     class: 'handle handle-icon',
@@ -1193,7 +1206,7 @@ function onDragEnd() {
   var primaryFinal = captureElementState(state.selectedId);
   if (!primaryFinal) { dragOriginal = null; dragOriginals = null; return; }
 
-  // Single-element special behaviors: long-press text edit, mode-toggle click
+  // Single-element special behavior: long-press text edit
   if (dragOriginals.length === 1) {
     const orig = { ...dragOriginal };
     const final = { ...primaryFinal };
@@ -1207,17 +1220,7 @@ function onDragEnd() {
       }
     }
 
-    if (dragStart && dragStart._dragSource === 'mode-toggle') {
-      let dx, dy;
-      if (primaryFinal.type === 'line') { dx = final.x1 - orig.x1; dy = final.y1 - orig.y1; }
-      else { dx = (final.x || 0) - (orig.x || 0); dy = (final.y || 0) - (orig.y || 0); }
-      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
-        dragOriginal = null; dragOriginals = null;
-        textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
-        refreshSelection();
-        return;
-      }
-    }
+
   }
 
   // Build combined action for all moved elements
@@ -1298,10 +1301,8 @@ function startResize(handleEl, startPt, e) {
   const data = captureElementState(state.selectedId);
   if (!data) return;
 
-  // Mode-toggle: start drag (move). _dragSource flags for click detection
-  if (handleType === 'mode-toggle' && (data.type === 'line' || data.type === 'text' || data.type === 'rectangle')) {
+  if (handleType === 'move' && data.type === 'line') {
     startDrag(state.selectedId, startPt);
-    if (dragStart) dragStart._dragSource = 'mode-toggle';
     return;
   }
 
@@ -1311,12 +1312,53 @@ function startResize(handleEl, startPt, e) {
   dragOriginal = { ...data };
   dragCurrent = { ...data };
 
-  if (data.type === 'line' && (handleType === 'p1' || handleType === 'p2') && textInteractMode === 'rotate') {
-    const cx = (dragCurrent.x1 + dragCurrent.x2) / 2;
-    const cy = (dragCurrent.y1 + dragCurrent.y2) / 2;
+  if (data.type === 'line' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
+    const el = dom.annotationLayer.querySelector(`#${CSS.escape(dragCurrent.id)}`);
+    const lineChild = el?.querySelector('.annotation-line');
+    if (lineChild) {
+      try {
+        const bb = lineChild.getBBox();
+        const sw = parseFloat(lineChild.getAttribute('stroke-width')) || 1;
+        const hsw = sw / 2;
+        origBbox = { x: bb.x - hsw, y: bb.y - hsw, width: bb.width + sw, height: bb.height + sw };
+      } catch {
+        const pts = dragCurrent.points || [{x: dragCurrent.x1, y: dragCurrent.y1}, {x: dragCurrent.x2, y: dragCurrent.y2}];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of pts) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+        origBbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+      }
+    } else {
+      origBbox = { x: dragCurrent.x1, y: dragCurrent.y1, width: 1, height: 1 };
+    }
+
     origRotation = dragCurrent.rotation || 0;
-    rotationCenter = { x: cx, y: cy };
-    dragStart.angle = Math.atan2(startPt.y - cy, startPt.x - cx) * 180 / Math.PI;
+    rotationCenter = { x: origBbox.x + origBbox.width / 2, y: origBbox.y + origBbox.height / 2 };
+
+    if (textInteractMode === 'rotate') {
+      dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
+    } else {
+      const anchorMap = {
+        tl: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+        tr: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+        bl: { x: origBbox.x + origBbox.width, y: origBbox.y },
+        br: { x: origBbox.x,                  y: origBbox.y },
+      };
+      resizeAnchor = anchorMap[handleType];
+
+      const draggedCornerMap = {
+        tl: { x: origBbox.x,                  y: origBbox.y },
+        tr: { x: origBbox.x + origBbox.width, y: origBbox.y },
+        bl: { x: origBbox.x,                  y: origBbox.y + origBbox.height },
+        br: { x: origBbox.x + origBbox.width, y: origBbox.y + origBbox.height },
+      };
+      const dc = draggedCornerMap[handleType];
+      const dx = dc.x - resizeAnchor.x;
+      const dy = dc.y - resizeAnchor.y;
+      origDiagLen = Math.sqrt(dx * dx + dy * dy);
+      origDiagVec = origDiagLen > 0
+        ? { x: dx / origDiagLen, y: dy / origDiagLen }
+        : { x: 1, y: 1 };
+    }
   } else if (data.type === 'text' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
     const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(dragCurrent.id)}`);
     if (textEl) {
@@ -1409,7 +1451,7 @@ function onResizeMove(e) {
   if (!data) return;
 
   if (data.type === 'line') {
-    if (textInteractMode === 'rotate' && (resizeHandle === 'p1' || resizeHandle === 'p2')) {
+    if (textInteractMode === 'rotate') {
       const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
       const angleDiff = currentAngle - dragStart.angle;
       let newRot = origRotation + angleDiff;
@@ -1418,16 +1460,31 @@ function onResizeMove(e) {
       data.rotation = newRot;
       updateLineSVG(data);
       showRotationTooltip(e, newRot);
-    } else if (resizeHandle === 'p1') {
-      data.x1 = pt.x;
-      data.y1 = pt.y;
-      if (data.points) { data.points[0] = { x: pt.x, y: pt.y }; }
-    } else if (resizeHandle === 'p2') {
-      data.x2 = pt.x;
-      data.y2 = pt.y;
-      if (data.points) { data.points[data.points.length - 1] = { x: pt.x, y: pt.y }; }
+    } else if (resizeAnchor) {
+      const angleRad = -(data.rotation || 0) * Math.PI / 180;
+      const cosA = Math.cos(angleRad);
+      const sinA = Math.sin(angleRad);
+      const dxMouse = pt.x - rotationCenter.x;
+      const dyMouse = pt.y - rotationCenter.y;
+      const unrotatedPtX = rotationCenter.x + dxMouse * cosA - dyMouse * sinA;
+      const unrotatedPtY = rotationCenter.y + dxMouse * sinA + dyMouse * cosA;
+
+      const mx = unrotatedPtX - resizeAnchor.x;
+      const my = unrotatedPtY - resizeAnchor.y;
+      const projLen = mx * origDiagVec.x + my * origDiagVec.y;
+      const scaleFactor = origDiagLen > 0 ? Math.max(0.1, projLen / origDiagLen) : 1;
+
+      const srcPts = dragOriginal.points || [{x: dragOriginal.x1, y: dragOriginal.y1}, {x: dragOriginal.x2, y: dragOriginal.y2}];
+      const pts = srcPts.map(p => ({
+        x: resizeAnchor.x + (p.x - resizeAnchor.x) * scaleFactor,
+        y: resizeAnchor.y + (p.y - resizeAnchor.y) * scaleFactor,
+      }));
+      data.points = pts;
+      data.x1 = pts[0].x; data.y1 = pts[0].y;
+      data.x2 = pts[pts.length - 1].x; data.y2 = pts[pts.length - 1].y;
+
+      updateLineSVG(data);
     }
-    updateLineSVG(data);
   } else if (data.type === 'text') {
     if (textInteractMode === 'rotate') {
       const currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
@@ -1564,7 +1621,7 @@ function onResizeEnd() {
 
   if (data.type === 'line') {
     const desc = textInteractMode === 'rotate' ? 'Rotate line' : 'Resize line';
-    const changed = orig.rotation !== final.rotation || orig.x1 !== final.x1 || orig.y1 !== final.y1 || orig.x2 !== final.x2 || orig.y2 !== final.y2;
+    const changed = orig.rotation !== final.rotation || orig.x1 !== final.x1 || orig.y1 !== final.y1 || orig.x2 !== final.x2 || orig.y2 !== final.y2 || JSON.stringify(orig.points) !== JSON.stringify(final.points);
     if (changed) {
       var sid = state.selectedId;
       pushAction({
