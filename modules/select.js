@@ -30,6 +30,7 @@ let origRotation = 0;     // original rotation angle when starting rotation
 let rotationCenter = null; // { cx, cy }
 let lineEditMode = 'move';  // 'move' | 'change-end'
 let _tempUngrouped = false;
+let _tempGroupParentId = null;
 let selectedLineEndpoint = 'end'; // 'start' | 'end'
 let rotationTooltip = null;
 let _lastClickTime = 0;
@@ -363,6 +364,7 @@ function onMouseDown(e) {
         }
         if (actualAnnot) {
           _tempUngrouped = true;
+          _tempGroupParentId = actualAnnot.parentElement ? actualAnnot.parentElement.id : null;
           selectElement(actualAnnot.id, false);
           return;
         }
@@ -396,6 +398,7 @@ function onMouseDown(e) {
         var actualAnnot = findActualAnnotation(target);
         if (actualAnnot) {
           _tempUngrouped = true;
+          _tempGroupParentId = id;
           selectElement(actualAnnot.id, false);
           return;
         }
@@ -515,12 +518,18 @@ function findAnnotationParent(target) {
   while (el && el !== dom.svg) {
     if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) {
       var groupParent = el.parentElement;
-      if (!_tempUngrouped && groupParent && groupParent.dataset && groupParent.dataset.type === 'group') return groupParent;
+      if (groupParent && groupParent.dataset && groupParent.dataset.type === 'group') {
+        if (_tempUngrouped && _tempGroupParentId && groupParent.id === _tempGroupParentId) return el;
+        return groupParent;
+      }
       return el;
     }
     if (el.dataset && el.dataset.type === 'text') {
       var gp = el.parentElement;
-      if (!_tempUngrouped && gp && gp.dataset && gp.dataset.type === 'group') return gp;
+      if (gp && gp.dataset && gp.dataset.type === 'group') {
+        if (_tempUngrouped && _tempGroupParentId && gp.id === _tempGroupParentId) return el;
+        return gp;
+      }
       return el;
     }
     if (el.dataset && el.dataset.type === 'group') return el;
@@ -542,6 +551,7 @@ function findActualAnnotation(target) {
 
 export function clearTempUngroup() {
   _tempUngrouped = false;
+  _tempGroupParentId = null;
 }
 
 function getGroupChildIds(id) {
@@ -564,6 +574,7 @@ export function selectElement(id, addToSelection) {
   var groupChildIds = getGroupChildIds(id);
   if (groupChildIds) {
     _tempUngrouped = false;
+    _tempGroupParentId = null;
     if (addToSelection) {
       var allSelected = true;
       for (var gg = 0; gg < groupChildIds.length; gg++) {
@@ -612,6 +623,7 @@ export function selectElement(id, addToSelection) {
     var _keepUngroup = _tempUngrouped && hasParentGroup(id);
     clearSelection();
     _tempUngrouped = _keepUngroup;
+    _tempGroupParentId = _keepUngroup ? document.getElementById(id).parentElement.id : null;
   }
 
   state.selectedId = id;
@@ -759,6 +771,7 @@ export function cycleGroupSelection(direction) {
 
 export function clearSelection() {
   _tempUngrouped = false;
+  _tempGroupParentId = null;
   state.selectedId = null;
   state.selectedIds = [];
   dom.handleLayer.innerHTML = '';
