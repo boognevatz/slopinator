@@ -34,6 +34,7 @@ let rotationTooltip = null;
 let _lastClickTime = 0;
 let _lastClickId = null;
 let _renameTargetId = null;
+let _applyingRotation = false;
 
 // Pan state
 let isPanning = false;
@@ -232,6 +233,22 @@ export function initSelect() {
       });
     }
   }
+
+  // Rotation input
+  var rotationInput = document.getElementById('rotation-input');
+  if (rotationInput) {
+    rotationInput.addEventListener('input', function () {
+      if (_applyingRotation) return;
+      var raw = parseFloat(this.value);
+      if (isNaN(raw)) return;
+      var displayVal = ((raw % 360) + 360) % 360;
+      if (displayVal === 360) displayVal = 0;
+      var storedVal = (360 - displayVal) % 360;
+      if (storedVal === 360) storedVal = 0;
+      this.value = displayVal;
+      applyRotationToSelected(storedVal);
+    });
+  }
 }
 
 function setLineEditMode(mode) {
@@ -314,6 +331,8 @@ function onMouseDown(e) {
     // Toggle interact mode for center icon
     if (handleEl.dataset.handle === 'mode-toggle') {
       textInteractMode = textInteractMode === 'resize' ? 'rotate' : 'resize';
+      var _rig = document.getElementById('rotation-input-group');
+      if (_rig) _rig.hidden = textInteractMode !== 'rotate';
       refreshSelection();
       return;
     }
@@ -650,6 +669,13 @@ export function selectElement(id, addToSelection) {
   // Sync element ID display
   var idInput = document.getElementById('element-id-input');
   if (idInput) { idInput.value = data.id; _renameTargetId = data.id; }
+  var rotInput = document.getElementById('rotation-input');
+  if (rotInput) {
+    rotInput.value = (360 - (data.rotation || 0)) % 360;
+    rotInput.disabled = data.type === 'freehand';
+  }
+  var _rig = document.getElementById('rotation-input-group');
+  if (_rig) _rig.hidden = textInteractMode !== 'rotate';
   renderGroupChildrenPreview();
 
   updateGroupButton();
@@ -717,6 +743,10 @@ export function clearSelection() {
   updateMoveButtons();
   var idInput = document.getElementById('element-id-input');
   if (idInput) { idInput.value = ''; _renameTargetId = null; }
+  var rotInput = document.getElementById('rotation-input');
+  if (rotInput) { rotInput.value = '0'; rotInput.disabled = false; }
+  var _rig = document.getElementById('rotation-input-group');
+  if (_rig) _rig.hidden = true;
   var preview = document.getElementById('group-children-preview');
   if (preview) preview.style.display = 'none';
   textInteractMode = 'resize';
@@ -1459,7 +1489,10 @@ function onResizeMove(e) {
       newRot = ((newRot % 360) + 360) % 360;
       data.rotation = newRot;
       updateLineSVG(data);
-      showRotationTooltip(e, newRot);
+      var displayRot = (360 - newRot) % 360;
+      var _ri = document.getElementById('rotation-input');
+      if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
+      showRotationTooltip(e, displayRot);
     } else if (resizeAnchor) {
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
@@ -1494,7 +1527,10 @@ function onResizeMove(e) {
       newRot = ((newRot % 360) + 360) % 360;
       data.rotation = newRot;
       updateTextSVG(data);
-      showRotationTooltip(e, newRot);
+      var displayRot = (360 - newRot) % 360;
+      var _ri = document.getElementById('rotation-input');
+      if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
+      showRotationTooltip(e, displayRot);
     } else if (resizeAnchor) {
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
@@ -1541,7 +1577,10 @@ function onResizeMove(e) {
       newRot = ((newRot % 360) + 360) % 360;
       data.rotation = newRot;
       updateRectangleElement(data);
-      showRotationTooltip(e, newRot);
+      var displayRot = (360 - newRot) % 360;
+      var _ri = document.getElementById('rotation-input');
+      if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
+      showRotationTooltip(e, displayRot);
     } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
@@ -2133,6 +2172,36 @@ function hideRotationTooltip() {
     rotationTooltip.remove();
     rotationTooltip = null;
   }
+}
+
+function applyRotationToSelected(val) {
+  if (!state.selectedId) return;
+  var id = state.selectedId;
+  var data = captureElementState(id);
+  if (!data) return;
+  if (data.type === 'freehand') return;
+  var oldVal = data.rotation || 0;
+  if (oldVal === val) return;
+  data.rotation = val;
+  applyElementState(data);
+  drawHandles();
+  pushAction({
+    description: 'Set rotation',
+    doFn: function() {
+      var cur = captureElementState(id);
+      if (!cur) return;
+      cur.rotation = val;
+      applyElementState(cur);
+      drawHandles();
+    },
+    undoFn: function() {
+      var cur = captureElementState(id);
+      if (!cur) return;
+      cur.rotation = oldVal;
+      applyElementState(cur);
+      drawHandles();
+    },
+  });
 }
 
 // ── Apply property changes to selected ──────────────────────────
