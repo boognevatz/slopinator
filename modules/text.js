@@ -289,13 +289,24 @@ export function startEditing(id) {
 
   const textarea = textEditOverlay.querySelector('textarea');
 
-  // Get the actual rendered bounding box of the SVG text element
+  // Get dimensions from bounding rect
   const textRect = textEl.getBoundingClientRect();
 
   const container = document.getElementById('editor-container');
   const containerRect = container.getBoundingClientRect();
 
-  const relX = textRect.left - containerRect.left;
+  // Use annotation layer CTM for horizontal position (more reliable for text inside groups)
+  let relX;
+  const layerCtm = dom.annotationLayer.getScreenCTM();
+  if (layerCtm) {
+    const pt = dom.svg.createSVGPoint();
+    pt.x = data.x;
+    pt.y = data.y;
+    const screenPt = pt.matrixTransform(layerCtm);
+    relX = screenPt.x - containerRect.left;
+  } else {
+    relX = textRect.left - containerRect.left;
+  }
   const relY = textRect.top - containerRect.top;
 
   // Get the true SVG-to-screen scale via the CTM (handles letterboxing correctly)

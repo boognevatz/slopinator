@@ -151,6 +151,7 @@ export function initSelect() {
 
       // Find longest common prefix between old group ID and child IDs
       var prefix = oldId;
+      var commonSuffix = '';
       if (type === 'group') {
         for (var ci = 0; ci < targetEl.children.length; ci++) {
           var childId = targetEl.children[ci].id;
@@ -159,20 +160,37 @@ export function initSelect() {
           }
           if (prefix.length === 0) break;
         }
+        // Find longest common suffix between old group ID and child IDs
+        commonSuffix = oldId;
+        for (var ci = 0; ci < targetEl.children.length; ci++) {
+          var childId = targetEl.children[ci].id;
+          while (!childId.endsWith(commonSuffix) && commonSuffix.length > 0) {
+            commonSuffix = commonSuffix.slice(1);
+          }
+          if (commonSuffix.length === 0) break;
+        }
       }
 
       targetEl.setAttribute('id', sanitized);
       targetEl.id = sanitized;
 
       if (type === 'group') {
-        var extraSuffix = prefix.length > 0 ? oldId.slice(prefix.length) : '';
+        // Strip common suffix from old IDs for rename computation
+        var strippedOldId = (commonSuffix.length > 0 && oldId.endsWith(commonSuffix))
+          ? oldId.slice(0, -commonSuffix.length) : oldId;
+        var extraSuffix = prefix.length > 0 ? strippedOldId.slice(prefix.length) : '';
         var newBase = (extraSuffix && sanitized.endsWith(extraSuffix)) ? sanitized.slice(0, -extraSuffix.length) : sanitized;
+        var newGroupEndsWithSuffix = commonSuffix.length > 0 && sanitized.endsWith(commonSuffix);
 
         var childIdMap = {};
         for (var ci = 0; ci < targetEl.children.length; ci++) {
           var oldChildId = targetEl.children[ci].id;
-          if (prefix.length > 0 && oldChildId.indexOf(prefix) === 0) {
-            var newChildId = newBase + oldChildId.slice(prefix.length);
+          // Strip common suffix from old child ID for prefix replacement
+          var strippedChild = (commonSuffix.length > 0 && oldChildId.endsWith(commonSuffix))
+            ? oldChildId.slice(0, -commonSuffix.length) : oldChildId;
+          if (prefix.length > 0 && strippedChild.indexOf(prefix) === 0) {
+            var computed = newBase + strippedChild.slice(prefix.length);
+            var newChildId = newGroupEndsWithSuffix ? computed + commonSuffix : computed;
             if (!document.getElementById(newChildId) || newChildId === oldChildId) {
               childIdMap[oldChildId] = newChildId;
               targetEl.children[ci].setAttribute('id', newChildId);
@@ -408,7 +426,7 @@ function onMouseDown(e) {
   }
 
   // Check if clicking an annotation
-  const annotGroup = findAnnotationParent(target);
+  const annotGroup = findAnnotationParent(target, e.detail >= 2);
   if (annotGroup) {
     e.preventDefault();
     const id = annotGroup.id;
@@ -541,7 +559,7 @@ function onKeyDown(e) {
   drawHandles();
 }
 
-function findAnnotationParent(target) {
+function findAnnotationParent(target, isDblClick) {
   var el = target;
   while (el && el !== dom.svg) {
     if (el.dataset && (el.dataset.type === 'line' || el.dataset.type === 'freehand' || el.dataset.type === 'rectangle')) {
@@ -556,6 +574,7 @@ function findAnnotationParent(target) {
       var gp = el.parentElement;
       if (gp && gp.dataset && gp.dataset.type === 'group') {
         if (_tempUngrouped && _tempGroupParentId && gp.id === _tempGroupParentId) return el;
+        if (isDblClick) return el;
         return gp;
       }
       return el;
@@ -2260,10 +2279,21 @@ function renderGroupChildrenPreview() {
     if (prefix.length === 0) break;
   }
 
-  // Extra suffix on the group ID beyond the common prefix (e.g. "-group")
-  var extraSuffix = prefix.length > 0 ? _renameTargetId.slice(prefix.length) : '';
-  // Derive base name to use for children (strip same extra suffix if it matches)
+  // Find longest common suffix between old group ID and all child IDs
+  var commonSuffix = _renameTargetId;
+  for (var ci = 0; ci < data.childIds.length; ci++) {
+    while (!data.childIds[ci].endsWith(commonSuffix) && commonSuffix.length > 0) {
+      commonSuffix = commonSuffix.slice(1);
+    }
+    if (commonSuffix.length === 0) break;
+  }
+
+  // Strip common suffix from old IDs before computing extraSuffix
+  var strippedOldId = (commonSuffix.length > 0 && _renameTargetId.endsWith(commonSuffix))
+    ? _renameTargetId.slice(0, -commonSuffix.length) : _renameTargetId;
+  var extraSuffix = prefix.length > 0 ? strippedOldId.slice(prefix.length) : '';
   var newBase = (extraSuffix && newGroupId.endsWith(extraSuffix)) ? newGroupId.slice(0, -extraSuffix.length) : newGroupId;
+  var newGroupEndsWithSuffix = commonSuffix.length > 0 && newGroupId.endsWith(commonSuffix);
 
   preview.style.display = 'block';
   preview.innerHTML = '';
@@ -2275,30 +2305,51 @@ function renderGroupChildrenPreview() {
 
     if (prefix.length > 0 && childId.indexOf(prefix) === 0) {
       var rest = childId.slice(prefix.length);
+      // Split rest into middle + common suffix
+      var middle = (commonSuffix.length > 0 && rest.endsWith(commonSuffix))
+        ? rest.slice(0, -commonSuffix.length) : rest;
+      var suffixPart = (commonSuffix.length > 0 && rest.endsWith(commonSuffix)) ? commonSuffix : '';
+
+      // Old side: prefix + middle + suffix
       var oldSpan = document.createElement('span');
       oldSpan.className = 'child-id-old';
       oldSpan.textContent = prefix;
       line.appendChild(oldSpan);
 
-      var restSpan = document.createElement('span');
-      restSpan.className = 'child-id-rest';
-      restSpan.textContent = rest;
-      line.appendChild(restSpan);
+      var middleSpan = document.createElement('span');
+      middleSpan.className = 'child-id-rest';
+      middleSpan.textContent = middle;
+      line.appendChild(middleSpan);
+
+      if (suffixPart) {
+        var suffixSpan = document.createElement('span');
+        suffixSpan.className = 'child-id-suffix';
+        suffixSpan.textContent = suffixPart;
+        line.appendChild(suffixSpan);
+      }
 
       var arrowSpan = document.createElement('span');
       arrowSpan.className = 'child-id-arrow';
       arrowSpan.textContent = '\u2192';
       line.appendChild(arrowSpan);
 
+      // New side: newBase + middle + (suffix if preserved)
       var newSpan = document.createElement('span');
       newSpan.className = 'child-id-new';
       newSpan.textContent = newBase;
       line.appendChild(newSpan);
 
-      var rest2Span = document.createElement('span');
-      rest2Span.className = 'child-id-rest';
-      rest2Span.textContent = rest;
-      line.appendChild(rest2Span);
+      var newMiddleSpan = document.createElement('span');
+      newMiddleSpan.className = 'child-id-rest';
+      newMiddleSpan.textContent = middle;
+      line.appendChild(newMiddleSpan);
+
+      if (newGroupEndsWithSuffix && suffixPart) {
+        var newSuffixSpan = document.createElement('span');
+        newSuffixSpan.className = 'child-id-suffix';
+        newSuffixSpan.textContent = suffixPart;
+        line.appendChild(newSuffixSpan);
+      }
     } else {
       line.textContent = childId + ' (no match)';
     }

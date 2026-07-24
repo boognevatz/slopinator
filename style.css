@@ -564,6 +564,12 @@ button.tool-btn.active {
 .child-id-no-match {
   opacity: 0.45;
 }
+.child-id-suffix {
+  background: rgba(200, 80, 0, 0.4);
+  color: #fff;
+  border-radius: 2px;
+  padding: 0 1px;
+}
 
 @media (max-width: 768px) {
   .mobile-group-btn {
