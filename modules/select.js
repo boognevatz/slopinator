@@ -161,23 +161,34 @@ export function initSelect() {
         }
       }
 
+      targetEl.setAttribute('id', sanitized);
       targetEl.id = sanitized;
 
       if (type === 'group') {
         var extraSuffix = prefix.length > 0 ? oldId.slice(prefix.length) : '';
         var newBase = (extraSuffix && sanitized.endsWith(extraSuffix)) ? sanitized.slice(0, -extraSuffix.length) : sanitized;
 
+        var childIdMap = {};
         for (var ci = 0; ci < targetEl.children.length; ci++) {
           var oldChildId = targetEl.children[ci].id;
           if (prefix.length > 0 && oldChildId.indexOf(prefix) === 0) {
             var newChildId = newBase + oldChildId.slice(prefix.length);
             if (!document.getElementById(newChildId) || newChildId === oldChildId) {
+              childIdMap[oldChildId] = newChildId;
+              targetEl.children[ci].setAttribute('id', newChildId);
               targetEl.children[ci].id = newChildId;
             }
           }
         }
+        if (state.selectedId && childIdMap[state.selectedId]) {
+          state.selectedId = childIdMap[state.selectedId];
+        }
+        for (var si = 0; si < state.selectedIds.length; si++) {
+          if (childIdMap[state.selectedIds[si]]) {
+            state.selectedIds[si] = childIdMap[state.selectedIds[si]];
+          }
+        }
       }
-      // For non-group elements inside a group, no parent group childIds array to update
       if (state.selectedId === oldId) {
         state.selectedId = sanitized;
       }
