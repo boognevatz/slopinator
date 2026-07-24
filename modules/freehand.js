@@ -152,17 +152,14 @@ function onMouseUp(e) {
   };
 
   addFreehandElement(data);
-  state.elements.push(data);
 
   pushAction({
     description: 'Draw freehand',
     doFn: () => {
       addFreehandElement(data);
-      state.elements.push(data);
     },
     undoFn: () => {
       removeFreehandElement(id);
-      state.elements = state.elements.filter(el => el.id !== id);
     },
   });
 

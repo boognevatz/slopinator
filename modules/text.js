@@ -206,17 +206,14 @@ function onMouseDown(e) {
   };
 
   addTextElement(textData);
-  state.elements.push(textData);
 
   pushAction({
     description: 'Add text',
     doFn: () => {
       addTextElement(textData);
-      state.elements.push(textData);
     },
     undoFn: () => {
       removeTextElement(id);
-      state.elements = state.elements.filter(el => el.id !== id);
     },
   });
 
