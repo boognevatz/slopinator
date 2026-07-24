@@ -324,6 +324,23 @@ function onMouseDown(e) {
   const target = e.target;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
 
+  // Shift-click: toggle selection (must run before handle check, since handles on
+  // the handle-layer intercept clicks on selected elements)
+  if (e.shiftKey) {
+    var els = document.elementsFromPoint(e.clientX, e.clientY);
+    var _sgAnnot = null;
+    for (var ei = 0; ei < els.length; ei++) {
+      _sgAnnot = findAnnotationParent(els[ei]);
+      if (_sgAnnot) break;
+    }
+    if (_sgAnnot) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectElement(_sgAnnot.id, true);
+      return;
+    }
+  }
+
   // Check if clicking a handle (including child elements of a handle group)
   const handleEl = target.closest ? target.closest('.handle') : null;
   if (handleEl) {
@@ -393,7 +410,7 @@ function onMouseDown(e) {
     const isDblClick = (e.detail >= 2) || (id === _lastClickId && now - _lastClickTime < 600);
     _lastClickTime = now;
     _lastClickId = id;
-    if (isDblClick) {
+    if (isDblClick && !e.shiftKey) {
       if (annotType === 'group') {
         var actualAnnot = findActualAnnotation(target);
         if (actualAnnot) {
