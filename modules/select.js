@@ -1487,7 +1487,20 @@ function startResize(handleEl, startPt, e) {
     dragGroupOriginals = [];
     for (var gi = 0; gi < state.selectedIds.length; gi++) {
       var cData = captureElementState(state.selectedIds[gi]);
-      if (cData) dragGroupOriginals.push(JSON.parse(JSON.stringify(cData)));
+      if (cData) {
+        var cloned = JSON.parse(JSON.stringify(cData));
+        if (cloned.type === 'text') {
+          var tel = document.getElementById(cloned.id);
+          if (tel) {
+            try {
+              var tb = tel.getBBox();
+              cloned._ocx = tb.x + tb.width / 2;
+              cloned._ocy = tb.y + tb.height / 2;
+            } catch {}
+          }
+        }
+        dragGroupOriginals.push(cloned);
+      }
     }
     if (dragGroupOriginals.length === 0) return;
 
@@ -1683,15 +1696,65 @@ function onResizeMove(e) {
       var currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
       var angleDiff = currentAngle - dragStart.angle;
       var snappedAngle = Math.round(angleDiff / 5) * 5;
+      var angleRad = snappedAngle * Math.PI / 180;
+      var cosA = Math.cos(angleRad);
+      var sinA = Math.sin(angleRad);
+      var gcx = rotationCenter.x;
+      var gcy = rotationCenter.y;
 
       for (var gi = 0; gi < dragGroupOriginals.length; gi++) {
         var origData = dragGroupOriginals[gi];
         var curData = captureElementState(origData.id);
         if (!curData) continue;
-        var newRot = ((origData.rotation || 0) + snappedAngle) % 360;
-        if (newRot < 0) newRot += 360;
-        curData.rotation = newRot;
-        applyElementState(curData);
+
+        if (curData.type === 'line') {
+          var srcPts = origData.points || [{x: origData.x1, y: origData.y1}, {x: origData.x2, y: origData.y2}];
+          var newPts = srcPts.map(function(p) {
+            var dx = p.x - gcx, dy = p.y - gcy;
+            return { x: gcx + dx * cosA - dy * sinA, y: gcy + dx * sinA + dy * cosA };
+          });
+          curData.points = newPts;
+          curData.x1 = newPts[0].x; curData.y1 = newPts[0].y;
+          curData.x2 = newPts[newPts.length - 1].x; curData.y2 = newPts[newPts.length - 1].y;
+          curData.rotation = origData.rotation || 0;
+          updateLineSVG(curData);
+        } else if (curData.type === 'freehand') {
+          curData.points = origData.points.map(function(p) {
+            var dx = p.x - gcx, dy = p.y - gcy;
+            return { x: gcx + dx * cosA - dy * sinA, y: gcy + dx * sinA + dy * cosA };
+          });
+          if (curData.rawPoints) {
+            curData.rawPoints = origData.rawPoints.map(function(p) {
+              var dx = p.x - gcx, dy = p.y - gcy;
+              return { x: gcx + dx * cosA - dy * sinA, y: gcy + dx * sinA + dy * cosA };
+            });
+          }
+          updateFreehandElement(curData);
+        } else if (curData.type === 'rectangle') {
+          var cx = origData.x + origData.width / 2;
+          var cy = origData.y + origData.height / 2;
+          var dx = cx - gcx, dy = cy - gcy;
+          var newCx = gcx + dx * cosA - dy * sinA;
+          var newCy = gcy + dx * sinA + dy * cosA;
+          curData.x = newCx - origData.width / 2;
+          curData.y = newCy - origData.height / 2;
+          var newRot = ((origData.rotation || 0) + snappedAngle) % 360;
+          if (newRot < 0) newRot += 360;
+          curData.rotation = newRot;
+          updateRectangleElement(curData);
+        } else if (curData.type === 'text') {
+          var tcx = origData._ocx || origData.x;
+          var tcy = origData._ocy || (origData.y - (origData.fontSize || 64) / 2);
+          var dx = tcx - gcx, dy = tcy - gcy;
+          var newCx = gcx + dx * cosA - dy * sinA;
+          var newCy = gcy + dx * sinA + dy * cosA;
+          curData.x = origData.x + (newCx - tcx);
+          curData.y = origData.y + (newCy - tcy);
+          var newRot = ((origData.rotation || 0) + snappedAngle) % 360;
+          if (newRot < 0) newRot += 360;
+          curData.rotation = newRot;
+          updateTextSVG(curData);
+        }
       }
 
       var displayRot = (360 - ((snappedAngle % 360) + 360) % 360) % 360;
