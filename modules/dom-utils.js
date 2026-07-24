@@ -247,12 +247,14 @@ export function captureElementState(id) {
     const stroke = lineEl?.getAttribute('stroke');
     const strokeWidth = parseFloat(lineEl?.getAttribute('stroke-width') || 2);
     const geom = readLineGeometry(el);
+    const transformAttr = el.getAttribute('transform');
+    const rotation = parseFloat(transformAttr?.match(/rotate\(([^,)]+)/)?.[1] || 0);
     const result = {
       id, type: 'line',
       points: geom.points,
       x1: geom.x1, y1: geom.y1,
       x2: geom.x2, y2: geom.y2,
-      stroke: el.dataset.startDecoration ? undefined : stroke,
+      stroke,
       strokeWidth,
       lineStyle: el.dataset.lineStyle,
       lineMarkerSize: el.dataset.lineMarkerSize,
@@ -265,7 +267,7 @@ export function captureElementState(id) {
       result.closed = true;
       result.fill = geom.fill || 'none';
     }
-    if (stroke !== undefined) result.stroke = stroke;
+    if (rotation) result.rotation = rotation;
     return result;
   }
 
