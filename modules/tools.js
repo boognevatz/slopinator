@@ -129,7 +129,6 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   const visible = new Set(TOOL_SETTINGS[tool] || []);
 
   setGroupVisible('color-group', visible.has('color'));
-  setGroupVisible('thickness-group', visible.has('thickness'));
   setGroupVisible('line-style-group', visible.has('line-style'));
   setGroupVisible('line-mode-group', visible.has('line-mode'));
   setGroupVisible('font-size-group', visible.has('font-size'));

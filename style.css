@@ -285,9 +285,31 @@ button.tool-btn.active {
   cursor: pointer;
 }
 
-.color-dropdown-opacity .toolbar-label {
-  min-width: 24px;
+.color-dropdown-opacity .toolbar-label:first-child,
+.color-dropdown-thickness .toolbar-label:first-child {
+  width: 72px;
+  text-align: left;
+}
+
+.color-dropdown-opacity .toolbar-label:last-child,
+.color-dropdown-thickness .toolbar-label:last-child {
+  width: 28px;
   text-align: right;
+}
+
+.color-dropdown-thickness {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.color-dropdown-thickness input[type="range"] {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
 
 .color-dropdown-custom {
@@ -584,10 +606,7 @@ button.tool-btn.active {
     margin-left: 0;
     padding-left: 0;
   }
-  #thickness-group {
-    position: relative;
-    padding-top: 1.4em;
-  }
+
   #thickness-group > .toolbar-label:first-child {
     position: absolute;
     top: 0;

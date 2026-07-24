@@ -72,12 +72,20 @@ function setSquareColor(id, color) {
 function setupIndicatorClicks() {
   document.getElementById('fg-click-area').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (dropdownOpen && activeTarget === 'foreground') {
+      closeDropdown();
+      return;
+    }
     activeTarget = 'foreground';
     openDropdown();
   });
 
   document.getElementById('bg-click-area').addEventListener('click', (e) => {
     e.stopPropagation();
+    if (dropdownOpen && activeTarget === 'background') {
+      closeDropdown();
+      return;
+    }
     activeTarget = 'background';
     openDropdown();
   });
@@ -88,6 +96,8 @@ function setupIndicatorClicks() {
 function openDropdown() {
   syncOpacitySlider();
   highlightActiveSwatch();
+  const thicknessGroup = document.getElementById('color-dropdown-thickness');
+  if (thicknessGroup) thicknessGroup.hidden = activeTarget !== 'foreground';
   const dd = document.getElementById('color-dropdown');
   if (window.innerWidth < 768) {
     const indicator = document.getElementById('color-indicator');
@@ -313,11 +323,16 @@ function setupDropdownPicker() {
 
 // ── Thickness Slider ────────────────────────────────────────────
 
+let _thicknessUpdate = null;
+
 function renderThickness() {
   const slider = document.getElementById('thickness-slider');
   const valueDisplay = document.getElementById('thickness-value');
+  if (!slider || !valueDisplay) return;
 
-  const update = () => {
+  if (_thicknessUpdate) slider.removeEventListener('input', _thicknessUpdate);
+
+  _thicknessUpdate = () => {
     const val = parseFloat(slider.value);
     state.activeThickness = val;
     valueDisplay.textContent = val;
@@ -325,7 +340,7 @@ function renderThickness() {
     saveColorPreferences();
   };
 
-  slider.addEventListener('input', update);
+  slider.addEventListener('input', _thicknessUpdate);
   slider.value = state.activeThickness;
   valueDisplay.textContent = state.activeThickness;
 }
