@@ -809,6 +809,12 @@ function readPointsFromEl(el) {
 export function drawHandles(_data) {
   dom.handleLayer.innerHTML = '';
 
+  if (isGroupSelection()) {
+    var combinedBbox = getCombinedBBox();
+    drawGroupHandles(combinedBbox);
+    return;
+  }
+
   for (var _i = 0; _i < state.selectedIds.length; _i++) {
     var _sid = state.selectedIds[_i];
     var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(_sid));
@@ -1326,10 +1332,161 @@ function onDragEnd() {
 // ── Resize ──────────────────────────────────────────────────────
 
 let dragCurrent = null;
+let dragGroupOriginals = null; // array of original states for group members during resize
+
+function isGroupSelection() {
+  if (state.selectedIds.length < 2) return false;
+  if (_tempUngrouped) return false;
+  var groupEl = null;
+  for (var i = 0; i < state.selectedIds.length; i++) {
+    var el = document.getElementById(state.selectedIds[i]);
+    if (!el) return false;
+    var parent = el.parentElement;
+    if (!parent || parent.dataset.type !== 'group') return false;
+    if (i === 0) groupEl = parent;
+    else if (parent !== groupEl) return false;
+  }
+  return groupEl !== null && groupEl.children.length === state.selectedIds.length;
+}
+
+function getCombinedBBox() {
+  var bbox = null;
+  for (var i = 0; i < state.selectedIds.length; i++) {
+    var data = captureElementState(state.selectedIds[i]);
+    if (!data) continue;
+    var eb = getBBoxFromData(data);
+    if (!bbox) bbox = eb;
+    else {
+      var x1 = Math.min(bbox.x, eb.x);
+      var y1 = Math.min(bbox.y, eb.y);
+      var x2 = Math.max(bbox.x + bbox.width, eb.x + eb.width);
+      var y2 = Math.max(bbox.y + bbox.height, eb.y + eb.height);
+      bbox = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+    }
+  }
+  return bbox || { x: 0, y: 0, width: 0, height: 0 };
+}
+
+function drawGroupHandles(bbox) {
+  var bx = bbox.x, by = bbox.y, bw = bbox.width, bh = bbox.height;
+  var cx = bx + bw / 2, cy = by + bh / 2;
+  var r = getHandleRadius();
+  var hw = r * 2, hh = r * 2;
+  var isRotate = textInteractMode === 'rotate';
+
+  var handleGroup = svgEl('g', {});
+
+  handleGroup.appendChild(svgEl('rect', {
+    x: bx, y: by, width: bw, height: bh,
+    class: 'selection-box',
+  }));
+
+  handleGroup.appendChild(svgEl('rect', {
+    x: bx, y: by, width: bw, height: bh,
+    class: 'handle',
+    'data-handle': 'move',
+    style: 'fill: transparent; cursor: move;',
+  }));
+
+  var corners = [
+    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
+  ];
+
+  for (var ci = 0; ci < corners.length; ci++) {
+    var c = corners[ci];
+    handleGroup.appendChild(svgEl('rect', {
+      x: c.x, y: c.y, width: hw, height: hh,
+      class: 'handle handle-resize-corner',
+      'data-handle': c.handle,
+      style: 'cursor: ' + c.cursor,
+    }));
+  }
+
+  var viewBox = dom.svg.viewBox.baseVal;
+  var svgRect = dom.svg.getBoundingClientRect();
+  var scale = viewBox && svgRect.width ? viewBox.width / svgRect.width : 1;
+  var iconScreenPx = 32;
+  var iconSVGSize = iconScreenPx * scale;
+  var iconScale = iconSVGSize / 24;
+  var actualSize = iconSVGSize;
+
+  var iconG = svgEl('g', {
+    class: 'handle handle-icon',
+    'data-handle': 'mode-toggle',
+    transform: 'translate(' + (cx - actualSize / 2) + ', ' + (cy - actualSize / 2) + ') scale(' + iconScale + ')',
+  });
+
+  iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
+
+  var movePath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
+  var rotatePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
+
+  iconG.appendChild(svgEl('path', {
+    d: isRotate ? rotatePath : movePath,
+    fill: '#fff',
+  }));
+
+  handleGroup.appendChild(iconG);
+  dom.handleLayer.appendChild(handleGroup);
+}
 
 function startResize(handleEl, startPt, e) {
   e.preventDefault();
   const handleType = handleEl.dataset.handle;
+
+  // Group selection resize/rotation
+  if (isGroupSelection()) {
+    if (handleType === 'move') {
+      startDrag(state.selectedIds[0], startPt);
+      return;
+    }
+    isResizing = true;
+    resizeHandle = handleType;
+    dragStart = startPt;
+
+    dragGroupOriginals = [];
+    for (var gi = 0; gi < state.selectedIds.length; gi++) {
+      var cData = captureElementState(state.selectedIds[gi]);
+      if (cData) dragGroupOriginals.push(JSON.parse(JSON.stringify(cData)));
+    }
+    if (dragGroupOriginals.length === 0) return;
+
+    var combinedBbox = getCombinedBBox();
+    origBbox = combinedBbox;
+    origRotation = 0;
+    rotationCenter = { x: combinedBbox.x + combinedBbox.width / 2, y: combinedBbox.y + combinedBbox.height / 2 };
+
+    if (textInteractMode === 'rotate') {
+      dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
+    } else if (['tl', 'tr', 'bl', 'br'].includes(handleType)) {
+      var anchorMap = {
+        tl: { x: combinedBbox.x + combinedBbox.width, y: combinedBbox.y + combinedBbox.height },
+        tr: { x: combinedBbox.x, y: combinedBbox.y + combinedBbox.height },
+        bl: { x: combinedBbox.x + combinedBbox.width, y: combinedBbox.y },
+        br: { x: combinedBbox.x, y: combinedBbox.y },
+      };
+      resizeAnchor = anchorMap[handleType];
+
+      var draggedCornerMap = {
+        tl: { x: combinedBbox.x, y: combinedBbox.y },
+        tr: { x: combinedBbox.x + combinedBbox.width, y: combinedBbox.y },
+        bl: { x: combinedBbox.x, y: combinedBbox.y + combinedBbox.height },
+        br: { x: combinedBbox.x + combinedBbox.width, y: combinedBbox.y + combinedBbox.height },
+      };
+      var dc = draggedCornerMap[handleType];
+      var dx = dc.x - resizeAnchor.x;
+      var dy = dc.y - resizeAnchor.y;
+      origDiagLen = Math.sqrt(dx * dx + dy * dy);
+      origDiagVec = origDiagLen > 0 ? { x: dx / origDiagLen, y: dy / origDiagLen } : { x: 1, y: 1 };
+    }
+
+    document.addEventListener('pointermove', onResizeMove);
+    document.addEventListener('pointerup', onResizeEnd);
+    return;
+  }
 
   const data = captureElementState(state.selectedId);
   if (!data) return;
@@ -1481,7 +1638,78 @@ function onResizeMove(e) {
   if (!isResizing) return;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const data = dragCurrent;
-  if (!data) return;
+  if (!data && !dragGroupOriginals) return;
+
+  // ── Group resize/rotation ──────────────────────────────────
+  if (dragGroupOriginals) {
+    if (textInteractMode === 'rotate') {
+      var currentAngle = Math.atan2(pt.y - rotationCenter.y, pt.x - rotationCenter.x) * 180 / Math.PI;
+      var angleDiff = currentAngle - dragStart.angle;
+      var snappedAngle = Math.round(angleDiff / 5) * 5;
+
+      for (var gi = 0; gi < dragGroupOriginals.length; gi++) {
+        var origData = dragGroupOriginals[gi];
+        var curData = captureElementState(origData.id);
+        if (!curData) continue;
+        var newRot = ((origData.rotation || 0) + snappedAngle) % 360;
+        if (newRot < 0) newRot += 360;
+        curData.rotation = newRot;
+        applyElementState(curData);
+      }
+
+      var displayRot = (360 - ((snappedAngle % 360) + 360) % 360) % 360;
+      var _ri = document.getElementById('rotation-input');
+      if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
+      showRotationTooltip(e, displayRot);
+    } else if (resizeAnchor) {
+      var mx = pt.x - resizeAnchor.x;
+      var my = pt.y - resizeAnchor.y;
+      var projLen = mx * origDiagVec.x + my * origDiagVec.y;
+      var scaleFactor = origDiagLen > 0 ? Math.max(0.1, projLen / origDiagLen) : 1;
+
+      for (var gi = 0; gi < dragGroupOriginals.length; gi++) {
+        var origData = dragGroupOriginals[gi];
+        var curData = captureElementState(origData.id);
+        if (!curData) continue;
+
+        if (curData.type === 'rectangle') {
+          curData.x = resizeAnchor.x + (origData.x - resizeAnchor.x) * scaleFactor;
+          curData.y = resizeAnchor.y + (origData.y - resizeAnchor.y) * scaleFactor;
+          curData.width = Math.max(5, Math.round(origData.width * scaleFactor));
+          curData.height = Math.max(5, Math.round(origData.height * scaleFactor));
+          var maxRx = Math.min(curData.width, curData.height) / 2;
+          if (curData.rx > maxRx) curData.rx = maxRx;
+          updateRectangleElement(curData);
+        } else if (curData.type === 'line') {
+          var srcPts = origData.points || [{x: origData.x1, y: origData.y1}, {x: origData.x2, y: origData.y2}];
+          var newPts = srcPts.map(function(p) {
+            return { x: resizeAnchor.x + (p.x - resizeAnchor.x) * scaleFactor, y: resizeAnchor.y + (p.y - resizeAnchor.y) * scaleFactor };
+          });
+          curData.points = newPts;
+          curData.x1 = newPts[0].x; curData.y1 = newPts[0].y;
+          curData.x2 = newPts[newPts.length - 1].x; curData.y2 = newPts[newPts.length - 1].y;
+          updateLineSVG(curData);
+        } else if (curData.type === 'text') {
+          curData.x = resizeAnchor.x + (origData.x - resizeAnchor.x) * scaleFactor;
+          curData.y = resizeAnchor.y + (origData.y - resizeAnchor.y) * scaleFactor;
+          curData.fontSize = Math.max(8, Math.round(origData.fontSize * Math.abs(scaleFactor)));
+          updateTextSVG(curData);
+        } else if (curData.type === 'freehand') {
+          curData.points = origData.points.map(function(p) {
+            return { x: resizeAnchor.x + (p.x - resizeAnchor.x) * scaleFactor, y: resizeAnchor.y + (p.y - resizeAnchor.y) * scaleFactor };
+          });
+          if (curData.rawPoints) {
+            curData.rawPoints = origData.rawPoints.map(function(p) {
+              return { x: resizeAnchor.x + (p.x - resizeAnchor.x) * scaleFactor, y: resizeAnchor.y + (p.y - resizeAnchor.y) * scaleFactor };
+            });
+          }
+          updateFreehandElement(curData);
+        }
+      }
+    }
+    drawHandles();
+    return;
+  }
 
   if (data.type === 'line') {
     if (textInteractMode === 'rotate') {
@@ -1647,6 +1875,24 @@ function onResizeMove(e) {
   drawHandles();
 }
 
+function deepCloneState(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function applyStateToCapture(target, source) {
+  for (var key in source) {
+    if (key === 'id') continue;
+    if (Array.isArray(source[key])) {
+      target[key] = source[key].map(function(item) {
+        if (typeof item === 'object' && item !== null) return { x: item.x, y: item.y };
+        return item;
+      });
+    } else {
+      target[key] = source[key];
+    }
+  }
+}
+
 function onResizeEnd() {
   document.removeEventListener('pointermove', onResizeMove);
   document.removeEventListener('pointerup', onResizeEnd);
@@ -1655,6 +1901,50 @@ function onResizeEnd() {
 
   if (!isResizing) return;
   isResizing = false;
+
+  // ── Group resize/rotation undo ──────────────────────────────
+  if (dragGroupOriginals) {
+    var groupSnapshots = [];
+    var groupChanged = false;
+    for (var gi = 0; gi < dragGroupOriginals.length; gi++) {
+      var origData = dragGroupOriginals[gi];
+      var finalData = captureElementState(origData.id);
+      if (!finalData) continue;
+      if (JSON.stringify(origData) !== JSON.stringify(finalData)) groupChanged = true;
+      groupSnapshots.push({ id: origData.id, orig: deepCloneState(origData), final: deepCloneState(finalData) });
+    }
+    if (groupChanged) {
+      pushAction({
+        description: (textInteractMode === 'rotate' ? 'Rotate' : 'Resize') + ' group (' + groupSnapshots.length + ' elements)',
+        doFn: function() {
+          for (var si = 0; si < groupSnapshots.length; si++) {
+            var snap = groupSnapshots[si];
+            var d = captureElementState(snap.id);
+            if (!d) continue;
+            applyStateToCapture(d, snap.final);
+            applyElementState(d);
+          }
+          drawHandles();
+        },
+        undoFn: function() {
+          for (var si = 0; si < groupSnapshots.length; si++) {
+            var snap = groupSnapshots[si];
+            var d = captureElementState(snap.id);
+            if (!d) continue;
+            applyStateToCapture(d, snap.orig);
+            applyElementState(d);
+          }
+          drawHandles();
+        },
+      });
+    }
+    dragGroupOriginals = null;
+    dragOriginal = null;
+    dragCurrent = null;
+    resizeAnchor = null;
+    origBbox = null;
+    return;
+  }
 
   const data = dragCurrent;
   if (!data) return;
