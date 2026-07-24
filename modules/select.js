@@ -11,6 +11,7 @@ import { selectLayer } from './layers.js';
 import { normalizeLineStyle, setActiveLineStyle, setActiveLineMarkerSize, normalizeLineMarkerSize, updateLineElement, normalizeLineDecoration, styleToDecoration, decorationToStyle, legacyStyleToDecorations } from './line.js';
 import { updateFreehandElement, syncFreehandEpsilonSlider } from './freehand.js';
 import { updateRectangleElement } from './rectangle.js';
+import { switchTool } from './tools.js';
 
 let isDragging = false;
 let isResizing = false;
@@ -376,6 +377,7 @@ function onMouseDown(e) {
         }
       }
       if (annotType === 'text') {
+        switchTool('text');
         setTimeout(() => startEditing(id), 0);
         return;
       }
@@ -1245,6 +1247,7 @@ function onDragEnd() {
       const elapsed = Date.now() - dragStart._time;
       if (elapsed >= 400 && orig.x === final.x && orig.y === final.y) {
         dragOriginal = null; dragOriginals = null;
+        switchTool('text');
         setTimeout(function() { startEditing(state.selectedId); }, 0);
         return;
       }
