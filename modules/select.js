@@ -349,6 +349,30 @@ function onMouseDown(e) {
       }
     }
 
+    // Double-click on group move handle → step into individual child
+    if (handleEl.dataset.handle === 'move' && isGroupSelection()) {
+      var now = Date.now();
+      var isDblClick = e.detail >= 2 || (now - _lastClickTime < 600);
+      _lastClickTime = now;
+      if (isDblClick) {
+        var els = document.elementsFromPoint(e.clientX, e.clientY);
+        var actualAnnot = null;
+        for (var ei = 0; ei < els.length; ei++) {
+          var candidate = findActualAnnotation(els[ei]);
+          if (candidate) { actualAnnot = candidate; break; }
+        }
+        if (actualAnnot) {
+          _tempUngrouped = true;
+          selectElement(actualAnnot.id, false);
+          return;
+        }
+        // No annotation found at click point → stay in group mode
+      }
+      // Single click on move handle → move the whole group
+      startResize(handleEl, pt, e);
+      return;
+    }
+
     startResize(handleEl, pt, e);
     return;
   }
