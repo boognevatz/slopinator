@@ -2,6 +2,7 @@
 
 import { state, dom } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
+import { captureElementState } from './dom-utils.js';
 import { snapToGrid } from './grid.js';
 import { pushAction } from './history.js';
 import { startEditing, isEditing } from './text.js';
@@ -269,22 +270,22 @@ function setSelectedLineEndpoint(endpoint) {
   selectedLineEndpoint = endpoint === 'start' ? 'start' : 'end';
   state.activeLineEndpoint = selectedLineEndpoint;
 
-  const data = state.selectedId ? state.elements.find(el => el.id === state.selectedId) : null;
-  if (data && data.type === 'line') {
-    syncLineToolbarFromSelection(data);
+  const el = state.selectedId ? dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId)) : null;
+  if (el && el.dataset.type === 'line') {
+    syncLineToolbarFromSelection(el);
   }
 }
 
-function getDefaultLineEndpoint(data) {
-  if (normalizeLineDecoration(data.endDecoration) !== 'none') return 'end';
-  if (normalizeLineDecoration(data.startDecoration) !== 'none') return 'start';
+function getDefaultLineEndpointFromEl(el) {
+  if (normalizeLineDecoration(el.dataset.endDecoration) !== 'none') return 'end';
+  if (normalizeLineDecoration(el.dataset.startDecoration) !== 'none') return 'start';
   return 'end';
 }
 
-function syncLineToolbarFromSelection(data) {
+function syncLineToolbarFromSelection(el) {
   const endpoint = selectedLineEndpoint === 'start' ? 'start' : 'end';
-  const decoration = endpoint === 'start' ? normalizeLineDecoration(data.startDecoration) : normalizeLineDecoration(data.endDecoration);
-  const size = endpoint === 'start' ? normalizeLineMarkerSize(data.startDecorationSize ?? data.lineMarkerSize) : normalizeLineMarkerSize(data.endDecorationSize ?? data.lineMarkerSize);
+  const decoration = endpoint === 'start' ? normalizeLineDecoration(el.dataset.startDecoration) : normalizeLineDecoration(el.dataset.endDecoration);
+  const size = endpoint === 'start' ? normalizeLineMarkerSize(el.dataset.startDecorationSize || el.dataset.lineMarkerSize) : normalizeLineMarkerSize(el.dataset.endDecorationSize || el.dataset.lineMarkerSize);
   setActiveLineStyle(decorationToStyle(decoration));
   setActiveLineMarkerSize(size);
 }
@@ -712,18 +713,80 @@ export function clearSelection() {
   hideRotationTooltip();
 }
 
+function buildLineDataFromEl(el) {
+  var lineEl = el.querySelector('.annotation-line');
+  if (!lineEl) return null;
+  var tag = lineEl.tagName.toLowerCase();
+  var transformAttr = el.getAttribute('transform');
+  var rotation = parseFloat(transformAttr ? transformAttr.match(/rotate\(([^,)]+)/)[1] : 0);
+  if (tag === 'line') {
+    return {
+      x1: parseFloat(lineEl.getAttribute('x1')),
+      y1: parseFloat(lineEl.getAttribute('y1')),
+      x2: parseFloat(lineEl.getAttribute('x2')),
+      y2: parseFloat(lineEl.getAttribute('y2')),
+      rotation: rotation || 0,
+    };
+  }
+  var ptsAttr = lineEl.getAttribute('points');
+  if (!ptsAttr) return null;
+  var pts = ptsAttr.trim().split(/\s+/).map(function(p) {
+    var parts = p.split(',');
+    return { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
+  });
+  if (pts.length < 2) return null;
+  return {
+    x1: pts[0].x, y1: pts[0].y,
+    x2: pts[pts.length - 1].x, y2: pts[pts.length - 1].y,
+    rotation: rotation || 0,
+  };
+}
+
+function buildRectDataFromEl(el) {
+  var fillRect = el.querySelector('.rect-fill');
+  if (!fillRect) return null;
+  return {
+    x: parseFloat(fillRect.getAttribute('x')),
+    y: parseFloat(fillRect.getAttribute('y')),
+    width: parseFloat(fillRect.getAttribute('width')),
+    height: parseFloat(fillRect.getAttribute('height')),
+  };
+}
+
+function readPointsFromEl(el) {
+  var polyline = el.querySelector('polyline, .annotation-line');
+  if (!polyline) return [];
+  var ptsAttr = polyline.getAttribute('points');
+  if (!ptsAttr) return [];
+  return ptsAttr.trim().split(/\s+/).map(function(p) {
+    var parts = p.split(',');
+    return { x: parseFloat(parts[0]), y: parseFloat(parts[1]) };
+  });
+}
+
 export function drawHandles(_data) {
   dom.handleLayer.innerHTML = '';
 
   for (var _i = 0; _i < state.selectedIds.length; _i++) {
     var _sid = state.selectedIds[_i];
-    var el = state.elements.find(function(e) { return e.id === _sid; });
-    if (!el) continue;
+    var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(_sid));
+    if (!svgEl) continue;
 
-    if (el.type === 'line') drawLineHandles(el);
-    else if (el.type === 'text') drawTextHandles(el);
-    else if (el.type === 'freehand') drawFreehandHandles(el);
-    else if (el.type === 'rectangle') drawRectangleHandles(el);
+    var type = svgEl.dataset.type;
+    if (type === 'line') {
+      var lineData = buildLineDataFromEl(svgEl);
+      if (lineData) drawLineHandles(lineData);
+    } else if (type === 'text') {
+      var rotAttr = svgEl.getAttribute('transform');
+      var rot = parseFloat(rotAttr ? rotAttr.match(/rotate\(([^,)]+)/)[1] : 0);
+      drawTextHandles({ id: _sid, rotation: rot || 0 });
+    } else if (type === 'freehand') {
+      var pts = readPointsFromEl(svgEl);
+      if (pts.length) drawFreehandHandles({ points: pts });
+    } else if (type === 'rectangle') {
+      var rectData = buildRectDataFromEl(svgEl);
+      if (rectData) drawRectangleHandles(rectData);
+    }
   }
 }
 
@@ -1547,26 +1610,22 @@ export function deleteSelected() {
   var removed = [];
   for (var di = 0; di < ids.length; di++) {
     var id = ids[di];
-    var idx = state.elements.findIndex(function(el) { return el.id === id; });
-    if (idx === -1) continue;
-    removed.push({ idx: idx, data: { ...state.elements[idx] } });
-    state.elements.splice(idx, 1);
     var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
-    if (el) el.remove();
+    if (!el) continue;
+
+    removed.push({
+      data: captureElementState(id),
+      parentId: el.parentNode && el.parentNode.id !== 'layer-annotation' ? el.parentNode.id : null,
+      nextSiblingId: el.nextElementSibling ? el.nextElementSibling.id : null,
+    });
+    el.remove();
   }
 
-  // Clean up empty groups
-  for (var gi = state.elements.length - 1; gi >= 0; gi--) {
-    var el = state.elements[gi];
-    if (el.type === 'group') {
-      el.childIds = el.childIds.filter(function(cid) {
-        return state.elements.some(function(e) { return e.id === cid; });
-      });
-      if (el.childIds.length === 0) {
-        var gEl = dom.annotationLayer.querySelector('#' + CSS.escape(el.id));
-        if (gEl) gEl.remove();
-        state.elements.splice(gi, 1);
-      }
+  // Clean up empty groups (walk DOM instead of state.elements)
+  var groupEls = dom.annotationLayer.querySelectorAll('[data-type="group"]');
+  for (var gi = 0; gi < groupEls.length; gi++) {
+    if (groupEls[gi].children.length === 0) {
+      groupEls[gi].remove();
     }
   }
 
@@ -1576,21 +1635,28 @@ export function deleteSelected() {
     description: 'Delete ' + removed.length + ' element' + (removed.length > 1 ? 's' : ''),
     doFn: function() {
       for (var i = 0; i < removed.length; i++) {
-        var r = removed[i];
-        var ci = state.elements.findIndex(function(e) { return e.id === r.data.id; });
-        if (ci !== -1) state.elements.splice(ci, 1);
-        var svgEl = dom.annotationLayer.querySelector('#' + CSS.escape(r.data.id));
-        if (svgEl) svgEl.remove();
+        var existing = dom.annotationLayer.querySelector('#' + CSS.escape(removed[i].data.id));
+        if (existing) existing.remove();
       }
     },
     undoFn: function() {
       for (var i = 0; i < removed.length; i++) {
         var r = removed[i];
-        state.elements.splice(r.idx, 0, r.data);
-        if (r.data.type === 'line') addLineSVGAtIndex(r.data, r.idx);
-        else if (r.data.type === 'text') addTextSVGAtIndex(r.data, r.idx);
-        else if (r.data.type === 'freehand') addFreehandSVGAtIndex(r.data, r.idx);
-        else if (r.data.type === 'rectangle') addRectangleSVGAtIndex(r.data, r.idx);
+        var data = r.data;
+        if (data.type === 'line') _lineModule.addLineElement(data);
+        else if (data.type === 'text') _textModule.addTextElement(data);
+        else if (data.type === 'freehand') _freehandModule.addFreehandElement(data);
+        else if (data.type === 'rectangle') _rectangleModule.addRectangleElement(data);
+        // Restore DOM position
+        var recreated = dom.annotationLayer.querySelector('#' + CSS.escape(data.id));
+        if (recreated && r.parentId) {
+          var parent = dom.annotationLayer.querySelector('#' + CSS.escape(r.parentId));
+          var nextSib = r.nextSiblingId ? dom.annotationLayer.querySelector('#' + CSS.escape(r.nextSiblingId)) : null;
+          if (parent) {
+            if (nextSib) parent.insertBefore(recreated, nextSib);
+            else parent.appendChild(recreated);
+          }
+        }
       }
     },
   });
@@ -1600,13 +1666,15 @@ export function deleteSelected() {
 
 function nextDupPrefix() {
   var maxN = 0;
-  state.elements.forEach(function(el) {
-    var m = el.id.match(/^dup(\d+)-/);
+  var allElements = dom.annotationLayer.querySelectorAll('[id]');
+  for (var j = 0; j < allElements.length; j++) {
+    var id = allElements[j].id;
+    var m = id.match(/^dup(\d+)-/);
     if (m) {
       var n = parseInt(m[1], 10);
       if (n > maxN) maxN = n;
     }
-  });
+  }
   return 'dup' + (maxN + 1) + '-';
 }
 
@@ -1616,14 +1684,14 @@ function nextDupSuffix(id) {
   do {
     candidate = id + '-' + n;
     n++;
-  } while (state.elements.some(function(el) { return el.id === candidate; }));
+  } while (dom.annotationLayer.querySelector('#' + CSS.escape(candidate)));
   return candidate;
 }
 
 function renderGroupChildrenPreview() {
   var preview = document.getElementById('group-children-preview');
   if (!preview) return;
-  var data = _renameTargetId ? state.elements.find(function(e) { return e.id === _renameTargetId; }) : null;
+  var data = _renameTargetId ? captureElementState(_renameTargetId) : null;
   if (!data || data.type !== 'group' || !data.childIds || data.childIds.length === 0) {
     preview.style.display = 'none';
     return;
@@ -1699,44 +1767,42 @@ export function duplicateSelected() {
   if (state.selectedIds.length === 0) return;
   var ids = state.selectedIds.slice();
 
-  // Check if selection represents a full group
-  var parentGroup = state.elements.find(function(el) {
-    if (el.type !== 'group') return false;
-    if (el.childIds.length !== ids.length) return false;
-    return ids.every(function(id) { return el.childIds.indexOf(id) !== -1; });
-  });
+  // Check if selection represents a full group (all children of the same <g data-type="group">)
+  var parentGroupEl = null;
+  for (var gi = 0; gi < ids.length; gi++) {
+    var el = dom.annotationLayer.querySelector('#' + CSS.escape(ids[gi]));
+    if (!el) { parentGroupEl = null; break; }
+    var parentG = el.parentNode && el.parentNode.closest ? el.parentNode.closest('[data-type="group"]') : null;
+    if (!parentG) { parentGroupEl = null; break; }
+    if (gi === 0) parentGroupEl = parentG;
+    else if (parentG !== parentGroupEl) { parentGroupEl = null; break; }
+  }
 
-  if (parentGroup) {
+  if (parentGroupEl) {
     var dupPrefix = nextDupPrefix();
-    var newGroupId = dupPrefix + parentGroup.id;
+    var newGroupId = dupPrefix + parentGroupEl.id;
     var newChildIds = [];
     var dupes = [];
-    var origChildIds = parentGroup.childIds;
 
-    for (var gi = 0; gi < origChildIds.length; gi++) {
-      var oldId = origChildIds[gi];
-      var orig = state.elements.find(function(el) { return el.id === oldId; });
-      if (!orig) continue;
-      var copy = JSON.parse(JSON.stringify(orig));
+    for (var gi2 = 0; gi2 < parentGroupEl.children.length; gi2++) {
+      var oldId = parentGroupEl.children[gi2].id;
+      var origData = captureElementState(oldId);
+      if (!origData) continue;
+      var copy = { ...origData };
       var newId = dupPrefix + oldId;
       copy.id = newId;
-      copy.parentId = newGroupId;
       newChildIds.push(newId);
-      state.elements.push(copy);
-      if (copy.type === 'line') addLineSVGAtIndex(copy, -1);
-      else if (copy.type === 'text') addTextSVGAtIndex(copy, -1);
-      else if (copy.type === 'freehand') addFreehandSVGAtIndex(copy, -1);
-      else if (copy.type === 'rectangle') addRectangleSVGAtIndex(copy, -1);
+      if (copy.type === 'line') _lineModule.addLineElement(copy);
+      else if (copy.type === 'text') _textModule.addTextElement(copy);
+      else if (copy.type === 'freehand') _freehandModule.addFreehandElement(copy);
+      else if (copy.type === 'rectangle') _rectangleModule.addRectangleElement(copy);
       dupes.push(copy);
     }
     if (dupes.length === 0) return;
 
-    var newGroup = { id: newGroupId, type: 'group', childIds: newChildIds };
-    state.elements.push(newGroup);
-
     var g = svgEl('g', { id: newGroupId, 'data-type': 'group' });
-    for (var gi2 = 0; gi2 < newChildIds.length; gi2++) {
-      var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(newChildIds[gi2]));
+    for (var gi3 = 0; gi3 < newChildIds.length; gi3++) {
+      var childSvg = dom.annotationLayer.querySelector('#' + CSS.escape(newChildIds[gi3]));
       if (childSvg) g.appendChild(childSvg);
     }
     dom.annotationLayer.appendChild(g);
@@ -1746,39 +1812,28 @@ export function duplicateSelected() {
     pushAction({
       description: 'Duplicate group (' + newChildIds.length + ' elements)',
       doFn: function() {
-        for (var ri = 0; ri < dupes.length; ri++) {
-          var d = dupes[ri];
-          if (!state.elements.find(function(e) { return e.id === d.id; })) {
-            state.elements.push(d);
-            if (d.type === 'line') addLineSVGAtIndex(d, -1);
-            else if (d.type === 'text') addTextSVGAtIndex(d, -1);
-            else if (d.type === 'freehand') addFreehandSVGAtIndex(d, -1);
-            else if (d.type === 'rectangle') addRectangleSVGAtIndex(d, -1);
-          }
-        }
-        if (!state.elements.find(function(e) { return e.id === newGroupId; })) {
-          state.elements.push(newGroup);
-        }
         var dg = dom.annotationLayer.querySelector('#' + CSS.escape(newGroupId));
         if (!dg) {
           dg = svgEl('g', { id: newGroupId, 'data-type': 'group' });
           dom.annotationLayer.appendChild(dg);
         }
-        for (var dj = 0; dj < newChildIds.length; dj++) {
-          var ds = dom.annotationLayer.querySelector('#' + CSS.escape(newChildIds[dj]));
-          if (ds) dg.appendChild(ds);
+        for (var di = 0; di < dupes.length; di++) {
+          var d = dupes[di];
+          if (!dom.annotationLayer.querySelector('#' + CSS.escape(d.id))) {
+            if (d.type === 'line') _lineModule.addLineElement(d);
+            else if (d.type === 'text') _textModule.addTextElement(d);
+            else if (d.type === 'freehand') _freehandModule.addFreehandElement(d);
+            else if (d.type === 'rectangle') _rectangleModule.addRectangleElement(d);
+            var ds = dom.annotationLayer.querySelector('#' + CSS.escape(d.id));
+            if (ds) dg.appendChild(ds);
+          }
         }
       },
       undoFn: function() {
-        for (var ri = 0; ri < dupes.length; ri++) {
-          var d = dupes[ri];
-          var di2 = state.elements.findIndex(function(e) { return e.id === d.id; });
-          if (di2 !== -1) state.elements.splice(di2, 1);
-          var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(d.id));
+        for (var di = 0; di < dupes.length; di++) {
+          var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(dupes[di].id));
           if (svgChild) svgChild.remove();
         }
-        var dgIdx = state.elements.findIndex(function(e) { return e.id === newGroupId; });
-        if (dgIdx !== -1) state.elements.splice(dgIdx, 1);
         var dgEl = dom.annotationLayer.querySelector('#' + CSS.escape(newGroupId));
         if (dgEl) dgEl.remove();
       },
@@ -1789,16 +1844,18 @@ export function duplicateSelected() {
   // Fallback: duplicate individual elements
   var dupes = [];
   for (var di = 0; di < ids.length; di++) {
-    var orig = state.elements.find(function(el) { return el.id === ids[di]; });
-    if (!orig) continue;
-    var copy = JSON.parse(JSON.stringify(orig));
-    copy.id = nextDupSuffix(orig.id);
-    if (copy.parentId) copy.parentId = undefined;
-    state.elements.push(copy);
-    if (copy.type === 'line') addLineSVGAtIndex(copy, -1);
-    else if (copy.type === 'text') addTextSVGAtIndex(copy, -1);
-    else if (copy.type === 'freehand') addFreehandSVGAtIndex(copy, -1);
-    else if (copy.type === 'rectangle') addRectangleSVGAtIndex(copy, -1);
+    var origData = captureElementState(ids[di]);
+    if (!origData) continue;
+    var copy = { ...origData };
+    copy.id = nextDupSuffix(origData.id);
+    if (origData.type === 'group') {
+      // Groups as individual selection: capture children too
+      // (handled by captureElementState for group type)
+    }
+    if (copy.type === 'line') _lineModule.addLineElement(copy);
+    else if (copy.type === 'text') _textModule.addTextElement(copy);
+    else if (copy.type === 'freehand') _freehandModule.addFreehandElement(copy);
+    else if (copy.type === 'rectangle') _rectangleModule.addRectangleElement(copy);
     dupes.push(copy);
   }
   if (dupes.length === 0) return;
@@ -1809,21 +1866,17 @@ export function duplicateSelected() {
     doFn: function() {
       for (var ri = 0; ri < dupes.length; ri++) {
         var d = dupes[ri];
-        if (!state.elements.find(function(e) { return e.id === d.id; })) {
-          state.elements.push(d);
-          if (d.type === 'line') addLineSVGAtIndex(d, -1);
-          else if (d.type === 'text') addTextSVGAtIndex(d, -1);
-          else if (d.type === 'freehand') addFreehandSVGAtIndex(d, -1);
-          else if (d.type === 'rectangle') addRectangleSVGAtIndex(d, -1);
+        if (!dom.annotationLayer.querySelector('#' + CSS.escape(d.id))) {
+          if (d.type === 'line') _lineModule.addLineElement(d);
+          else if (d.type === 'text') _textModule.addTextElement(d);
+          else if (d.type === 'freehand') _freehandModule.addFreehandElement(d);
+          else if (d.type === 'rectangle') _rectangleModule.addRectangleElement(d);
         }
       }
     },
     undoFn: function() {
       for (var ri = 0; ri < dupes.length; ri++) {
-        var d = dupes[ri];
-        var di2 = state.elements.findIndex(function(e) { return e.id === d.id; });
-        if (di2 !== -1) state.elements.splice(di2, 1);
-        var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(d.id));
+        var svgChild = dom.annotationLayer.querySelector('#' + CSS.escape(dupes[ri].id));
         if (svgChild) svgChild.remove();
       }
     },
@@ -2281,22 +2334,25 @@ export function refreshSelection() {
     clearSelection();
     return;
   }
-  const data = state.elements.find(el => el.id === state.selectedId);
-  if (!data) {
+  var el = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
+  if (!el) {
     clearSelection();
     return;
   }
-  if (data.type === 'line' && lineEditMode === 'change-end') {
-    syncLineToolbarFromSelection(data);
-  } else if (data.type === 'line') {
-    setActiveLineStyle(normalizeLineStyle(data.lineStyle));
-  } else if (data.type === 'freehand') {
-    syncFreehandEpsilonSlider(data.epsilon);
-  } else if (data.type === 'rectangle') {
-    document.getElementById('corner-radius-input').value = data.rx || 0;
-    state.activeCornerRadius = data.rx || 0;
+  var type = el.dataset.type;
+  if (type === 'line' && lineEditMode === 'change-end') {
+    syncLineToolbarFromSelection(el);
+  } else if (type === 'line') {
+    setActiveLineStyle(normalizeLineStyle(el.dataset.lineStyle));
+  } else if (type === 'freehand') {
+    syncFreehandEpsilonSlider(parseFloat(el.getAttribute('data-epsilon') || 0));
+  } else if (type === 'rectangle') {
+    var fillRect = el.querySelector('.rect-fill');
+    var rx = fillRect ? parseFloat(fillRect.getAttribute('rx') || 0) : 0;
+    document.getElementById('corner-radius-input').value = rx;
+    state.activeCornerRadius = rx;
   }
-  drawHandles(data);
+  drawHandles(el);
   updateGroupButton();
   updateUngroupButton();
   updateMoveButtons();

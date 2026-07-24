@@ -264,19 +264,28 @@ function removeTextElement(id) {
  * Start inline editing of a text element.
  */
 export function startEditing(id) {
-  // If already editing something else, finish it first
   if (editingTextId && editingTextId !== id) {
     finishEditing();
   }
 
-  const data = state.elements.find(el => el.id === id);
-  if (!data || data.type !== 'text') return;
+  const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
+  if (!textEl) return;
+
+  const data = {
+    id,
+    type: 'text',
+    x: parseFloat(textEl.getAttribute('x')),
+    y: parseFloat(textEl.getAttribute('y')),
+    fontSize: parseFloat(textEl.getAttribute('font-size')),
+    fill: textEl.getAttribute('fill'),
+    stroke: textEl.getAttribute('stroke'),
+    strokeWidth: parseFloat(textEl.getAttribute('stroke-width') || 0),
+    content: textEl.textContent,
+    rotation: parseFloat(textEl.getAttribute('transform')?.match(/rotate\(([^,)]+)/)?.[1] || 0),
+  };
 
   editingTextId = id;
   editingData = data;
-
-  const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
-  if (!textEl) return;
 
   const textarea = textEditOverlay.querySelector('textarea');
 
@@ -345,42 +354,34 @@ function finishEditing() {
   const newContent = textarea.value.trim() || 'Text';
   const id = editingTextId;
 
-  // Clear state before DOM updates to prevent re-entrant calls
   editingTextId = null;
   editingData = null;
   textEditOverlay.style.display = 'none';
   textEditOverlay.style.transform = 'none';
 
-  const data = state.elements.find(el => el.id === id);
-  if (data) {
-    const oldContent = data.content;
-    data.content = newContent;
-
-    // Update SVG element
-    const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
-    if (textEl) {
+  const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
+  if (textEl) {
+    const oldContent = textEl.textContent;
+    if (oldContent !== newContent) {
       textEl.textContent = newContent;
       textEl.removeAttribute('visibility');
-    }
 
-    if (oldContent !== newContent) {
       pushAction({
         description: 'Edit text',
         doFn: () => {
-          data.content = newContent;
           const el = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
           if (el) el.textContent = newContent;
         },
         undoFn: () => {
-          data.content = oldContent;
           const el = dom.annotationLayer.querySelector(`#${CSS.escape(id)}`);
           if (el) el.textContent = oldContent;
         },
       });
+    } else {
+      textEl.removeAttribute('visibility');
     }
   }
 
-  // Switch to select tool and automatically select the newly edited text
   switchTool('select');
   selectElement(id);
 }
