@@ -365,7 +365,6 @@ function onMouseUp(e) {
   };
 
   addLineElement(lineData);
-  state.elements.push(lineData);
 
   // Enter extend mode instead of pushing to history immediately
   // Each click on empty space adds a new segment from the active endpoint
@@ -751,11 +750,9 @@ export function finalizePolyline() {
       description: data.points.length > 2 ? 'Draw polyline' : 'Draw line',
       doFn: () => {
         addLineElement(data);
-        state.elements.push(data);
       },
       undoFn: () => {
         removeLineElement(id);
-        state.elements = state.elements.filter(el => el.id !== id);
       },
     });
   }

@@ -262,17 +262,14 @@ function onMouseUp(e) {
   };
 
   addRectangleElement(data);
-  state.elements.push(data);
 
   pushAction({
     description: 'Draw rectangle',
     doFn: function() {
       addRectangleElement(data);
-      state.elements.push(data);
     },
     undoFn: function() {
       removeRectangleElement(id);
-      state.elements = state.elements.filter(function(el) { return el.id !== id; });
     },
   });
 
