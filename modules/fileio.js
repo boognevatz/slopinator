@@ -1272,7 +1272,7 @@ function getLayerElementIds(layerId) {
   return ids;
 }
 
-function serializeElement(el, withinGroup) {
+export function serializeElement(el, withinGroup) {
   if (el.type === 'group') {
     var g = `<g id="${el.id}" data-type="group">\n`;
     var groupDom = document.getElementById(el.id);
@@ -1295,6 +1295,10 @@ function serializeElement(el, withinGroup) {
       }
     } else {
       var s = `<g id="${el.id}" data-type="line" data-line-style="${normalizeLineStyle(el.lineStyle)}" data-line-marker-size="${normalizeLineMarkerSize(el.lineMarkerSize)}"`;
+      if (el.startDecoration) s += ` data-start-decoration="${el.startDecoration}"`;
+      if (el.endDecoration) s += ` data-end-decoration="${el.endDecoration}"`;
+      if (el.startDecorationSize) s += ` data-start-decoration-size="${el.startDecorationSize}"`;
+      if (el.endDecorationSize) s += ` data-end-decoration-size="${el.endDecorationSize}"`;
       if (el.rotation) {
         const cx = (pts[0].x + pts[pts.length - 1].x) / 2;
         const cy = (pts[0].y + pts[pts.length - 1].y) / 2;

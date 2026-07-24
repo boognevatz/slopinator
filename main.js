@@ -19,6 +19,7 @@ import { initGrid, toggleGrid } from './modules/grid.js';
 import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
 import { groupSelected, ungroupSelected } from './modules/group.js';
+import { clipCopy, clipPaste } from './modules/clipboard.js';
 
 import { dom } from './modules/editor.js';
 
@@ -215,6 +216,20 @@ function init() {
       return;
     }
 
+    // Ctrl+C — Copy
+    if (e.ctrlKey && e.key === 'c') {
+      e.preventDefault();
+      clipCopy();
+      return;
+    }
+
+    // Ctrl+V — Paste
+    if (e.ctrlKey && e.key === 'v') {
+      e.preventDefault();
+      clipPaste();
+      return;
+    }
+
     // Zoom shortcuts (+, -)
     if (e.key === '+' || e.key === '=') {
       e.preventDefault();
@@ -283,6 +298,13 @@ function init() {
           break;
       }
     }
+  });
+
+  // ── Mouse tracking for paste position ───────────────────────
+  document.addEventListener('pointermove', function(pe) {
+    if (!state.hasImage) return;
+    state._lastClientX = pe.clientX;
+    state._lastClientY = pe.clientY;
   });
 
   // ── Mousewheel / Pinch zooming ──────────────────────────────

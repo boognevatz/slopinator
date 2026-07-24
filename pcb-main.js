@@ -15,6 +15,7 @@ import { initSettings, loadColorPreferences } from './modules/settings.js';
 import { initAutosave, loadAutosave, saveAutosave } from './modules/opfs.js';
 import { initLibraryUI, renderLibrary } from './modules/symbols.js';
 import { groupSelected, ungroupSelected } from './modules/group.js';
+import { clipCopy, clipPaste } from './modules/clipboard.js';
 
 import { dom } from './modules/editor.js';
 
@@ -195,6 +196,20 @@ function init() {
       return;
     }
 
+    // Ctrl+C — Copy
+    if (e.ctrlKey && e.key === 'c') {
+      e.preventDefault();
+      clipCopy();
+      return;
+    }
+
+    // Ctrl+V — Paste
+    if (e.ctrlKey && e.key === 'v') {
+      e.preventDefault();
+      clipPaste();
+      return;
+    }
+
     if (e.key === '+' || e.key === '=') {
       e.preventDefault();
       zoomIn();
@@ -265,6 +280,13 @@ function init() {
       zoomOut(e.clientX, e.clientY);
     }
   }, { passive: false });
+  // Mouse tracking for paste position
+  document.addEventListener('pointermove', function(pe) {
+    if (!state.hasImage) return;
+    state._lastClientX = pe.clientX;
+    state._lastClientY = pe.clientY;
+  });
+
   let pinchPointers = [];
   document.addEventListener('pointerdown', (e) => {
     if (_isOnPopup(e)) return;
