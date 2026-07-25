@@ -105,13 +105,24 @@ function onKeyDown(e) {
   if (!dx && !dy) return;
   e.preventDefault();
 
-  // Convert annotation rect to viewBox space
-  var vbCorners = [
-    applyImageRotationToPoint(data.x, data.y),
-    applyImageRotationToPoint(data.x + data.width, data.y),
-    applyImageRotationToPoint(data.x + data.width, data.y + data.height),
-    applyImageRotationToPoint(data.x, data.y + data.height),
+  // Compute actual visual corners of the rotated rect in viewBox space
+  var cx = data.x + data.width / 2, cy = data.y + data.height / 2;
+  var halfW = data.width / 2, halfH = data.height / 2;
+  var relPts = [
+    { x: -halfW, y: -halfH },
+    { x: halfW, y: -halfH },
+    { x: halfW, y: halfH },
+    { x: -halfW, y: halfH },
   ];
+  if (data.rotation) {
+    var rad = data.rotation * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    relPts = relPts.map(function(p) {
+      return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
+    });
+  }
+  var pts = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
+  var vbCorners = pts.map(function(p) { return applyImageRotationToPoint(p.x, p.y); });
   var xs = vbCorners.map(function(c) { return c.x; });
   var ys = vbCorners.map(function(c) { return c.y; });
   var vbX = Math.min.apply(null, xs);
@@ -260,15 +271,9 @@ function onMouseMove(e) {
 }
 
 function vbRectToAnnotation(vbX, vbY, vbW, vbH) {
-  var c1 = applyInverseImageRotationToPoint(vbX, vbY);
-  var c2 = applyInverseImageRotationToPoint(vbX + vbW, vbY);
-  var c3 = applyInverseImageRotationToPoint(vbX + vbW, vbY + vbH);
-  var c4 = applyInverseImageRotationToPoint(vbX, vbY + vbH);
-  var xs = [c1.x, c2.x, c3.x, c4.x];
-  var ys = [c1.y, c2.y, c3.y, c4.y];
-  var ax = Math.min.apply(null, xs);
-  var ay = Math.min.apply(null, ys);
-  return { x: ax, y: ay, width: Math.max.apply(null, xs) - ax, height: Math.max.apply(null, ys) - ay };
+  var vbCX = vbX + vbW / 2, vbCY = vbY + vbH / 2;
+  var annCenter = applyInverseImageRotationToPoint(vbCX, vbCY);
+  return { x: annCenter.x - vbW / 2, y: annCenter.y - vbH / 2, width: vbW, height: vbH };
 }
 
 function onMouseUp(e) {
@@ -372,13 +377,25 @@ function startResizeRect(idx, vbPt) {
   var groupEl = document.getElementById(data.id);
   if (groupEl) groupEl.style.visibility = 'hidden';
 
-  // Convert annotation rect to viewBox space
-  var vbCorners = [
-    applyImageRotationToPoint(data.x, data.y),
-    applyImageRotationToPoint(data.x + data.width, data.y),
-    applyImageRotationToPoint(data.x + data.width, data.y + data.height),
-    applyImageRotationToPoint(data.x, data.y + data.height),
+  // Compute actual visual corners of the rotated rect in annotation space
+  var cx = data.x + data.width / 2, cy = data.y + data.height / 2;
+  var halfW = data.width / 2, halfH = data.height / 2;
+  var relPts = [
+    { x: -halfW, y: -halfH },
+    { x: halfW, y: -halfH },
+    { x: halfW, y: halfH },
+    { x: -halfW, y: halfH },
   ];
+  if (data.rotation) {
+    var rad = data.rotation * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    relPts = relPts.map(function(p) {
+      return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
+    });
+  }
+  var pts = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
+  // Convert to viewBox space
+  var vbCorners = pts.map(function(p) { return applyImageRotationToPoint(p.x, p.y); });
   var xs = vbCorners.map(function(c) { return c.x; });
   var ys = vbCorners.map(function(c) { return c.y; });
   var vbX = Math.min.apply(null, xs);
