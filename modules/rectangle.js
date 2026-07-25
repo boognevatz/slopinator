@@ -369,6 +369,9 @@ function startResizeRect(idx, vbPt) {
   var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
 
+  var groupEl = document.getElementById(data.id);
+  if (groupEl) groupEl.style.visibility = 'hidden';
+
   // Convert annotation rect to viewBox space
   var vbCorners = [
     applyImageRotationToPoint(data.x, data.y),
@@ -405,7 +408,7 @@ function startResizeRect(idx, vbPt) {
   var corner = CORNERS[idx];
   resizeAnchor = anchorMap[corner];
   resizeStart = { x: vbPt.x, y: vbPt.y };
-  resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
+  resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
@@ -437,6 +440,7 @@ function onResizeMove(e) {
 
   // Convert vbData to annotation space for handles
   var ann = vbRectToAnnotation(nx, ny, nw, nh);
+  ann.rotation = resizeOrig.rotation;
   drawRectToolCircleHandles(ann, activeCorner);
 }
 
@@ -461,35 +465,25 @@ function onResizeEnd(e) {
 
   var orig = resizeOrig;
   var ann = vbRectToAnnotation(vbX, vbY, vbW, vbH);
-  var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height) };
+  var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height), rotation: orig.rotation };
   var cornerIdx = activeCorner;
 
+  // Show original annotation rect
+  var groupEl = document.getElementById(id);
+  if (groupEl) groupEl.style.visibility = 'visible';
+
   // Update annotation layer rect
-  updateRectangleElement({ id: id, x: final.x, y: final.y, width: final.width, height: final.height, rx: orig.rx || 0, fill: orig.fill, stroke: orig.stroke, strokeWidth: orig.strokeWidth });
+  updateRectangleElement({ id: id, x: final.x, y: final.y, width: final.width, height: final.height, rx: orig.rx || 0, rotation: orig.rotation, fill: orig.fill, stroke: orig.stroke, strokeWidth: orig.strokeWidth });
 
   if (orig.x !== final.x || orig.y !== final.y || orig.width !== final.width || orig.height !== final.height) {
     pushAction({
       description: 'Resize rectangle',
       doFn: function() {
-        var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
-        if (!el) return;
-        var fr = el.querySelector('.rect-fill'), sr = el.querySelector('.rect-stroke');
-        [fr, sr].forEach(function(r) {
-          if (!r) return;
-          r.setAttribute('x', final.x); r.setAttribute('y', final.y);
-          r.setAttribute('width', final.width); r.setAttribute('height', final.height);
-        });
+        updateRectangleElement({ id: id, x: final.x, y: final.y, width: final.width, height: final.height, rx: orig.rx || 0, rotation: orig.rotation, fill: orig.fill, stroke: orig.stroke, strokeWidth: orig.strokeWidth });
         drawRectToolCircleHandles(final, cornerIdx);
       },
       undoFn: function() {
-        var el = dom.annotationLayer.querySelector('#' + CSS.escape(id));
-        if (!el) return;
-        var fr = el.querySelector('.rect-fill'), sr = el.querySelector('.rect-stroke');
-        [fr, sr].forEach(function(r) {
-          if (!r) return;
-          r.setAttribute('x', orig.x); r.setAttribute('y', orig.y);
-          r.setAttribute('width', orig.width); r.setAttribute('height', orig.height);
-        });
+        updateRectangleElement({ id: id, x: orig.x, y: orig.y, width: orig.width, height: orig.height, rx: orig.rx || 0, rotation: orig.rotation, fill: orig.fill, stroke: orig.stroke, strokeWidth: orig.strokeWidth });
         drawRectToolCircleHandles(orig, cornerIdx);
       },
     });
