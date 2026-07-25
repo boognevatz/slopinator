@@ -21,10 +21,9 @@ let moveOrig = null;
 let isPreparingDrag = false;
 let dragStartPt = null;
 let dragCornerIdx = -1;
-let resizeAnnAnchor = null;
-
 var CORNERS = ['tl', 'tr', 'br', 'bl'];
 var rectDrag = null;
+var resizeLastAnn = null;
 
 export function initRectangle() {}
 
@@ -74,7 +73,7 @@ function cancelResizeMove() {
   resizeAnchor = null;
   resizeStart = null;
   resizeOrig = null;
-  resizeAnnAnchor = null;
+  resizeLastAnn = null;
   moveStart = null;
   moveOrig = null;
   dragStartPt = null;
@@ -397,7 +396,6 @@ function startResizeRect(idx, vbPt) {
     });
   }
   var pts = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
-  resizeAnnAnchor = pts[(idx + 2) % 4];
   // Convert to viewBox space
   var vbCorners = pts.map(function(p) { return applyImageRotationToPoint(p.x, p.y); });
   var xs = vbCorners.map(function(c) { return c.x; });
@@ -410,15 +408,15 @@ function startResizeRect(idx, vbPt) {
   // Create rect drag group on handleLayer
   rectDrag = svgEl('g', { id: 'rect-drag' });
   dom.handleLayer.appendChild(rectDrag);
-  var vRect = svgEl('rect', {
-    x: vbX, y: vbY, width: vbW, height: vbH,
-    rx: data.rx || 0,
+  var polyPts = vbCorners.map(function(c) { return c.x + ',' + c.y; }).join(' ');
+  var vPoly = svgEl('polygon', {
+    points: polyPts,
     fill: data.fill || 'transparent',
     stroke: data.stroke,
     'stroke-width': data.strokeWidth,
     'pointer-events': 'none',
   });
-  rectDrag.appendChild(vRect);
+  rectDrag.appendChild(vPoly);
 
   var anchorMap = {
     tl: { x: vbX + vbW, y: vbY + vbH },
@@ -453,31 +451,33 @@ function onResizeMove(e) {
   if (nh < 5) nh = 5;
 
   // Update rectDrag on handleLayer
-  var vr = rectDrag.querySelector('rect');
-  vr.setAttribute('x', nx);
-  vr.setAttribute('y', ny);
-  vr.setAttribute('width', nw);
-  vr.setAttribute('height', nh);
+  var ann = vbRectToAnnotation(nx, ny, nw, nh);
+  ann.rotation = resizeOrig.rotation;
+  resizeLastAnn = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: ann.rotation };
 
-  // Convert vbData to annotation space for handles
-  var imageRotation = state.image.rotation || 0;
-  var dragAnn = pt;
-  var centerX = (resizeAnnAnchor.x + dragAnn.x) / 2;
-  var centerY = (resizeAnnAnchor.y + dragAnn.y) / 2;
-  var rotRelX = (resizeAnnAnchor.x - dragAnn.x) / 2;
-  var rotRelY = (resizeAnnAnchor.y - dragAnn.y) / 2;
-  var rad = imageRotation * Math.PI / 180;
-  var cosR = Math.cos(rad), sinR = Math.sin(rad);
-  var unrotX = rotRelX * cosR - rotRelY * sinR;
-  var unrotY = rotRelX * sinR + rotRelY * cosR;
-  var hw = Math.abs(unrotX), hh = Math.abs(unrotY);
-  var ann = {
-    x: centerX - hw,
-    y: centerY - hh,
-    width: 2 * hw,
-    height: 2 * hh,
-    rotation: resizeOrig.rotation,
-  };
+  // Compute visual corners from annotation bbox + rotation
+  var cx = ann.x + ann.width / 2, cy = ann.y + ann.height / 2;
+  var halfW = ann.width / 2, halfH = ann.height / 2;
+  var relPts = [
+    { x: -halfW, y: -halfH },
+    { x: halfW, y: -halfH },
+    { x: halfW, y: halfH },
+    { x: -halfW, y: halfH },
+  ];
+  if (ann.rotation) {
+    var rad = ann.rotation * Math.PI / 180;
+    var cos2 = Math.cos(rad), sin2 = Math.sin(rad);
+    relPts = relPts.map(function(p) {
+      return { x: p.x * cos2 - p.y * sin2, y: p.x * sin2 + p.y * cos2 };
+    });
+  }
+  var vbPts = relPts.map(function(p) {
+    var tp = applyImageRotationToPoint(cx + p.x, cy + p.y);
+    return tp.x + ',' + tp.y;
+  });
+  var poly = rectDrag.querySelector('polygon');
+  poly.setAttribute('points', vbPts.join(' '));
+
   drawRectToolCircleHandles(ann, activeCorner);
 }
 
@@ -492,33 +492,11 @@ function onResizeEnd(e) {
 
   // Read final rect from rectDrag (viewBox space)
   if (!rectDrag) return;
-  var vr = rectDrag.querySelector('rect');
-  var vbX = parseFloat(vr.getAttribute('x'));
-  var vbY = parseFloat(vr.getAttribute('y'));
-  var vbW = parseFloat(vr.getAttribute('width'));
-  var vbH = parseFloat(vr.getAttribute('height'));
   rectDrag.remove();
   rectDrag = null;
 
   var orig = resizeOrig;
-  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var imageRotation = state.image.rotation || 0;
-  var dragAnn = pt;
-  var centerX = (resizeAnnAnchor.x + dragAnn.x) / 2;
-  var centerY = (resizeAnnAnchor.y + dragAnn.y) / 2;
-  var rotRelX = (resizeAnnAnchor.x - dragAnn.x) / 2;
-  var rotRelY = (resizeAnnAnchor.y - dragAnn.y) / 2;
-  var rad = imageRotation * Math.PI / 180;
-  var cosR = Math.cos(rad), sinR = Math.sin(rad);
-  var unrotX = rotRelX * cosR - rotRelY * sinR;
-  var unrotY = rotRelX * sinR + rotRelY * cosR;
-  var hw = Math.abs(unrotX), hh = Math.abs(unrotY);
-  var ann = {
-    x: centerX - hw,
-    y: centerY - hh,
-    width: 2 * hw,
-    height: 2 * hh,
-  };
+  var ann = resizeLastAnn || orig;
   var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height), rotation: orig.rotation };
   var cornerIdx = activeCorner;
 
