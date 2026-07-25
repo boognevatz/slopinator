@@ -527,6 +527,8 @@ function cancelDraw() {
 }
 
 export function addRectangleElement(data) {
+  if (isNaN(data.x) || isNaN(data.y) || isNaN(data.width) || isNaN(data.height)) return;
+
   var group = svgEl('g', {
     id: data.id,
     'data-type': 'rectangle',
@@ -563,6 +565,8 @@ export function addRectangleElement(data) {
 export function updateRectangleElement(data) {
   var group = dom.annotationLayer.querySelector('#' + CSS.escape(data.id));
   if (!group) return;
+
+  if (isNaN(data.x) || isNaN(data.y) || isNaN(data.width) || isNaN(data.height)) return;
 
   var fillRect = group.querySelector('.rect-fill');
   var strokeRect = group.querySelector('.rect-stroke');

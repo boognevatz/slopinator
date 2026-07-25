@@ -2039,6 +2039,9 @@ function onResizeMove(e) {
       if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
       showRotationTooltip(e, displayRot);
     } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
+      var _bx = resizeAnchor._bx, _by = resizeAnchor._by;
+      if (!_bx || !_by) return;
+
       var _anchorIdx = resizeHandle === 'tl' ? 2 : 0;
       var _dragIdx = resizeHandle === 'tl' ? 0 : 2;
       var _anchorVb = resizeAnchor._vbCorners[_anchorIdx];
@@ -2049,9 +2052,9 @@ function onResizeMove(e) {
       var _vx = _mouseVb.x - _ctrVbX;
       var _vy = _mouseVb.y - _ctrVbY;
 
-      var _bx = resizeAnchor._bx, _by = resizeAnchor._by;
       var _projX = _vx * _bx.x + _vy * _bx.y;
       var _projY = _vx * _by.x + _vy * _by.y;
+      if (isNaN(_projX) || isNaN(_projY)) return;
 
       var _newW, _newH;
       if (resizeHandle === 'tl') {
@@ -2084,6 +2087,8 @@ function onResizeMove(e) {
       var _localBRX = _ctrAnnX + _dxBR * _cE + _dyBR * _sE;
       var _localBRY = _ctrAnnY - _dxBR * _sE + _dyBR * _cE;
 
+      if (isNaN(_localTLX) || isNaN(_localTLY) || isNaN(_localBRX) || isNaN(_localBRY)) return;
+
       data.x = Math.round(Math.min(_localTLX, _localBRX));
       data.y = Math.round(Math.min(_localTLY, _localBRY));
       data.width = Math.max(5, Math.round(Math.abs(_localBRX - _localTLX)));
@@ -2110,6 +2115,7 @@ function onResizeMove(e) {
         const diagUnitX = diagX / diagLen;
         const diagUnitY = diagY / diagLen;
         const proj = dx * diagUnitX + dy * diagUnitY - (resizeAnchor._initProj || 0);
+        if (isNaN(proj)) return;
         const origRx = dragOriginal.rx || 0;
         const newRx = Math.max(0, Math.min(origRx + proj, Math.min(data.width, data.height) / 2));
         data.rx = newRx;
