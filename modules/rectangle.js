@@ -418,14 +418,8 @@ function startResizeRect(idx, vbPt) {
   });
   rectDrag.appendChild(vPoly);
 
-  var anchorMap = {
-    tl: { x: vbX + vbW, y: vbY + vbH },
-    tr: { x: vbX,        y: vbY + vbH },
-    bl: { x: vbX + vbW, y: vbY },
-    br: { x: vbX,        y: vbY },
-  };
-  var corner = CORNERS[idx];
-  resizeAnchor = anchorMap[corner];
+  var anchorIdx = (idx + 2) % 4;
+  resizeAnchor = { x: vbCorners[anchorIdx].x, y: vbCorners[anchorIdx].y };
   resizeStart = { x: vbPt.x, y: vbPt.y };
   resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
