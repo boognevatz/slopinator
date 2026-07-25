@@ -21,6 +21,7 @@ let moveOrig = null;
 let isPreparingDrag = false;
 let dragStartPt = null;
 let dragCornerIdx = -1;
+let resizeAnnAnchor = null;
 
 var CORNERS = ['tl', 'tr', 'br', 'bl'];
 var rectDrag = null;
@@ -73,6 +74,7 @@ function cancelResizeMove() {
   resizeAnchor = null;
   resizeStart = null;
   resizeOrig = null;
+  resizeAnnAnchor = null;
   moveStart = null;
   moveOrig = null;
   dragStartPt = null;
@@ -395,6 +397,7 @@ function startResizeRect(idx, vbPt) {
     });
   }
   var pts = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
+  resizeAnnAnchor = pts[(idx + 2) % 4];
   // Convert to viewBox space
   var vbCorners = pts.map(function(p) { return applyImageRotationToPoint(p.x, p.y); });
   var xs = vbCorners.map(function(c) { return c.x; });
@@ -457,8 +460,24 @@ function onResizeMove(e) {
   vr.setAttribute('height', nh);
 
   // Convert vbData to annotation space for handles
-  var ann = vbRectToAnnotation(nx, ny, nw, nh);
-  ann.rotation = resizeOrig.rotation;
+  var imageRotation = state.image.rotation || 0;
+  var dragAnn = pt;
+  var centerX = (resizeAnnAnchor.x + dragAnn.x) / 2;
+  var centerY = (resizeAnnAnchor.y + dragAnn.y) / 2;
+  var rotRelX = (resizeAnnAnchor.x - dragAnn.x) / 2;
+  var rotRelY = (resizeAnnAnchor.y - dragAnn.y) / 2;
+  var rad = imageRotation * Math.PI / 180;
+  var cosR = Math.cos(rad), sinR = Math.sin(rad);
+  var unrotX = rotRelX * cosR - rotRelY * sinR;
+  var unrotY = rotRelX * sinR + rotRelY * cosR;
+  var hw = Math.abs(unrotX), hh = Math.abs(unrotY);
+  var ann = {
+    x: centerX - hw,
+    y: centerY - hh,
+    width: 2 * hw,
+    height: 2 * hh,
+    rotation: resizeOrig.rotation,
+  };
   drawRectToolCircleHandles(ann, activeCorner);
 }
 
@@ -482,7 +501,24 @@ function onResizeEnd(e) {
   rectDrag = null;
 
   var orig = resizeOrig;
-  var ann = vbRectToAnnotation(vbX, vbY, vbW, vbH);
+  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
+  var imageRotation = state.image.rotation || 0;
+  var dragAnn = pt;
+  var centerX = (resizeAnnAnchor.x + dragAnn.x) / 2;
+  var centerY = (resizeAnnAnchor.y + dragAnn.y) / 2;
+  var rotRelX = (resizeAnnAnchor.x - dragAnn.x) / 2;
+  var rotRelY = (resizeAnnAnchor.y - dragAnn.y) / 2;
+  var rad = imageRotation * Math.PI / 180;
+  var cosR = Math.cos(rad), sinR = Math.sin(rad);
+  var unrotX = rotRelX * cosR - rotRelY * sinR;
+  var unrotY = rotRelX * sinR + rotRelY * cosR;
+  var hw = Math.abs(unrotX), hh = Math.abs(unrotY);
+  var ann = {
+    x: centerX - hw,
+    y: centerY - hh,
+    width: 2 * hw,
+    height: 2 * hh,
+  };
   var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height), rotation: orig.rotation };
   var cornerIdx = activeCorner;
 
