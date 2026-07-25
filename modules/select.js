@@ -1,6 +1,6 @@
 // ── Select module: Selection, move, resize, delete ─────────────
 
-import { state, dom, applyImageRotationToPoint } from './editor.js';
+import { state, dom, applyImageRotationToPoint, applyInverseImageRotationToPoint } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { captureElementState } from './dom-utils.js';
 import { snapToGrid } from './grid.js';
@@ -1765,6 +1765,27 @@ function startResize(handleEl, startPt, e) {
       origDiagVec = origDiagLen > 0
         ? { x: dx / origDiagLen, y: dy / origDiagLen }
         : { x: 1, y: 1 };
+      // Compute 4 viewBox corners and basis vectors for stationary-corner resize
+      var _cxD = dragCurrent.x + dragCurrent.width / 2;
+      var _cyD = dragCurrent.y + dragCurrent.height / 2;
+      var _hwD = dragCurrent.width / 2, _hhD = dragCurrent.height / 2;
+      var _rRD = (dragCurrent.rotation || 0) * Math.PI / 180;
+      var _cRD = Math.cos(_rRD), _sRD = Math.sin(_rRD);
+      var _rel = [
+        { x: -_hwD, y: -_hhD },
+        { x: _hwD, y: -_hhD },
+        { x: _hwD, y: _hhD },
+        { x: -_hwD, y: _hhD },
+      ];
+      if (dragCurrent.rotation) {
+        _rel = _rel.map(function(p) { return { x: p.x * _cRD - p.y * _sRD, y: p.x * _sRD + p.y * _cRD }; });
+      }
+      var _annC = _rel.map(function(p) { return { x: _cxD + p.x, y: _cyD + p.y }; });
+      var _tc = _annC.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
+      resizeAnchor._vbCorners = _tc;
+      var _wI = dragCurrent.width, _hI = dragCurrent.height;
+      resizeAnchor._bx = { x: (_tc[1].x - _tc[0].x) / _wI, y: (_tc[1].y - _tc[0].y) / _wI };
+      resizeAnchor._by = { x: (_tc[3].x - _tc[0].x) / _hI, y: (_tc[3].y - _tc[0].y) / _hI };
     } else if (handleType === 'bl' || handleType === 'tr') {
       resizeAnchor = {
         x: handleType === 'bl' ? dragCurrent.x : dragCurrent.x + dragCurrent.width,
@@ -2018,35 +2039,55 @@ function onResizeMove(e) {
       if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
       showRotationTooltip(e, displayRot);
     } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
-      const angleRad = -(data.rotation || 0) * Math.PI / 180;
-      const cosA = Math.cos(angleRad);
-      const sinA = Math.sin(angleRad);
-      const dxMouse = pt.x - dragStart.x;
-      const dyMouse = pt.y - dragStart.y;
-      const unrotatedDx = dxMouse * cosA - dyMouse * sinA;
-      const unrotatedDy = dxMouse * sinA + dyMouse * cosA;
-      const origCornerX = dragOriginal.x + (resizeHandle === 'br' ? dragOriginal.width : 0);
-      const origCornerY = dragOriginal.y + (resizeHandle === 'br' ? dragOriginal.height : 0);
+      var _anchorIdx = resizeHandle === 'tl' ? 2 : 0;
+      var _dragIdx = resizeHandle === 'tl' ? 0 : 2;
+      var _anchorVb = resizeAnchor._vbCorners[_anchorIdx];
+      var _mouseVb = applyImageRotationToPoint(pt.x, pt.y);
 
-      const mx = (origCornerX + unrotatedDx) - resizeAnchor.x;
-      const my = (origCornerY + unrotatedDy) - resizeAnchor.y;
-      const projLen = mx * origDiagVec.x + my * origDiagVec.y;
-      const scaleFactor = origDiagLen > 0 ? Math.max(0.1, projLen / origDiagLen) : 1;
+      var _ctrVbX = (_anchorVb.x + _mouseVb.x) / 2;
+      var _ctrVbY = (_anchorVb.y + _mouseVb.y) / 2;
+      var _vx = _mouseVb.x - _ctrVbX;
+      var _vy = _mouseVb.y - _ctrVbY;
 
-      const newW = Math.max(5, Math.round(dragOriginal.width * Math.abs(scaleFactor)));
-      const newH = Math.max(5, Math.round(dragOriginal.height * Math.abs(scaleFactor)));
+      var _bx = resizeAnchor._bx, _by = resizeAnchor._by;
+      var _projX = _vx * _bx.x + _vy * _bx.y;
+      var _projY = _vx * _by.x + _vy * _by.y;
 
-      if (resizeHandle === 'br') {
-        data.x = resizeAnchor.x;
-        data.y = resizeAnchor.y;
-        data.width = newW;
-        data.height = newH;
+      var _newW, _newH;
+      if (resizeHandle === 'tl') {
+        _newW = Math.max(5, Math.abs(-2 * _projX));
+        _newH = Math.max(5, Math.abs(-2 * _projY));
       } else {
-        data.x = resizeAnchor.x - newW;
-        data.y = resizeAnchor.y - newH;
-        data.width = newW;
-        data.height = newH;
+        _newW = Math.max(5, Math.abs(2 * _projX));
+        _newH = Math.max(5, Math.abs(2 * _projY));
       }
+
+      var _halfW = _newW / 2, _halfH = _newH / 2;
+      var _vbCorners = [
+        { x: _ctrVbX - _halfW * _bx.x - _halfH * _by.x, y: _ctrVbY - _halfW * _bx.y - _halfH * _by.y },
+        { x: _ctrVbX + _halfW * _bx.x - _halfH * _by.x, y: _ctrVbY + _halfW * _bx.y - _halfH * _by.y },
+        { x: _ctrVbX + _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY + _halfW * _bx.y + _halfH * _by.y },
+        { x: _ctrVbX - _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY - _halfW * _bx.y + _halfH * _by.y },
+      ];
+
+      var _annCorners = _vbCorners.map(function(c) { return applyInverseImageRotationToPoint(c.x, c.y); });
+      var _eRotRad = (data.rotation || 0) * Math.PI / 180;
+      var _cE = Math.cos(_eRotRad), _sE = Math.sin(_eRotRad);
+      var _ctrAnnX = (_annCorners[_anchorIdx].x + _annCorners[_dragIdx].x) / 2;
+      var _ctrAnnY = (_annCorners[_anchorIdx].y + _annCorners[_dragIdx].y) / 2;
+      var _annTL = _annCorners[0];
+      var _dxTL = _annTL.x - _ctrAnnX, _dyTL = _annTL.y - _ctrAnnY;
+      var _localTLX = _ctrAnnX + _dxTL * _cE + _dyTL * _sE;
+      var _localTLY = _ctrAnnY - _dxTL * _sE + _dyTL * _cE;
+      var _annBR = _annCorners[2];
+      var _dxBR = _annBR.x - _ctrAnnX, _dyBR = _annBR.y - _ctrAnnY;
+      var _localBRX = _ctrAnnX + _dxBR * _cE + _dyBR * _sE;
+      var _localBRY = _ctrAnnY - _dxBR * _sE + _dyBR * _cE;
+
+      data.x = Math.round(Math.min(_localTLX, _localBRX));
+      data.y = Math.round(Math.min(_localTLY, _localBRY));
+      data.width = Math.max(5, Math.round(Math.abs(_localBRX - _localTLX)));
+      data.height = Math.max(5, Math.round(Math.abs(_localBRY - _localTLY)));
 
       const maxRx = Math.min(data.width, data.height) / 2;
       if (data.rx > maxRx) {
