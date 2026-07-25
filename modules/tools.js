@@ -22,6 +22,7 @@ const TOOL_SETTINGS = {
   crop: ['crop'],
   perspective: ['perspective'],
   color: ['color-correction'],
+  measure: ['measure-group'],
 };
 
 export function initTools() {
@@ -142,4 +143,5 @@ function updateToolSettingsVisibility(tool, selectedType = null) {
   setGroupVisible('perspective-group', visible.has('perspective'));
   setGroupVisible('color-correction-group', visible.has('color-correction'));
   setGroupVisible('element-id-group', visible.has('element-id'));
+  setGroupVisible('measure-group', visible.has('measure-group'));
 }

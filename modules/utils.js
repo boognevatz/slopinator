@@ -31,7 +31,7 @@ export function screenToCoords(svg, el, clientX, clientY) {
   const ctm = el.getScreenCTM();
   if (!ctm) return { x: 0, y: 0 };
   const svgPt = pt.matrixTransform(ctm.inverse());
-  return { x: svgPt.x, y: svgPt.y };
+  return { x: Math.round(svgPt.x), y: Math.round(svgPt.y) };
 }
 
 /**

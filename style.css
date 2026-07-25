@@ -674,6 +674,7 @@ body {
 
 #editor-svg {
   display: block;
+  user-select: none;
 }
 
 #editor-svg svg,

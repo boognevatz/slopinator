@@ -13,12 +13,18 @@ let dragIdx = -1;
 let dragHandle = null;
 var selectedEndpoint = -1;
 var arrowKeyStep = 1;
+var handleGroup = null;
+var _syncing = false;
 
 export function activateMeasure() {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onPointerDown);
   document.addEventListener('dpi-changed', updateLabel);
   document.addEventListener('keydown', onKeyDown);
+  document.getElementById('measure-pt1-x')?.addEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt1-y')?.addEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt2-x')?.addEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt2-y')?.addEventListener('input', onToolbarInput);
 }
 
 export function deactivateMeasure() {
@@ -28,6 +34,10 @@ export function deactivateMeasure() {
   document.removeEventListener('pointerup', onPointerUp);
   document.removeEventListener('dpi-changed', updateLabel);
   document.removeEventListener('keydown', onKeyDown);
+  document.getElementById('measure-pt1-x')?.removeEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt1-y')?.removeEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt2-x')?.removeEventListener('input', onToolbarInput);
+  document.getElementById('measure-pt2-y')?.removeEventListener('input', onToolbarInput);
   isDrawing = false;
   isDragging = false;
   cleanupElements();
@@ -44,6 +54,7 @@ function cleanupElements() {
     if (labelDeltaText.parentNode) labelDeltaText.parentNode.removeChild(labelDeltaText);
   }
   dom.handleLayer.innerHTML = '';
+  handleGroup = null;
   measureLine = null;
   labelText = null;
   labelDeltaText = null;
@@ -58,6 +69,14 @@ function onPointerDown(e) {
 
   // If we have existing measure elements, check for handle drag
   if (measureLine && pt1 && pt2) {
+    // DOM-based hit detection — avoids coordinate space issues
+    var handleEl = e.target.closest ? e.target.closest('[data-handle]') : null;
+    if (handleEl) {
+      var idx = parseInt(handleEl.dataset.handle.replace('p', '')) - 1;
+      startHandleDrag(idx, e);
+      return;
+    }
+    // Fallback: distance-based hit detection in annotation space
     const clickPt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
     var d1 = Math.hypot(clickPt.x - pt1.x, clickPt.y - pt1.y);
     var d2 = Math.hypot(clickPt.x - pt2.x, clickPt.y - pt2.y);
@@ -77,15 +96,16 @@ function onPointerDown(e) {
   pt1 = { x: startPt.x, y: startPt.y };
   pt2 = { x: startPt.x, y: startPt.y };
 
+  var tp1 = applyImageRotationToPoint(pt1.x, pt1.y);
   measureLine = svgEl('line', {
-    x1: pt1.x, y1: pt1.y,
-    x2: pt2.x, y2: pt2.y,
+    x1: tp1.x, y1: tp1.y,
+    x2: tp1.x, y2: tp1.y,
     stroke: '#4fc3f7',
     'stroke-width': 1.5,
     'stroke-dasharray': '5,3',
     'pointer-events': 'none',
   });
-  dom.annotationLayer.appendChild(measureLine);
+  dom.handleLayer.appendChild(measureLine);
 
   document.addEventListener('pointermove', onPointerMove);
   document.addEventListener('pointerup', onPointerUp);
@@ -94,8 +114,9 @@ function onPointerDown(e) {
 function onPointerMove(e) {
   if (isDrawing) {
     pt2 = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-    measureLine.setAttribute('x2', pt2.x);
-    measureLine.setAttribute('y2', pt2.y);
+    var tp2 = applyImageRotationToPoint(pt2.x, pt2.y);
+    measureLine.setAttribute('x2', tp2.x);
+    measureLine.setAttribute('y2', tp2.y);
     updateLabel();
     return;
   }
@@ -103,10 +124,12 @@ function onPointerMove(e) {
     var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
     if (dragIdx === 0) { pt1 = { x: pt.x, y: pt.y }; }
     else { pt2 = { x: pt.x, y: pt.y }; }
-    measureLine.setAttribute('x1', pt1.x);
-    measureLine.setAttribute('y1', pt1.y);
-    measureLine.setAttribute('x2', pt2.x);
-    measureLine.setAttribute('y2', pt2.y);
+    var dp1 = applyImageRotationToPoint(pt1.x, pt1.y);
+    var dp2 = applyImageRotationToPoint(pt2.x, pt2.y);
+    measureLine.setAttribute('x1', dp1.x);
+    measureLine.setAttribute('y1', dp1.y);
+    measureLine.setAttribute('x2', dp2.x);
+    measureLine.setAttribute('y2', dp2.y);
     if (dragHandle) {
       var dhTp = applyImageRotationToPoint(pt.x, pt.y);
       dragHandle.setAttribute('cx', dhTp.x);
@@ -130,8 +153,9 @@ function onPointerUp(e) {
       return;
     }
     pt2 = { x: endPt.x, y: endPt.y };
-    measureLine.setAttribute('x2', pt2.x);
-    measureLine.setAttribute('y2', pt2.y);
+    var upTp2 = applyImageRotationToPoint(pt2.x, pt2.y);
+    measureLine.setAttribute('x2', upTp2.x);
+    measureLine.setAttribute('y2', upTp2.y);
     selectedEndpoint = 1;
     updateLabel();
     showHandles();
@@ -141,14 +165,18 @@ function onPointerUp(e) {
   if (isDragging) {
     isDragging = false;
     selectedEndpoint = dragIdx;
-    dom.handleLayer.innerHTML = '';
+    if (handleGroup) handleGroup.innerHTML = '';
     showHandles();
   }
 }
 
 function showHandles() {
   if (!pt1 || !pt2) return;
-  dom.handleLayer.innerHTML = '';
+  if (!handleGroup || !handleGroup.parentNode) {
+    handleGroup = svgEl('g', { id: 'measure-handles' });
+    dom.handleLayer.appendChild(handleGroup);
+  }
+  handleGroup.innerHTML = '';
   var r = getHandleRadius();
   var hitR = getHitRadius();
   var pts = [pt1, pt2];
@@ -156,10 +184,11 @@ function showHandles() {
     var tp = applyImageRotationToPoint(pts[i].x, pts[i].y);
     var hit = svgEl('circle', {
       cx: tp.x, cy: tp.y, r: hitR,
-      fill: 'transparent', stroke: 'none',
+      fill: 'rgba(0,0,0,0.001)', stroke: 'none',
+      'pointer-events': 'fill',
       'data-handle': 'p' + (i + 1),
     });
-    dom.handleLayer.appendChild(hit);
+    handleGroup.appendChild(hit);
     var isActive = i === selectedEndpoint;
     var vis = svgEl('circle', {
       cx: tp.x, cy: tp.y, r: r,
@@ -167,7 +196,7 @@ function showHandles() {
       stroke: '#4fc3f7', 'stroke-width': 1.5,
       'pointer-events': 'none',
     });
-    dom.handleLayer.appendChild(vis);
+    handleGroup.appendChild(vis);
   }
 }
 
@@ -187,7 +216,7 @@ function onKeyDown(e) {
       if (selectedEndpoint >= 0 && pt1 && pt2) {
         e.preventDefault();
         selectedEndpoint = e.shiftKey ? 0 : 1;
-        dom.handleLayer.innerHTML = '';
+        if (handleGroup) handleGroup.innerHTML = '';
         showHandles();
       }
       break;
@@ -201,19 +230,25 @@ function moveEndpoint(dx, dy) {
   if (!pt) return;
   pt.x += dx;
   pt.y += dy;
-  measureLine.setAttribute('x1', pt1.x);
-  measureLine.setAttribute('y1', pt1.y);
-  measureLine.setAttribute('x2', pt2.x);
-  measureLine.setAttribute('y2', pt2.y);
+  var mp1 = applyImageRotationToPoint(pt1.x, pt1.y);
+  var mp2 = applyImageRotationToPoint(pt2.x, pt2.y);
+  measureLine.setAttribute('x1', mp1.x);
+  measureLine.setAttribute('y1', mp1.y);
+  measureLine.setAttribute('x2', mp2.x);
+  measureLine.setAttribute('y2', mp2.y);
   updateLabel();
-  dom.handleLayer.innerHTML = '';
+  if (handleGroup) handleGroup.innerHTML = '';
   showHandles();
 }
 
 function startHandleDrag(idx, e) {
   isDragging = true;
   dragIdx = idx;
-  dom.handleLayer.innerHTML = '';
+  if (!handleGroup || !handleGroup.parentNode) {
+    handleGroup = svgEl('g', { id: 'measure-handles' });
+    dom.handleLayer.appendChild(handleGroup);
+  }
+  handleGroup.innerHTML = '';
   var pt = idx === 0 ? pt1 : pt2;
   var tp = applyImageRotationToPoint(pt.x, pt.y);
   var r = getHandleRadius();
@@ -222,9 +257,40 @@ function startHandleDrag(idx, e) {
     fill: '#fff', stroke: '#4fc3f7', 'stroke-width': 1.5,
     'pointer-events': 'none',
   });
-  dom.handleLayer.appendChild(dragHandle);
+  handleGroup.appendChild(dragHandle);
   document.addEventListener('pointermove', onPointerMove);
   document.addEventListener('pointerup', onPointerUp);
+}
+
+function syncToolbar() {
+  var el = document.getElementById('measure-pt1-x');
+  if (!el) return;
+  _syncing = true;
+  el.value = pt1 != null ? pt1.x : '';
+  document.getElementById('measure-pt1-y').value = pt1 != null ? pt1.y : '';
+  document.getElementById('measure-pt2-x').value = pt2 != null ? pt2.x : '';
+  document.getElementById('measure-pt2-y').value = pt2 != null ? pt2.y : '';
+  _syncing = false;
+}
+
+function onToolbarInput() {
+  if (_syncing || !measureLine) return;
+  var x1 = parseInt(document.getElementById('measure-pt1-x').value, 10);
+  var y1 = parseInt(document.getElementById('measure-pt1-y').value, 10);
+  var x2 = parseInt(document.getElementById('measure-pt2-x').value, 10);
+  var y2 = parseInt(document.getElementById('measure-pt2-y').value, 10);
+  if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return;
+  pt1 = { x: x1, y: y1 };
+  pt2 = { x: x2, y: y2 };
+  var mp1 = applyImageRotationToPoint(pt1.x, pt1.y);
+  var mp2 = applyImageRotationToPoint(pt2.x, pt2.y);
+  measureLine.setAttribute('x1', mp1.x);
+  measureLine.setAttribute('y1', mp1.y);
+  measureLine.setAttribute('x2', mp2.x);
+  measureLine.setAttribute('y2', mp2.y);
+  updateLabel();
+  if (handleGroup) handleGroup.innerHTML = '';
+  showHandles();
 }
 
 function updateLabel() {
@@ -237,6 +303,7 @@ function updateLabel() {
   var dpi = state.image.dpi;
   var midX = (pt1.x + pt2.x) / 2;
   var midY = (pt1.y + pt2.y) / 2;
+  var tm = applyImageRotationToPoint(midX, midY);
 
   var text = Math.round(pixelLen) + 'px  \u00B7  ' + mmLen.toFixed(1) + 'mm';
   var deltaPx = '(' + Math.round(dx) + ', ' + Math.round(dy) + ')px';
@@ -246,7 +313,7 @@ function updateLabel() {
 
   if (!labelText) {
     labelText = svgEl('text', {
-      x: midX, y: midY - 12,
+      x: tm.x, y: tm.y - 12,
       'text-anchor': 'middle',
       fill: '#4fc3f7',
       'font-size': '13',
@@ -254,10 +321,10 @@ function updateLabel() {
       'font-weight': 'bold',
       'pointer-events': 'none',
     });
-    dom.annotationLayer.appendChild(labelText);
+    dom.handleLayer.appendChild(labelText);
   }
-  labelText.setAttribute('x', midX);
-  labelText.setAttribute('y', midY - 12);
+  labelText.setAttribute('x', tm.x);
+  labelText.setAttribute('y', tm.y - 12);
   labelText.textContent = text;
 
   var bg = labelText._bg;
@@ -273,7 +340,7 @@ function updateLabel() {
 
   if (!labelDeltaText) {
     labelDeltaText = svgEl('text', {
-      x: midX, y: midY + 18,
+      x: tm.x, y: tm.y + 18,
       'text-anchor': 'middle',
       fill: '#4fc3f7',
       'font-size': '13',
@@ -281,7 +348,7 @@ function updateLabel() {
       'font-weight': 'bold',
       'pointer-events': 'none',
     });
-    dom.annotationLayer.appendChild(labelDeltaText);
+    dom.handleLayer.appendChild(labelDeltaText);
     var bg2 = svgEl('rect', {
       fill: 'rgba(0,0,0,0.65)',
       rx: 3, ry: 3,
@@ -290,8 +357,8 @@ function updateLabel() {
     labelDeltaText.parentNode.insertBefore(bg2, labelDeltaText);
     labelDeltaText._bg = bg2;
   }
-  labelDeltaText.setAttribute('x', midX);
-  labelDeltaText.setAttribute('y', midY + 18);
+  labelDeltaText.setAttribute('x', tm.x);
+  labelDeltaText.setAttribute('y', tm.y + 18);
   labelDeltaText.textContent = deltaPx + '  ' + deltaMm;
 
   var bbox = labelText.getBBox();
@@ -306,6 +373,7 @@ function updateLabel() {
   bg2.setAttribute('y', bbox2.y - 2);
   bg2.setAttribute('width', bbox2.width + 8);
   bg2.setAttribute('height', bbox2.height + 4);
+  syncToolbar();
 }
 
 function getHandleRadius() {
