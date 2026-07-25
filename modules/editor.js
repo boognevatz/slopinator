@@ -204,7 +204,7 @@ export function updateImageTransform() {
     allGs[i].setAttribute('transform', transforms.join(' '));
   }
   dom.watermarkLayer.setAttribute('transform', transforms.join(' '));
-  if (dom.gridLayer) dom.gridLayer.setAttribute('transform', transforms.join(' '));
+  if (dom.gridLayer) dom.gridLayer.removeAttribute('transform');
   dom.handleLayer.setAttribute('transform', transforms.join(' '));
 
   updateLabels();
