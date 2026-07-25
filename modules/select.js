@@ -1770,6 +1770,18 @@ function startResize(handleEl, startPt, e) {
         x: handleType === 'bl' ? dragCurrent.x : dragCurrent.x + dragCurrent.width,
         y: handleType === 'bl' ? dragCurrent.y + dragCurrent.height : dragCurrent.y,
       };
+      var initDx = startPt.x - resizeAnchor.x;
+      var initDy = startPt.y - resizeAnchor.y;
+      var initDiagX = handleType === 'bl' ? dragCurrent.width : -dragCurrent.width;
+      var initDiagY = handleType === 'bl' ? -dragCurrent.height : dragCurrent.height;
+      var initDiagLen = Math.sqrt(initDiagX * initDiagX + initDiagY * initDiagY);
+      if (initDiagLen > 0) {
+        var initDiagUnitX = initDiagX / initDiagLen;
+        var initDiagUnitY = initDiagY / initDiagLen;
+        resizeAnchor._initProj = initDx * initDiagUnitX + initDy * initDiagUnitY;
+      } else {
+        resizeAnchor._initProj = 0;
+      }
     }
   }
 
@@ -2009,13 +2021,15 @@ function onResizeMove(e) {
       const angleRad = -(data.rotation || 0) * Math.PI / 180;
       const cosA = Math.cos(angleRad);
       const sinA = Math.sin(angleRad);
-      const dxMouse = pt.x - rotationCenter.x;
-      const dyMouse = pt.y - rotationCenter.y;
-      const unrotatedPtX = rotationCenter.x + dxMouse * cosA - dyMouse * sinA;
-      const unrotatedPtY = rotationCenter.y + dxMouse * sinA + dyMouse * cosA;
+      const dxMouse = pt.x - dragStart.x;
+      const dyMouse = pt.y - dragStart.y;
+      const unrotatedDx = dxMouse * cosA - dyMouse * sinA;
+      const unrotatedDy = dxMouse * sinA + dyMouse * cosA;
+      const origCornerX = dragOriginal.x + (resizeHandle === 'br' ? dragOriginal.width : 0);
+      const origCornerY = dragOriginal.y + (resizeHandle === 'br' ? dragOriginal.height : 0);
 
-      const mx = unrotatedPtX - resizeAnchor.x;
-      const my = unrotatedPtY - resizeAnchor.y;
+      const mx = (origCornerX + unrotatedDx) - resizeAnchor.x;
+      const my = (origCornerY + unrotatedDy) - resizeAnchor.y;
       const projLen = mx * origDiagVec.x + my * origDiagVec.y;
       const scaleFactor = origDiagLen > 0 ? Math.max(0.1, projLen / origDiagLen) : 1;
 
@@ -2054,7 +2068,7 @@ function onResizeMove(e) {
       if (diagLen > 0) {
         const diagUnitX = diagX / diagLen;
         const diagUnitY = diagY / diagLen;
-        const proj = dx * diagUnitX + dy * diagUnitY;
+        const proj = dx * diagUnitX + dy * diagUnitY - (resizeAnchor._initProj || 0);
         const origRx = dragOriginal.rx || 0;
         const newRx = Math.max(0, Math.min(origRx + proj, Math.min(data.width, data.height) / 2));
         data.rx = newRx;
