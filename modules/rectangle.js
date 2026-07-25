@@ -286,7 +286,16 @@ function onMouseUp(e) {
 
   if (vbW < 5 && vbH < 5) return;
 
-  var ann = vbRectToAnnotation(vbX, vbY, vbW, vbH);
+  var imageRotation = state.image.rotation || 0;
+  var vbCX = vbX + vbW / 2, vbCY = vbY + vbH / 2;
+  var annCenter = applyInverseImageRotationToPoint(vbCX, vbCY);
+  var ann = {
+    x: annCenter.x - vbW / 2,
+    y: annCenter.y - vbH / 2,
+    width: vbW,
+    height: vbH,
+    rotation: imageRotation ? -imageRotation : 0,
+  };
 
   var id = generateId();
   var data = {
@@ -294,7 +303,7 @@ function onMouseUp(e) {
     type: 'rectangle',
     x: ann.x, y: ann.y, width: ann.width, height: ann.height,
     rx: state.activeCornerRadius,
-    rotation: 0,
+    rotation: ann.rotation,
     stroke: state.activeColor,
     strokeWidth: state.activeThickness,
     fill: currentBgFill,
