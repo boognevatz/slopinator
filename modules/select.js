@@ -872,11 +872,14 @@ function buildLineDataFromEl(el) {
 function buildRectDataFromEl(el) {
   var fillRect = el.querySelector('.rect-fill');
   if (!fillRect) return null;
+  var rotAttr = el.getAttribute('transform');
+  var rotation = parseFloat(rotAttr ? rotAttr.match(/rotate\(([^,)]+)/)[1] : 0);
   return {
     x: parseFloat(fillRect.getAttribute('x')),
     y: parseFloat(fillRect.getAttribute('y')),
     width: parseFloat(fillRect.getAttribute('width')),
     height: parseFloat(fillRect.getAttribute('height')),
+    rotation: rotation || 0,
   };
 }
 
