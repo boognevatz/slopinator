@@ -34,7 +34,7 @@ export function activateRectangle(preSelectId) {
   document.addEventListener('palette-bgcolor-changed', onPaletteBgChange);
   var targetId = preSelectId || state.selectedId;
   if (targetId) {
-    if (preSelectId) selectElement(preSelectId);
+    if (preSelectId) { selectElement(preSelectId); dom.handleLayer.innerHTML = ''; }
     var data = captureElementState(targetId);
     if (data && data.type === 'rectangle') {
       drawRectToolCircleHandles(data, activeCorner);
@@ -218,6 +218,7 @@ function onMouseDown(e) {
       activeCorner = -1;
     } else {
       selectElement(foundId);
+      dom.handleLayer.innerHTML = '';
       var data = captureElementState(foundId);
       if (data) drawRectToolCircleHandles(data, activeCorner);
     }
