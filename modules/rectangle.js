@@ -218,7 +218,6 @@ function onMouseDown(e) {
     if (selEl && selEl.dataset.type === 'rectangle') {
       clearSelection();
       activeCorner = -1;
-      return;
     }
   }
 
