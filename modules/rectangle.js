@@ -225,7 +225,7 @@ function onMouseDown(e) {
   if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle, polyline')) return;
 
   isDrawing = true;
-  var vbPt = applyImageRotationToPoint(pt);
+  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   startPt = vbPt;
 
   currentBgFill = state.bgColor === 'transparent' ? 'none' : state.bgColor;
@@ -249,7 +249,7 @@ function onMouseDown(e) {
 function onMouseMove(e) {
   if (!isDrawing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var vbPt = applyImageRotationToPoint(pt);
+  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   var x = Math.min(startPt.x, vbPt.x);
   var y = Math.min(startPt.y, vbPt.y);
   var w = Math.abs(vbPt.x - startPt.x);
@@ -322,7 +322,7 @@ function startHandleDrag(idx, pt) {
   if (isResizing || isPreparingDrag) return;
   activeCorner = idx;
   dragCornerIdx = idx;
-  var vbPt = applyImageRotationToPoint(pt);
+  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   dragStartPt = { x: vbPt.x, y: vbPt.y };
   isPreparingDrag = true;
 
@@ -335,7 +335,7 @@ function startHandleDrag(idx, pt) {
 
 function onDragPrepare(e) {
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var vbPt = applyImageRotationToPoint(pt);
+  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   var dx = vbPt.x - dragStartPt.x;
   var dy = vbPt.y - dragStartPt.y;
   if (dx * dx + dy * dy < 9) return;
@@ -406,7 +406,7 @@ function startResizeRect(idx, vbPt) {
 function onResizeMove(e) {
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var vbPt = applyImageRotationToPoint(pt);
+  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   if (!state.selectedId || !rectDrag) return;
 
   var ax = resizeAnchor.x;
