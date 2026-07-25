@@ -1,6 +1,6 @@
 // ── Crop module: Image cropping ───────────────────────────────
 
-import { state, dom, updateViewBox, updateImageTransform } from './editor.js';
+import { state, dom, updateViewBox, updateImageTransform, applyImageRotationToPoint } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction, clearHistory } from './history.js';
 import { switchTool } from './tools.js';
@@ -200,16 +200,26 @@ function drawCropOverlay() {
     group = svgEl('g', { id: 'crop-overlay-group' });
     dom.handleLayer.appendChild(group);
   }
-  group.innerHTML = ''; // clear
+  group.innerHTML = '';
 
   const { x, y, width, height } = cropBox;
 
-  // Draw semi-transparent mask
-  const w = state.image.naturalWidth;
-  const h = state.image.naturalHeight;
-  
-  const pathData = `M0,0 H${w} V${h} H0 Z M${x},${y} V${y+height} H${x+width} V${y} Z`;
-  const mask = svgEl('path', {
+  // Transform crop box corners from annotation-space to viewBox-space
+  var c1 = applyImageRotationToPoint(x, y);
+  var c2 = applyImageRotationToPoint(x + width, y);
+  var c3 = applyImageRotationToPoint(x + width, y + height);
+  var c4 = applyImageRotationToPoint(x, y + height);
+  var tx = Math.min(c1.x, c2.x, c3.x, c4.x);
+  var ty = Math.min(c1.y, c2.y, c3.y, c4.y);
+  var tw = Math.max(c1.x, c2.x, c3.x, c4.x) - tx;
+  var th = Math.max(c1.y, c2.y, c3.y, c4.y) - ty;
+  var tcx = tx + tw / 2, tcy = ty + th / 2;
+
+  // Mask: full viewBox extent with punch-out of the axis-aligned crop region
+  var vb = dom.svg.viewBox.baseVal;
+  var vbW = vb.width, vbH = vb.height;
+  var pathData = 'M0,0 H' + vbW + ' V' + vbH + ' H0 Z M' + tx + ',' + ty + ' V' + (ty + th) + ' H' + (tx + tw) + ' V' + ty + ' Z';
+  var mask = svgEl('path', {
     d: pathData,
     fill: 'rgba(0, 0, 0, 0.5)',
     'fill-rule': 'evenodd',
@@ -217,48 +227,49 @@ function drawCropOverlay() {
   });
   group.appendChild(mask);
 
-  // Dashed box
-  const selBox = svgEl('rect', {
-    x, y, width, height,
+  // Dashed box (axis-aligned in viewBox space)
+  var selBox = svgEl('rect', {
+    x: tx, y: ty, width: tw, height: th,
     class: 'selection-box',
     'data-handle': 'move',
     style: 'cursor: move; pointer-events: all; fill: rgba(255,255,255,0.01);'
   });
   group.appendChild(selBox);
 
-  // 4 corner handles — zoom-aware so they stay consistent visual size
-  const viewBox = dom.svg.viewBox.baseVal;
-  const svgRect = dom.svg.getBoundingClientRect();
-  const scale = viewBox && viewBox.width > 0 && svgRect
+  // 4 corner handles at axis-aligned bbox corners
+  var viewBox = dom.svg.viewBox.baseVal;
+  var svgRect = dom.svg.getBoundingClientRect();
+  var scale = viewBox && viewBox.width > 0 && svgRect
     ? viewBox.width / svgRect.width : 1;
-  const hw = Math.max(6, 12 * scale);
-  const hh = hw;
+  var hw = Math.max(6, 12 * scale);
+  var hh = hw;
 
-  const corners = [
-    { handle: 'tl', cx: x, cy: y, cursor: 'nwse-resize' },
-    { handle: 'tr', cx: x + width, cy: y, cursor: 'nesw-resize' },
-    { handle: 'bl', cx: x, cy: y + height, cursor: 'nesw-resize' },
-    { handle: 'br', cx: x + width, cy: y + height, cursor: 'nwse-resize' },
+  var corners = [
+    { handle: 'tl', cx: tx, cy: ty, cursor: 'nwse-resize' },
+    { handle: 'tr', cx: tx + tw, cy: ty, cursor: 'nesw-resize' },
+    { handle: 'bl', cx: tx, cy: ty + th, cursor: 'nesw-resize' },
+    { handle: 'br', cx: tx + tw, cy: ty + th, cursor: 'nwse-resize' },
   ];
 
-  for (const c of corners) {
-    const hRect = svgEl('rect', {
+  for (var ci = 0; ci < corners.length; ci++) {
+    var c = corners[ci];
+    var hRect = svgEl('rect', {
       x: c.cx - hw/2, y: c.cy - hh/2, width: hw, height: hh,
       class: 'handle handle-resize-corner',
       'data-handle': c.handle,
-      style: `cursor: ${c.cursor}`,
+      style: 'cursor: ' + c.cursor,
     });
     group.appendChild(hRect);
   }
 
   // Label in the middle
-  const labelGroup = svgEl('g', {
-    transform: `translate(${x + width/2}, ${y + height/2})`,
+  var labelGroup = svgEl('g', {
+    transform: 'translate(' + tcx + ', ' + tcy + ')',
     style: 'cursor: pointer;',
     'data-handle': 'apply-crop'
   });
-  
-  const text = svgEl('text', {
+
+  var text = svgEl('text', {
     x: 0, y: 0,
     'text-anchor': 'middle',
     'dominant-baseline': 'middle',
@@ -269,11 +280,10 @@ function drawCropOverlay() {
     'pointer-events': 'none',
     style: 'text-shadow: 1px 1px 3px black;'
   });
-  text.textContent = `${Math.round(width)} × ${Math.round(height)} (Click to Crop)`;
-  
-  // Add a rect behind the text to make it clickable easily
-  const textBg = svgEl('rect', {
-    x: -width/2, y: -height*0.1, width: width, height: height*0.2,
+  text.textContent = Math.round(width) + ' \u00d7 ' + Math.round(height) + ' (Click to Crop)';
+
+  var textBg = svgEl('rect', {
+    x: -tw/2, y: -th*0.1, width: tw, height: th*0.2,
     fill: 'transparent',
     'pointer-events': 'all'
   });

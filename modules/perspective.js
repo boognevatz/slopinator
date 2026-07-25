@@ -1,4 +1,4 @@
-import { state, dom, loadImage } from './editor.js';
+import { state, dom, loadImage, applyImageRotationToPoint } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { addLineElement } from './line.js';
@@ -90,8 +90,9 @@ function onPointerDown(e) {
   if (corners.length === 0) {
     isDrawing = true;
     startPt = pt;
+    var tp = applyImageRotationToPoint(pt.x, pt.y);
     previewRect = svgEl('rect', {
-      x: pt.x, y: pt.y, width: 0, height: 0,
+      x: tp.x, y: tp.y, width: 0, height: 0,
       stroke: '#0078d4',
       'stroke-width': 2 / getScale(),
       fill: 'rgba(0,120,212,0.08)',
@@ -106,10 +107,12 @@ function onPointerDown(e) {
 function onDrawMove(e) {
   if (!isDrawing) return;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  const x = Math.min(startPt.x, pt.x);
-  const y = Math.min(startPt.y, pt.y);
-  const w = Math.abs(pt.x - startPt.x);
-  const h = Math.abs(pt.y - startPt.y);
+  var tsp = applyImageRotationToPoint(startPt.x, startPt.y);
+  var tpt = applyImageRotationToPoint(pt.x, pt.y);
+  var x = Math.min(tsp.x, tpt.x);
+  var y = Math.min(tsp.y, tpt.y);
+  var w = Math.abs(tpt.x - tsp.x);
+  var h = Math.abs(tpt.y - tsp.y);
   previewRect.setAttribute('x', x);
   previewRect.setAttribute('y', y);
   previewRect.setAttribute('width', w);
@@ -179,10 +182,12 @@ function drawQuad() {
   dom.handleLayer.innerHTML = '';
 
   const scale = getScale();
-  const s = (v) => v / scale;
+
+  // Transform corners to viewBox-space
+  var tc = corners.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
 
   const poly = svgEl('polygon', {
-    points: corners.map(p => `${p.x},${p.y}`).join(' '),
+    points: tc.map(p => p.x + ',' + p.y).join(' '),
     fill: 'rgba(0,120,212,0.08)',
     stroke: '#0078d4',
     'stroke-width': 2 / scale,
@@ -192,8 +197,8 @@ function drawQuad() {
 
   for (let i = 0; i < 4; i++) {
     const handle = svgEl('rect', {
-      x: corners[i].x - 11,
-      y: corners[i].y - 11,
+      x: tc[i].x - 11,
+      y: tc[i].y - 11,
       width: 22,
       height: 22,
       class: 'handle',

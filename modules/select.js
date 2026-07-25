@@ -1,6 +1,6 @@
 // ── Select module: Selection, move, resize, delete ─────────────
 
-import { state, dom } from './editor.js';
+import { state, dom, applyImageRotationToPoint } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { captureElementState } from './dom-utils.js';
 import { snapToGrid } from './grid.js';
@@ -937,32 +937,43 @@ function drawLineHandles(data) {
   const sw = parseFloat(lineEl.getAttribute('stroke-width')) || 1;
   const hsw = sw / 2;
   const bx = bbox.x - hsw, by = bbox.y - hsw, bw = bbox.width + sw, bh = bbox.height + sw;
-  const cx = bx + bw / 2, cy = by + bh / 2;
+
+  // Transform corners from annotation-space to viewBox-space
+  var tc1 = applyImageRotationToPoint(bx, by);
+  var tc2 = applyImageRotationToPoint(bx + bw, by);
+  var tc3 = applyImageRotationToPoint(bx + bw, by + bh);
+  var tc4 = applyImageRotationToPoint(bx, by + bh);
+  var tbx = Math.min(tc1.x, tc2.x, tc3.x, tc4.x);
+  var tby = Math.min(tc1.y, tc2.y, tc3.y, tc4.y);
+  var tbw = Math.max(tc1.x, tc2.x, tc3.x, tc4.x) - tbx;
+  var tbh = Math.max(tc1.y, tc2.y, tc3.y, tc4.y) - tby;
+  var tcx = tbx + tbw / 2, tcy = tby + tbh / 2;
+
   const r = getHandleRadius();
   const hw = r * 2, hh = r * 2;
   const isRotate = textInteractMode === 'rotate';
 
   const handleGroup = svgEl('g', {
-    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
+    transform: `rotate(${data.rotation || 0}, ${tcx}, ${tcy})`
   });
 
   handleGroup.appendChild(svgEl('rect', {
-    x: bx, y: by, width: bw, height: bh,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'selection-box',
   }));
 
   handleGroup.appendChild(svgEl('rect', {
-    x: bx, y: by, width: bw, height: bh,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'handle',
     'data-handle': 'move',
     style: 'fill: transparent; cursor: move;',
   }));
 
   const corners = [
-    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tbx,            y: tby,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tbx + tbw - hw,  y: tby,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: tbx,            y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: tbx + tbw - hw,  y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
@@ -985,7 +996,7 @@ function drawLineHandles(data) {
   const iconG = svgEl('g', {
     class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
-    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+    transform: `translate(${tcx - actualSize / 2}, ${tcy - actualSize / 2}) scale(${iconScale})`,
   });
 
   iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
@@ -1003,7 +1014,6 @@ function drawLineHandles(data) {
 }
 
 function drawTextHandles(data) {
-  // Get bounding box of the text element
   const textEl = dom.annotationLayer.querySelector(`#${CSS.escape(data.id)}`);
   if (!textEl) return;
 
@@ -1014,29 +1024,30 @@ function drawTextHandles(data) {
     return;
   }
 
-  const bx = bbox.x;
-  const by = bbox.y;
-  const bw = bbox.width;
-  const bh = bbox.height;
+  const bx = bbox.x, by = bbox.y, bw = bbox.width, bh = bbox.height;
 
-  // Center of the text
-  const cx = bbox.x + bbox.width / 2;
-  const cy = bbox.y + bbox.height / 2;
+  // Transform corners from annotation-space to viewBox-space
+  var tc1 = applyImageRotationToPoint(bx, by);
+  var tc2 = applyImageRotationToPoint(bx + bw, by);
+  var tc3 = applyImageRotationToPoint(bx + bw, by + bh);
+  var tc4 = applyImageRotationToPoint(bx, by + bh);
+  var tbx = Math.min(tc1.x, tc2.x, tc3.x, tc4.x);
+  var tby = Math.min(tc1.y, tc2.y, tc3.y, tc4.y);
+  var tbw = Math.max(tc1.x, tc2.x, tc3.x, tc4.x) - tbx;
+  var tbh = Math.max(tc1.y, tc2.y, tc3.y, tc4.y) - tby;
+  var tcx = tbx + tbw / 2, tcy = tby + tbh / 2;
 
-  // Create a group for the handles to apply the same rotation as the text
   const handleGroup = svgEl('g', {
-    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
+    transform: `rotate(${data.rotation || 0}, ${tcx}, ${tcy})`
   });
   dom.handleLayer.appendChild(handleGroup);
 
-  // Dashed selection box
   const selBox = svgEl('rect', {
-    x: bx, y: by, width: bw, height: bh,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'selection-box',
   });
   handleGroup.appendChild(selBox);
 
-  // 4 corner resize handles, square, same size as line endpoint handles
   const r = getHandleRadius();
   const hw = r * 2;
   const hh = r * 2;
@@ -1044,10 +1055,10 @@ function drawTextHandles(data) {
   const isRotate = textInteractMode === 'rotate';
 
   const corners = [
-    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tbx,            y: tby,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tbx + tbw - hw,  y: tby,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: tbx,            y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: tbx + tbw - hw,  y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
@@ -1060,7 +1071,6 @@ function drawTextHandles(data) {
     handleGroup.appendChild(h);
   }
 
-  // Draw the center mode-toggle icon
   const viewBox = dom.svg.viewBox.baseVal;
   const svgRect = dom.svg.getBoundingClientRect();
   const scale = viewBox && svgRect.width ? viewBox.width / svgRect.width : 1;
@@ -1072,16 +1082,14 @@ function drawTextHandles(data) {
   const iconG = svgEl('g', {
     class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
-    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+    transform: `translate(${tcx - actualSize / 2}, ${tcy - actualSize / 2}) scale(${iconScale})`,
   });
 
-  // Background circle for visibility
   iconG.appendChild(svgEl('circle', {
     cx: 12, cy: 12, r: 12,
     fill: '#000',
   }));
 
-  // SVG paths for icons (Material Design)
   const crossArrowPath = 'M12 2L8 6h3v5H6V8L2 12l4 4v-3h5v5H8l4 4 4-4h-3v-5h5v3l4-4-4-4v3h-5V6h3z';
   const recyclePath = 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z';
 
@@ -1100,8 +1108,9 @@ function drawFreehandHandles(data) {
   for (const p of data.points) { cx += p.x; cy += p.y; }
   cx /= data.points.length;
   cy /= data.points.length;
+  var tp = applyImageRotationToPoint(cx, cy);
   const hm = svgEl('rect', {
-    x: cx - r, y: cy - r, width: r * 2, height: r * 2,
+    x: tp.x - r, y: tp.y - r, width: r * 2, height: r * 2,
     class: 'handle handle-move',
     'data-handle': 'move',
   });
@@ -1115,25 +1124,34 @@ function drawRectangleHandles(data) {
   const hw = Math.max(22, 28 * scale);
   const hh = hw;
   const { x, y, width: w, height: h } = data;
-  const cx = x + w / 2;
-  const cy = y + h / 2;
+
+  // Transform corners from annotation-space to viewBox-space
+  var tc1 = applyImageRotationToPoint(x, y);
+  var tc2 = applyImageRotationToPoint(x + w, y);
+  var tc3 = applyImageRotationToPoint(x + w, y + h);
+  var tc4 = applyImageRotationToPoint(x, y + h);
+  var tbx = Math.min(tc1.x, tc2.x, tc3.x, tc4.x);
+  var tby = Math.min(tc1.y, tc2.y, tc3.y, tc4.y);
+  var tbw = Math.max(tc1.x, tc2.x, tc3.x, tc4.x) - tbx;
+  var tbh = Math.max(tc1.y, tc2.y, tc3.y, tc4.y) - tby;
+  var tcx = tbx + tbw / 2, tcy = tby + tbh / 2;
   const isRotate = textInteractMode === 'rotate';
 
   const handleGroup = svgEl('g', {
-    transform: `rotate(${data.rotation || 0}, ${cx}, ${cy})`
+    transform: `rotate(${data.rotation || 0}, ${tcx}, ${tcy})`
   });
 
   const selBox = svgEl('rect', {
-    x, y, width: w, height: h,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'selection-box',
   });
   handleGroup.appendChild(selBox);
 
   const corners = [
-    { handle: 'tl', x, y, cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: x + w - hw, y, cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'bl', x, y: y + h - hh, cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'br', x: x + w - hw, y: y + h - hh, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tbx,                y: tby,                cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tbx + tbw - hw,      y: tby,                cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'bl', x: tbx,                y: tby + tbh - hh,     cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'br', x: tbx + tbw - hw,      y: tby + tbh - hh,    cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
@@ -1154,7 +1172,7 @@ function drawRectangleHandles(data) {
   const iconG = svgEl('g', {
     class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
-    transform: `translate(${cx - actualSize / 2}, ${cy - actualSize / 2}) scale(${iconScale})`,
+    transform: `translate(${tcx - actualSize / 2}, ${tcy - actualSize / 2}) scale(${iconScale})`,
   });
 
   iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));
@@ -1454,7 +1472,18 @@ function getCombinedBBox() {
 
 function drawGroupHandles(bbox) {
   var bx = bbox.x, by = bbox.y, bw = bbox.width, bh = bbox.height;
-  var cx = bx + bw / 2, cy = by + bh / 2;
+
+  // Transform corners from annotation-space to viewBox-space
+  var tc1 = applyImageRotationToPoint(bx, by);
+  var tc2 = applyImageRotationToPoint(bx + bw, by);
+  var tc3 = applyImageRotationToPoint(bx + bw, by + bh);
+  var tc4 = applyImageRotationToPoint(bx, by + bh);
+  var tbx = Math.min(tc1.x, tc2.x, tc3.x, tc4.x);
+  var tby = Math.min(tc1.y, tc2.y, tc3.y, tc4.y);
+  var tbw = Math.max(tc1.x, tc2.x, tc3.x, tc4.x) - tbx;
+  var tbh = Math.max(tc1.y, tc2.y, tc3.y, tc4.y) - tby;
+  var tcx = tbx + tbw / 2, tcy = tby + tbh / 2;
+
   var r = getHandleRadius();
   var hw = r * 2, hh = r * 2;
   var isRotate = textInteractMode === 'rotate';
@@ -1462,22 +1491,22 @@ function drawGroupHandles(bbox) {
   var handleGroup = svgEl('g', {});
 
   handleGroup.appendChild(svgEl('rect', {
-    x: bx, y: by, width: bw, height: bh,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'selection-box',
   }));
 
   handleGroup.appendChild(svgEl('rect', {
-    x: bx, y: by, width: bw, height: bh,
+    x: tbx, y: tby, width: tbw, height: tbh,
     class: 'handle',
     'data-handle': 'move',
     style: 'fill: transparent; cursor: move;',
   }));
 
   var corners = [
-    { handle: 'tl', x: bx,            y: by,            cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: bx + bw - hw,  y: by,            cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'bl', x: bx,            y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
-    { handle: 'br', x: bx + bw - hw,  y: by + bh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tbx,            y: tby,            cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tbx + tbw - hw,  y: tby,            cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'bl', x: tbx,            y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nesw-resize' },
+    { handle: 'br', x: tbx + tbw - hw,  y: tby + tbh - hh,  cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (var ci = 0; ci < corners.length; ci++) {
@@ -1501,7 +1530,7 @@ function drawGroupHandles(bbox) {
   var iconG = svgEl('g', {
     class: 'handle handle-icon',
     'data-handle': 'mode-toggle',
-    transform: 'translate(' + (cx - actualSize / 2) + ', ' + (cy - actualSize / 2) + ') scale(' + iconScale + ')',
+    transform: 'translate(' + (tcx - actualSize / 2) + ', ' + (tcy - actualSize / 2) + ') scale(' + iconScale + ')',
   });
 
   iconG.appendChild(svgEl('circle', { cx: 12, cy: 12, r: 12, fill: '#000' }));

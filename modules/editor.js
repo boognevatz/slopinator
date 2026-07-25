@@ -205,7 +205,6 @@ export function updateImageTransform() {
   }
   dom.watermarkLayer.setAttribute('transform', transforms.join(' '));
   if (dom.gridLayer) dom.gridLayer.removeAttribute('transform');
-  dom.handleLayer.setAttribute('transform', transforms.join(' '));
 
   updateLabels();
 }
@@ -213,6 +212,37 @@ export function updateImageTransform() {
 /**
  * Get the current effective viewBox dimensions.
  */
+/**
+ * Transform a point from annotation-space (unrotated element coords)
+ * to viewBox-space, applying the same rotation/flip as the image layer.
+ */
+export function applyImageRotationToPoint(x, y) {
+  const { naturalWidth: w, naturalHeight: h, rotation, flipH, flipV } = state.image;
+  if (rotation === 0 && !flipH && !flipV) return { x, y };
+
+  const isRotated = rotation === 90 || rotation === 270;
+  const vbW = isRotated ? h : w;
+  const vbH = isRotated ? w : h;
+  const cx = vbW / 2;
+  const cy = vbH / 2;
+
+  let px = x - w / 2;
+  let py = y - h / 2;
+
+  if (flipH) px = -px;
+  if (flipV) py = -py;
+
+  if (rotation === 90) {
+    const tmp = px; px = -py; py = tmp;
+  } else if (rotation === 180) {
+    px = -px; py = -py;
+  } else if (rotation === 270) {
+    const tmp = px; px = py; py = -tmp;
+  }
+
+  return { x: px + cx, y: py + cy };
+}
+
 export function getViewBoxDims() {
   const { naturalWidth, naturalHeight, rotation } = state.image;
   const isRotated = rotation === 90 || rotation === 270;

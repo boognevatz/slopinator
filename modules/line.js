@@ -1,6 +1,6 @@
 // ── Line module: Straight line drawing & polyline builder ─────────────────────────
 
-import { state, dom } from './editor.js';
+import { state, dom, applyImageRotationToPoint } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { snapToGrid } from './grid.js';
 import { pushAction } from './history.js';
@@ -168,13 +168,14 @@ function onMouseDown(e) {
     let handleEl = target.closest('.handle-endpoint');
     if (!handleEl) {
       const handles = dom.handleLayer.querySelectorAll('.handle-endpoint');
+      const vbPt = applyImageRotationToPoint(clickPt.x, clickPt.y);
       for (let i = 0; i < handles.length; i++) {
         const c = handles[i];
         const cx = parseFloat(c.getAttribute('cx'));
         const cy = parseFloat(c.getAttribute('cy'));
         const r = parseFloat(c.getAttribute('r'));
-        const dx = clickPt.x - cx;
-        const dy = clickPt.y - cy;
+        const dx = vbPt.x - cx;
+        const dy = vbPt.y - cy;
         if (dx * dx + dy * dy <= (r + 3) * (r + 3)) {
           handleEl = c;
           break;
@@ -395,10 +396,10 @@ function drawLineToolCircleHandles(data, activeIdx) {
   const visR = Math.max(6, 10 * scale);
   const pts = data.points;
   for (let i = 0; i < pts.length; i++) {
-    const x = pts[i].x, y = pts[i].y;
+    const tp = applyImageRotationToPoint(pts[i].x, pts[i].y);
     const isActive = i === activeIdx || selectedNodeIndices.has(i);
     dom.handleLayer.appendChild(svgEl('circle', {
-      cx: x, cy: y, r: visR,
+      cx: tp.x, cy: tp.y, r: visR,
       class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'),
       'data-index': i,
     }));
@@ -410,9 +411,10 @@ function updateCoordTooltipForIdx(data, idx) {
   const pts = data.points;
   if (idx >= 0 && idx < pts.length) {
     var pt = pts[idx];
+    var tp = applyImageRotationToPoint(pt.x, pt.y);
     var svgPt = dom.svg.createSVGPoint();
-    svgPt.x = pt.x;
-    svgPt.y = pt.y;
+    svgPt.x = tp.x;
+    svgPt.y = tp.y;
     var screenPt = svgPt.matrixTransform(dom.svg.getScreenCTM());
     if (!coordTooltip) {
       coordTooltip = document.createElement('div');
@@ -506,9 +508,10 @@ function startVertexDrag(idx, e) {
 
   // Show the dragged vertex as an active (white filled) circle
   const pt = pendingPolyline.points[idx];
+  const tp = applyImageRotationToPoint(pt.x, pt.y);
   const r = getExtendHandleRadius();
   dragVisualHandle = svgEl('circle', {
-    cx: pt.x, cy: pt.y, r,
+    cx: tp.x, cy: tp.y, r,
     class: 'handle handle-endpoint active',
     'pointer-events': 'none',
   });
@@ -535,8 +538,9 @@ function onVertexDragMove(e) {
   updateLineElement(pendingPolyline);
 
   if (dragVisualHandle) {
-    dragVisualHandle.setAttribute('cx', pt.x);
-    dragVisualHandle.setAttribute('cy', pt.y);
+    var dhPt = applyImageRotationToPoint(pt.x, pt.y);
+    dragVisualHandle.setAttribute('cx', dhPt.x);
+    dragVisualHandle.setAttribute('cy', dhPt.y);
   }
   updateCoordTooltip(e.clientX, e.clientY, pt);
 }
@@ -600,8 +604,9 @@ function onVertexDragPrepare(e) {
 
   const r = getExtendHandleRadius();
   const pt = pendingPolyline.points[dragVertexIdx];
+  const tp = applyImageRotationToPoint(pt.x, pt.y);
   dragVisualHandle = svgEl('circle', {
-    cx: pt.x, cy: pt.y, r,
+    cx: tp.x, cy: tp.y, r,
     class: 'handle handle-endpoint active',
     'pointer-events': 'none',
   });
@@ -815,9 +820,10 @@ function onLineKeyDown(e) {
   updateLineElement(pendingPolyline);
   drawLineToolCircleHandles(pendingPolyline, activeExtendIdx);
   if (coordTooltip) {
+    var tp = applyImageRotationToPoint(pt.x, pt.y);
     var svgPt = dom.svg.createSVGPoint();
-    svgPt.x = pt.x;
-    svgPt.y = pt.y;
+    svgPt.x = tp.x;
+    svgPt.y = tp.y;
     var screenPt = svgPt.matrixTransform(dom.svg.getScreenCTM());
     updateCoordTooltip(screenPt.x, screenPt.y, pt);
   }

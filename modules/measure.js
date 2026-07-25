@@ -1,4 +1,4 @@
-import { state, dom } from './editor.js';
+import { state, dom, applyImageRotationToPoint } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 
 let isDrawing = false;
@@ -108,8 +108,9 @@ function onPointerMove(e) {
     measureLine.setAttribute('x2', pt2.x);
     measureLine.setAttribute('y2', pt2.y);
     if (dragHandle) {
-      dragHandle.setAttribute('cx', pt.x);
-      dragHandle.setAttribute('cy', pt.y);
+      var dhTp = applyImageRotationToPoint(pt.x, pt.y);
+      dragHandle.setAttribute('cx', dhTp.x);
+      dragHandle.setAttribute('cy', dhTp.y);
     }
     updateLabel();
   }
@@ -152,15 +153,16 @@ function showHandles() {
   var hitR = getHitRadius();
   var pts = [pt1, pt2];
   for (var i = 0; i < pts.length; i++) {
+    var tp = applyImageRotationToPoint(pts[i].x, pts[i].y);
     var hit = svgEl('circle', {
-      cx: pts[i].x, cy: pts[i].y, r: hitR,
+      cx: tp.x, cy: tp.y, r: hitR,
       fill: 'transparent', stroke: 'none',
       'data-handle': 'p' + (i + 1),
     });
     dom.handleLayer.appendChild(hit);
     var isActive = i === selectedEndpoint;
     var vis = svgEl('circle', {
-      cx: pts[i].x, cy: pts[i].y, r: r,
+      cx: tp.x, cy: tp.y, r: r,
       fill: isActive ? '#4fc3f7' : '#fff',
       stroke: '#4fc3f7', 'stroke-width': 1.5,
       'pointer-events': 'none',
@@ -213,9 +215,10 @@ function startHandleDrag(idx, e) {
   dragIdx = idx;
   dom.handleLayer.innerHTML = '';
   var pt = idx === 0 ? pt1 : pt2;
+  var tp = applyImageRotationToPoint(pt.x, pt.y);
   var r = getHandleRadius();
   dragHandle = svgEl('circle', {
-    cx: pt.x, cy: pt.y, r: r,
+    cx: tp.x, cy: tp.y, r: r,
     fill: '#fff', stroke: '#4fc3f7', 'stroke-width': 1.5,
     'pointer-events': 'none',
   });

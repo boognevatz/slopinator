@@ -1,4 +1,4 @@
-import { state, dom } from './editor.js';
+import { state, dom, applyImageRotationToPoint } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { selectElement, clearSelection } from './select.js';
@@ -136,13 +136,14 @@ function onMouseDown(e) {
   var handleEl = target.closest('.handle-endpoint');
   if (!handleEl) {
     var handles = dom.handleLayer.querySelectorAll('.handle-endpoint');
+    var vbPt = applyImageRotationToPoint(pt.x, pt.y);
     for (var i = 0; i < handles.length; i++) {
       var c = handles[i];
       var cx = parseFloat(c.getAttribute('cx'));
       var cy = parseFloat(c.getAttribute('cy'));
       var r = parseFloat(c.getAttribute('r'));
-      var dx = pt.x - cx;
-      var dy = pt.y - cy;
+      var dx = vbPt.x - cx;
+      var dy = vbPt.y - cy;
       if (dx * dx + dy * dy <= (r + 3) * (r + 3)) {
         handleEl = c;
         break;
@@ -514,8 +515,8 @@ function drawRectToolCircleHandles(data, activeIdx) {
     { x: data.x, y: data.y + data.height },
   ];
   for (var i = 0; i < pts.length; i++) {
-    var x = pts[i].x, y = pts[i].y;
+    var tp = applyImageRotationToPoint(pts[i].x, pts[i].y);
     var isActive = i === activeIdx;
-    dom.handleLayer.appendChild(svgEl('circle', { cx: x, cy: y, r: visR, class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'), 'data-index': i, 'data-corner': CORNERS[i] }));
+    dom.handleLayer.appendChild(svgEl('circle', { cx: tp.x, cy: tp.y, r: visR, class: 'handle handle-endpoint' + (isActive ? ' active' : ' unselected'), 'data-index': i, 'data-corner': CORNERS[i] }));
   }
 }
