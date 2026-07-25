@@ -1,11 +1,18 @@
 import { state, dom } from './editor.js';
-import { recreateElement } from './fileio.js';
+import { recreateElement, serializeElement } from './fileio.js';
 import { generateId } from './utils.js';
 
 
 var _selectedLib = null;
+var _selectedEntry = null;
 var _entries = [];
 var _thumbUrls = [];
+var CLIPBOARD_FILENAME = 'ctrlc.svg';
+
+function clipKey() {
+  var app = document.querySelector('html').dataset.appname || 'index';
+  return app + ':ctrlc';
+}
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -101,10 +108,18 @@ export async function renderLibrary() {
 
     html += '</div>';
     html += '<div style="padding:2px 8px;font-size:10px;color:#666;border-top:1px solid var(--color-border);">' + entries.length + ' symbol' + (entries.length !== 1 ? 's' : '') + '</div>';
+    html += '<button id="btn-lib-import" style="display:none;width:100%;border-radius:0;">\uD83D\uDCCB Import to clipboard</button>';
 
     content.innerHTML = html;
 
     document.getElementById('btn-lib-refresh').addEventListener('click', refreshLibrary);
+    document.getElementById('btn-lib-import').addEventListener('click', function() {
+      if (_selectedEntry) _copyToClipboard(_selectedEntry);
+    });
+
+    if (_selectedEntry) {
+      document.getElementById('btn-lib-import').style.display = '';
+    }
 
     for (var i = 0; i < entries.length; i++) {
       _loadThumbnail(entries[i]);
@@ -151,6 +166,15 @@ function onLibClick(entryEl) {
   entryEl.classList.add('selected');
   entryEl.style.background = 'rgba(var(--color-accent-rgb), 0.2)';
   _selectedLib = entryEl.dataset.name;
+
+  var name = entryEl.dataset.name;
+  _selectedEntry = null;
+  for (var i = 0; i < _entries.length; i++) {
+    if (_entries[i].name === name) { _selectedEntry = _entries[i]; break; }
+  }
+
+  var btn = document.getElementById('btn-lib-import');
+  if (btn) btn.style.display = _selectedEntry ? '' : 'none';
 }
 
 function onLibOpen(entryEl) {
@@ -160,7 +184,7 @@ function onLibOpen(entryEl) {
     if (_entries[i].name === name) { entry = _entries[i]; break; }
   }
   if (!entry) return;
-  importLibrary(entry);
+  _copyToClipboard(entry);
 }
 
 export async function importLibrary(entry) {
@@ -185,6 +209,79 @@ export async function importLibrary(entry) {
     document.dispatchEvent(new CustomEvent('editor-dirty'));
   } catch (e) {
     console.error('Library import error:', e);
+  }
+}
+
+async function _copyToClipboard(entry) {
+  try {
+    var file = await entry.handle.getFile();
+    var svgText = await file.text();
+
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(svgText, 'image/svg+xml');
+    var svgRoot = doc.documentElement;
+
+    if (svgRoot.querySelector('parsererror')) {
+      console.error('Library SVG parse error');
+      return;
+    }
+
+    var elements = _parseLibraryElements(doc, svgText);
+    if (elements.length === 0) return;
+
+    var groupChildren = {};
+    for (var i = 0; i < elements.length; i++) {
+      if (elements[i].type === 'group') groupChildren[elements[i].id] = [];
+    }
+
+    var topLevel = [];
+    for (var i = 0; i < elements.length; i++) {
+      var el = elements[i];
+      if (el.parentId && groupChildren[el.parentId]) {
+        groupChildren[el.parentId].push(el);
+      } else if (el.type !== 'group') {
+        topLevel.push(el);
+      }
+    }
+
+    var out = '';
+    for (var i = 0; i < topLevel.length; i++) {
+      out += serializeElement(topLevel[i]);
+    }
+
+    for (var i = 0; i < elements.length; i++) {
+      if (elements[i].type !== 'group') continue;
+      var g = elements[i];
+      out += '<g id="' + g.id + '" data-type="group">\n';
+      var children = groupChildren[g.id] || [];
+      for (var ci = 0; ci < children.length; ci++) {
+        out += serializeElement(children[ci], true);
+      }
+      out += '</g>\n';
+    }
+
+    if (!out) return;
+
+    var fullSvg = '<svg xmlns="http://www.w3.org/2000/svg">\n';
+    fullSvg += '<!-- cut from there -->\n';
+    fullSvg += out;
+    fullSvg += '<!-- cut until here -->\n';
+    fullSvg += '</svg>\n';
+
+    var root = await navigator.storage.getDirectory();
+    var handle = await root.getFileHandle(CLIPBOARD_FILENAME, { create: true });
+    var writable = await handle.createWritable();
+    await writable.write(fullSvg);
+    await writable.close();
+    localStorage.setItem(clipKey(), CLIPBOARD_FILENAME);
+
+    var btn = document.getElementById('btn-lib-import');
+    if (btn) btn.textContent = '\u2705 Copied!';
+    setTimeout(function() {
+      if (btn) btn.textContent = '\uD83D\uDCCB Import to clipboard';
+    }, 1500);
+  } catch (e) {
+    console.error('Library clipboard error:', e);
   }
 }
 
