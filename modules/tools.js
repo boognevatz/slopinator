@@ -78,6 +78,9 @@ export function switchTool(tool) {
     if (sel && sel.type === 'rectangle') selectedRectId = sel.id;
   }
 
+  // Capture selected IDs before deactivating (deactivateSelect clears selection)
+  let savedSelectedIds = state.selectedIds.length > 0 ? state.selectedIds.slice() : [];
+
   // Deactivate current
   switch (state.activeTool) {
     case 'select': deactivateSelect(); break;
@@ -105,7 +108,7 @@ export function switchTool(tool) {
     case 'select': activateSelect(); break;
     case 'line': activateLine(selectedLineData); break;
     case 'text': activateText(selectedTextId); break;
-    case 'crop': activateCrop(); break;
+    case 'crop': activateCrop(savedSelectedIds); break;
     case 'freehand': activateFreehand(); break;
     case 'rectangle': activateRectangle(selectedRectId); break;
     case 'perspective': activatePerspective(); break;

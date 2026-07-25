@@ -7,7 +7,7 @@ import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToO
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected, moveInGroup, cycleGroupSelection } from './modules/select.js';
-import { initCrop, setCropModuleRefs } from './modules/crop.js';
+import { initCrop, setCropModuleRefs, adjustCropBoxToSelection } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
 import { initFileIO, saveSVG } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
@@ -48,7 +48,7 @@ function init() {
 
   // Give select module references to line/text/freehand for undo recreation
   setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
-  setCropModuleRefs({ addLineElement }, { addTextElement });
+  setCropModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
 
   // History: update undo/redo button states on change
   initHistory(updateUndoRedoButtons);
@@ -163,6 +163,8 @@ function init() {
   document.getElementById('btn-ungroup').addEventListener('click', ungroupSelected);
   document.getElementById('btn-move-up').addEventListener('click', function() { moveInGroup(1); });
   document.getElementById('btn-move-down').addEventListener('click', function() { moveInGroup(-1); });
+
+  document.getElementById('btn-autocrop').addEventListener('click', adjustCropBoxToSelection);
 
   document.getElementById('btn-switch-pcb').addEventListener('click', () => { location.href = 'pcb.html'; });
 

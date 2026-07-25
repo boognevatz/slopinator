@@ -4,7 +4,8 @@ import { state, dom, updateViewBox, updateImageTransform } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { pushAction, clearHistory } from './history.js';
 import { switchTool } from './tools.js';
-import { captureAllElementsState } from './dom-utils.js';
+import { captureAllElementsState, captureElementState } from './dom-utils.js';
+import { showNotification } from './notifications.js';
 
 let isCropping = false;
 let isDragging = false;
@@ -15,6 +16,7 @@ let dragOriginal = null;
 
 let cropBox = null;
 let cropAspectMode = null; // null | 'original' | '4:3' | '16:9'
+let _savedSelectedIds = [];
 
 const MIN_CROP_SIZE = 10;
 
@@ -41,7 +43,8 @@ export function initCrop() {
   cropUI.ratio169.addEventListener('change', () => onCropRatioToggle('16:9'));
 }
 
-export function activateCrop() {
+export function activateCrop(selectedIds) {
+  _savedSelectedIds = (selectedIds && selectedIds.length > 0) ? selectedIds.slice() : [];
   isCropping = true;
   dom.svg.style.cursor = 'crosshair';
   
@@ -50,21 +53,25 @@ export function activateCrop() {
   const w = state.image.naturalWidth;
   const h = state.image.naturalHeight;
   
-  // Default crop box: 90% of image centered
-  if (!cropBox) {
-    cropBox = {
-      x: w * 0.05,
-      y: h * 0.05,
-      width: w * 0.9,
-      height: h * 0.9,
-    };
+  // Set crop box from saved selection if available
+  if (_savedSelectedIds.length > 0) {
+    var bbox = _computeBboxFromIds(_savedSelectedIds);
+    if (bbox && bbox.width > 0 && bbox.height > 0) {
+      cropBox = {
+        x: Math.floor(bbox.x),
+        y: Math.floor(bbox.y),
+        width: Math.ceil(bbox.x + bbox.width) - Math.floor(bbox.x),
+        height: Math.ceil(bbox.y + bbox.height) - Math.floor(bbox.y),
+      };
+    } else {
+      _defaultCropBox(w, h);
+    }
   } else {
-    // clamp existing crop box to new image dimensions if it was left over
-    cropBox.x = Math.max(0, Math.min(cropBox.x, w - 10));
-    cropBox.y = Math.max(0, Math.min(cropBox.y, h - 10));
-    cropBox.width = Math.min(cropBox.width, w - cropBox.x);
-    cropBox.height = Math.min(cropBox.height, h - cropBox.y);
+    _defaultCropBox(w, h);
   }
+
+  var btn = document.getElementById('btn-autocrop');
+  if (btn) btn.disabled = _savedSelectedIds.length === 0;
 
   const ratio = getActiveCropRatio();
   if (ratio) {
@@ -75,6 +82,102 @@ export function activateCrop() {
 
   dom.svg.addEventListener('pointerdown', onMouseDown);
   drawCropOverlay();
+}
+
+function _defaultCropBox(w, h) {
+  if (!cropBox) {
+    cropBox = { x: w * 0.05, y: h * 0.05, width: w * 0.9, height: h * 0.9 };
+  } else {
+    cropBox.x = Math.max(0, Math.min(cropBox.x, w - 10));
+    cropBox.y = Math.max(0, Math.min(cropBox.y, h - 10));
+    cropBox.width = Math.min(cropBox.width, w - cropBox.x);
+    cropBox.height = Math.min(cropBox.height, h - cropBox.y);
+  }
+}
+
+function _elBbox(el) {
+  if (el.type === 'line') {
+    if (el.points && el.points.length) {
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (var pi = 0; pi < el.points.length; pi++) {
+        var p = el.points[pi];
+        if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x; if (p.y > maxY) maxY = p.y;
+      }
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+    var lx1 = Math.min(el.x1, el.x2), lx2 = Math.max(el.x1, el.x2);
+    var ly1 = Math.min(el.y1, el.y2), ly2 = Math.max(el.y1, el.y2);
+    return { x: lx1, y: ly1, width: lx2 - lx1, height: ly2 - ly1 };
+  }
+  if (el.type === 'text') {
+    var charCount = (el.content || 'Text').length;
+    return { x: el.x, y: el.y - (el.fontSize || 32) * 0.9, width: charCount * (el.fontSize || 32) * 0.6, height: (el.fontSize || 32) * 1.2 };
+  }
+  if (el.type === 'rectangle') {
+    return { x: el.x, y: el.y, width: el.width || 0, height: el.height || 0 };
+  }
+  if (el.type === 'freehand') {
+    var fxMin = Infinity, fyMin = Infinity, fxMax = -Infinity, fyMax = -Infinity;
+    for (var fi = 0; fi < el.points.length; fi++) {
+      var fp = el.points[fi];
+      if (fp.x < fxMin) fxMin = fp.x; if (fp.y < fyMin) fyMin = fp.y;
+      if (fp.x > fxMax) fxMax = fp.x; if (fp.y > fyMax) fyMax = fp.y;
+    }
+    return { x: fxMin, y: fyMin, width: fxMax - fxMin, height: fyMax - fyMin };
+  }
+  return null;
+}
+
+function _computeBboxFromIds(ids) {
+  var bbox = null;
+  for (var si = 0; si < ids.length; si++) {
+    var data = captureElementState(ids[si]);
+    if (!data) continue;
+    var eb = _elBbox(data);
+    if (!bbox) bbox = eb;
+    else {
+      var x1 = Math.min(bbox.x, eb.x);
+      var y1 = Math.min(bbox.y, eb.y);
+      var x2 = Math.max(bbox.x + bbox.width, eb.x + eb.width);
+      var y2 = Math.max(bbox.y + bbox.height, eb.y + eb.height);
+      bbox = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+    }
+  }
+  return bbox;
+}
+
+export function adjustCropBoxToSelection() {
+  if (_savedSelectedIds.length === 0) {
+    showNotification('Select elements before switching to Crop tool', 3, true);
+    return;
+  }
+  if (!cropBox) return;
+  var bbox = _computeBboxFromIds(_savedSelectedIds);
+  if (!bbox || bbox.width < 1 || bbox.height < 1) {
+    showNotification('Selection has no size', 3, true);
+    return;
+  }
+  var selX = Math.floor(bbox.x);
+  var selY = Math.floor(bbox.y);
+  var selW = Math.ceil(bbox.x + bbox.width) - selX;
+  var selH = Math.ceil(bbox.y + bbox.height) - selY;
+
+  var curX = Math.round(cropBox.x);
+  var curY = Math.round(cropBox.y);
+  var curW = Math.round(cropBox.width);
+  var curH = Math.round(cropBox.height);
+
+  if (curX === selX && curY === selY && curW === selW && curH === selH) {
+    applyCrop();
+  } else {
+    cropBox.x = selX;
+    cropBox.y = selY;
+    cropBox.width = selW;
+    cropBox.height = selH;
+    syncCropControls();
+    drawCropOverlay();
+  }
 }
 
 export function deactivateCrop() {
@@ -511,13 +614,18 @@ function applyCrop() {
     const newElements = oldElements.map(el => {
       const newEl = { ...el };
       if (newEl.type === 'line') {
-        newEl.x1 -= startX;
-        newEl.y1 -= startY;
-        newEl.x2 -= startX;
-        newEl.y2 -= startY;
+        if (newEl.points && newEl.points.length) {
+          newEl.points = newEl.points.map(p => ({ x: p.x - startX, y: p.y - startY }));
+        } else {
+          newEl.x1 -= startX; newEl.y1 -= startY;
+          newEl.x2 -= startX; newEl.y2 -= startY;
+        }
       } else if (newEl.type === 'text') {
-        newEl.x -= startX;
-        newEl.y -= startY;
+        newEl.x -= startX; newEl.y -= startY;
+      } else if (newEl.type === 'rectangle') {
+        newEl.x -= startX; newEl.y -= startY;
+      } else if (newEl.type === 'freehand') {
+        newEl.points = newEl.points.map(p => ({ x: p.x - startX, y: p.y - startY }));
       }
       return newEl;
     });
@@ -545,10 +653,26 @@ function applyCrop() {
 
 let _lineModule = {};
 let _textModule = {};
+let _freehandModule = {};
+let _rectangleModule = {};
 
-export function setCropModuleRefs(lineMod, textMod) {
+function _addElement(el) {
+  if (el.type === 'line' && _lineModule.addLineElement) {
+    _lineModule.addLineElement(el);
+  } else if (el.type === 'text' && _textModule.addTextElement) {
+    _textModule.addTextElement(el);
+  } else if (el.type === 'freehand' && _freehandModule.addFreehandElement) {
+    _freehandModule.addFreehandElement(el);
+  } else if (el.type === 'rectangle' && _rectangleModule.addRectangleElement) {
+    _rectangleModule.addRectangleElement(el);
+  }
+}
+
+export function setCropModuleRefs(lineMod, textMod, freehandMod, rectangleMod) {
   _lineModule = lineMod;
   _textModule = textMod;
+  _freehandModule = freehandMod || {};
+  _rectangleModule = rectangleMod || {};
 }
 
 function executeCrop(dataURI, w, h, elements) {
@@ -563,11 +687,39 @@ function executeCrop(dataURI, w, h, elements) {
   dom.annotationLayer.innerHTML = '';
   dom.handleLayer.innerHTML = '';
   
-  for (const el of elements) {
-    if (el.type === 'line' && _lineModule.addLineElement) {
-      _lineModule.addLineElement(el);
-    } else if (el.type === 'text' && _textModule.addTextElement) {
-      _textModule.addTextElement(el);
+  // Build group child map
+  var groupChildMap = {};
+  for (var ei = 0; ei < elements.length; ei++) {
+    var e = elements[ei];
+    if (e.type === 'group') {
+      for (var gi = 0; gi < e.childIds.length; gi++) {
+        groupChildMap[e.childIds[gi]] = e.id;
+      }
+    }
+  }
+  
+  // Re-add elements, preserving group wrappers
+  var addedGroups = {};
+  for (var ri = 0; ri < elements.length; ri++) {
+    var el = elements[ri];
+    if (el.type === 'group') continue;
+    
+    var gid = groupChildMap[el.id];
+    if (gid) {
+      if (!addedGroups[gid]) {
+        var groupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        groupEl.setAttribute('id', gid);
+        groupEl.setAttribute('data-type', 'group');
+        dom.annotationLayer.appendChild(groupEl);
+        addedGroups[gid] = groupEl;
+      }
+      _addElement(el);
+      var addedEl = document.getElementById(el.id);
+      if (addedEl && addedEl.parentElement !== addedGroups[gid]) {
+        addedGroups[gid].appendChild(addedEl);
+      }
+    } else {
+      _addElement(el);
     }
   }
   

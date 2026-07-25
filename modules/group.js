@@ -31,6 +31,7 @@ export function groupSelected() {
   var btn = document.getElementById('btn-group');
   if (btn) btn.disabled = true;
   document.getElementById('btn-delete').disabled = false;
+  document.getElementById('btn-autocrop').disabled = false;
   document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: groupId } }));
 
   pushAction({

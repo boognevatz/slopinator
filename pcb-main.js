@@ -5,8 +5,9 @@ import { rotateCW, rotateCCW, flipH, flipV, zoomIn, zoomOut, zoomFit, zoomOneToO
 import { initLine, addLineElement, handlePolylineEscape } from './modules/line.js';
 import { initText, addTextElement, isEditing } from './modules/text.js';
 import { initSelect, deleteSelected, setModuleRefs, clearSelection, refreshSelection, selectElement, clearTempUngroup, duplicateSelected, moveInGroup, cycleGroupSelection } from './modules/select.js';
+import { setCropModuleRefs } from './modules/crop.js';
 import { initTools, switchTool } from './modules/tools.js';
-import { initFileIO, saveSVG } from './modules/fileio.js';
+import { initFileIO, saveSVG, autocropToSelection } from './modules/fileio.js';
 import { initFreehand, addFreehandElement } from './modules/freehand.js';
 import { initRectangle, addRectangleElement } from './modules/rectangle.js';
 import { initLayers, initLayerUI } from './modules/layers.js';
@@ -43,7 +44,7 @@ function init() {
   state.defaultTool = 'select';
 
   setModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
-
+  setCropModuleRefs({ addLineElement }, { addTextElement }, { addFreehandElement }, { addRectangleElement });
   initHistory(updateUndoRedoButtons);
 
   loadColorPreferences();
@@ -152,6 +153,8 @@ function init() {
   document.getElementById('btn-ungroup').addEventListener('click', ungroupSelected);
   document.getElementById('btn-move-up').addEventListener('click', function() { moveInGroup(1); });
   document.getElementById('btn-move-down').addEventListener('click', function() { moveInGroup(-1); });
+
+  document.getElementById('btn-autocrop').addEventListener('click', autocropToSelection);
 
   document.getElementById('btn-switch-slopinator').addEventListener('click', () => { location.href = 'index.html'; });
 

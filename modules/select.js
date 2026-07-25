@@ -638,7 +638,7 @@ export function selectElement(id, addToSelection) {
         if (state.selectedIds.length === 0) { clearSelection(); return; }
         state.selectedId = state.selectedIds[state.selectedIds.length - 1];
         drawHandles();
-        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
+        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.getElementById('btn-autocrop').disabled = false;
         document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: state.selectedId, data: captureElementState(state.selectedId) } }));
         return;
       }
@@ -653,7 +653,7 @@ export function selectElement(id, addToSelection) {
     }
     state.selectedId = groupChildIds[groupChildIds.length - 1];
     drawHandles();
-    document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
+    document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.getElementById('btn-autocrop').disabled = false;
     document.getElementById('element-id-input').value = id;
     _renameTargetId = id;
     renderGroupChildrenPreview();
@@ -687,7 +687,7 @@ export function selectElement(id, addToSelection) {
       var remainingData = captureElementState(state.selectedId);
       if (remainingData) {
         drawHandles();
-        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
+        document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.getElementById('btn-autocrop').disabled = false;
         var inp = document.getElementById('element-id-input');
         if (inp) { inp.value = remainingData.id; _renameTargetId = remainingData.id; renderGroupChildrenPreview(); }
         document.dispatchEvent(new CustomEvent('selection-changed', { detail: { id: remainingData.id, data: remainingData } }));
@@ -748,7 +748,7 @@ export function selectElement(id, addToSelection) {
   }
 
   drawHandles();
-  document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false;
+  document.getElementById('btn-delete').disabled = false; document.getElementById('btn-duplicate').disabled = false; document.getElementById('btn-autocrop').disabled = false;
   refreshPalette();
 
   // Sync element ID display
@@ -824,6 +824,7 @@ export function clearSelection() {
   dom.handleLayer.innerHTML = '';
   document.getElementById('btn-delete').disabled = true;
   document.getElementById('btn-duplicate').disabled = true;
+  document.getElementById('btn-autocrop').disabled = true;
   updateGroupButton();
   updateUngroupButton();
   updateMoveButtons();
@@ -1182,7 +1183,7 @@ function getHandleRadius() {
 
 // ── Drag (move) ─────────────────────────────────────────────────
 
-function getBBoxFromData(el) {
+export function getBBoxFromData(el) {
   if (el.type === 'line') {
     if (el.points && el.points.length) {
       var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

@@ -5,7 +5,7 @@ import { addLineElement, getLineDecorationsSvg, normalizeLineStyle, normalizeLin
 import { addTextElement } from './text.js';
 import { addFreehandElement } from './freehand.js';
 import { addRectangleElement } from './rectangle.js';
-import { clearHistory } from './history.js';
+import { pushAction, clearHistory } from './history.js';
 
 const BASE_TITLE = document.title || 'Slopinator';
 import { refreshPalette } from './palette.js';
@@ -14,6 +14,7 @@ import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
 import { isLayerVisible, updateWatermark, renderLayerList, selectLayer, setLayerOrder, setUserLayerCounter } from './layers.js';
 import { captureAllElementsState, captureElementState } from './dom-utils.js';
+import { getBBoxFromData } from './select.js';
 import { showNotification, hideNotification } from './notifications.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -906,6 +907,207 @@ function resizeImage(newWidth, newHeight) {
     updateWatermark();
   };
   imgEl.src = state.image.dataURI;
+}
+
+// ── Autocrop to Selection ──────────────────────────────────────
+
+function _elBboxOverlaps(el, cx, cy, cw, ch) {
+  if (el.type === 'line') {
+    if (el.points && el.points.length) {
+      for (var pi = 0; pi < el.points.length; pi++) {
+        var p = el.points[pi];
+        if (p.x >= cx && p.x < cx + cw && p.y >= cy && p.y < cy + ch) return true;
+      }
+      return false;
+    }
+    var lx1 = Math.min(el.x1, el.x2), lx2 = Math.max(el.x1, el.x2);
+    var ly1 = Math.min(el.y1, el.y2), ly2 = Math.max(el.y1, el.y2);
+    return lx1 < cx + cw && lx2 > cx && ly1 < cy + ch && ly2 > cy;
+  }
+  if (el.type === 'text') {
+    return el.x >= cx && el.x < cx + cw && el.y >= cy && el.y < cy + ch;
+  }
+  if (el.type === 'rectangle') {
+    return el.x < cx + cw && el.x + el.width > cx && el.y < cy + ch && el.y + el.height > cy;
+  }
+  if (el.type === 'freehand') {
+    for (var fi = 0; fi < el.points.length; fi++) {
+      var fp = el.points[fi];
+      if (fp.x >= cx && fp.x < cx + cw && fp.y >= cy && fp.y < cy + ch) return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+function _offsetEl(el, dx, dy) {
+  if (el.type === 'line') {
+    if (el.points && el.points.length) {
+      el.points = el.points.map(function(p) { return { x: p.x - dx, y: p.y - dy }; });
+    } else {
+      el.x1 -= dx; el.y1 -= dy; el.x2 -= dx; el.y2 -= dy;
+    }
+  } else if (el.type === 'text') {
+    el.x -= dx; el.y -= dy;
+  } else if (el.type === 'rectangle') {
+    el.x -= dx; el.y -= dy;
+  } else if (el.type === 'freehand') {
+    el.points = el.points.map(function(p) { return { x: p.x - dx, y: p.y - dy }; });
+  }
+  return el;
+}
+
+function _addElement(el) {
+  if (el.type === 'line') {
+    addLineElement(el);
+  } else if (el.type === 'text') {
+    addTextElement(el);
+  } else if (el.type === 'freehand') {
+    addFreehandElement(el);
+  } else if (el.type === 'rectangle') {
+    addRectangleElement(el);
+  }
+}
+
+export function autocropToSelection() {
+  if (!state.hasImage) return;
+  if (!state.selectedIds || state.selectedIds.length === 0) {
+    showNotification('Select elements first', 3, true);
+    return;
+  }
+
+  // Compute combined bbox of selection
+  var bbox = null;
+  for (var si = 0; si < state.selectedIds.length; si++) {
+    var data = captureElementState(state.selectedIds[si]);
+    if (!data) continue;
+    var eb = getBBoxFromData(data);
+    if (!bbox) bbox = eb;
+    else {
+      var x1 = Math.min(bbox.x, eb.x);
+      var y1 = Math.min(bbox.y, eb.y);
+      var x2 = Math.max(bbox.x + bbox.width, eb.x + eb.width);
+      var y2 = Math.max(bbox.y + bbox.height, eb.y + eb.height);
+      bbox = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+    }
+  }
+  if (!bbox || bbox.width < 1 || bbox.height < 1) {
+    showNotification('Selection has no size', 3, true);
+    return;
+  }
+
+  var cropX = Math.floor(bbox.x);
+  var cropY = Math.floor(bbox.y);
+  var cropW = Math.ceil(bbox.x + bbox.width) - cropX;
+  var cropH = Math.ceil(bbox.y + bbox.height) - cropY;
+
+  // Capture original state for undo
+  var oldDataURI = state.image.dataURI;
+  var oldW = state.image.naturalWidth;
+  var oldH = state.image.naturalHeight;
+  var oldElements = captureAllElementsState();
+
+  // Compute surviving (filtered + offset) elements
+  var groupChildMap = _buildGroupChildMap(oldElements);
+  var surviving = _filterAndOffsetElements(oldElements, groupChildMap, cropX, cropY, cropW, cropH);
+  var survivedGroupIds = {};
+  for (var si3 = 0; si3 < surviving.length; si3++) {
+    var gid = groupChildMap[surviving[si3].id];
+    if (gid) survivedGroupIds[gid] = true;
+  }
+
+  var newDataURI, newW, newH;
+
+  // Build the pushAction data synchronously, then execute
+  var actionData = {
+    description: 'Autocrop to Selection',
+    doFn: function() {
+      loadImage(newDataURI, newW, newH);
+      _reAddElementsWithGroups(surviving, groupChildMap, survivedGroupIds);
+    },
+    undoFn: function() {
+      loadImage(oldDataURI, oldW, oldH);
+      var undoGroupChildMap = _buildGroupChildMap(oldElements);
+      var undoGroupIds = {};
+      for (var ui = 0; ui < oldElements.length; ui++) {
+        var ue = oldElements[ui];
+        if (ue.type === 'group') continue;
+        var ug = undoGroupChildMap[ue.id];
+        if (ug) undoGroupIds[ug] = true;
+      }
+      _reAddElementsWithGroups(oldElements, undoGroupChildMap, undoGroupIds);
+    }
+  };
+
+  // Crop the image
+  var imgEl = new Image();
+  imgEl.onload = function() {
+    var canvas = document.createElement('canvas');
+    canvas.width = cropW;
+    canvas.height = cropH;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    newDataURI = canvas.toDataURL('image/png');
+    newW = cropW;
+    newH = cropH;
+
+    pushAction(actionData);
+    actionData.doFn();
+    switchTool('select');
+    showNotification('Cropped to selection (' + cropW + '×' + cropH + ')', 3);
+  };
+  imgEl.src = oldDataURI;
+}
+
+function _buildGroupChildMap(elements) {
+  var map = {};
+  for (var i = 0; i < elements.length; i++) {
+    var e = elements[i];
+    if (e.type === 'group') {
+      for (var j = 0; j < e.childIds.length; j++) {
+        map[e.childIds[j]] = e.id;
+      }
+    }
+  }
+  return map;
+}
+
+function _filterAndOffsetElements(elements, groupChildMap, cropX, cropY, cropW, cropH) {
+  var result = [];
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (el.type === 'group') continue;
+    if (!_elBboxOverlaps(el, cropX, cropY, cropW, cropH)) continue;
+    var newEl = { ...el };
+    _offsetEl(newEl, cropX, cropY);
+    result.push(newEl);
+  }
+  return result;
+}
+
+function _reAddElementsWithGroups(elements, groupChildMap, keptGroupIds) {
+  var addedGroups = {};
+  for (var i = 0; i < elements.length; i++) {
+    var el = elements[i];
+    if (el.type === 'group') continue;
+    var gid = groupChildMap[el.id];
+    if (gid && keptGroupIds[gid]) {
+      if (!addedGroups[gid]) {
+        var groupEl = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        groupEl.setAttribute('id', gid);
+        groupEl.setAttribute('data-type', 'group');
+        dom.annotationLayer.appendChild(groupEl);
+        addedGroups[gid] = groupEl;
+      }
+      _addElement(el);
+      var addedEl = document.getElementById(el.id);
+      if (addedEl && addedEl.parentElement !== addedGroups[gid]) {
+        addedGroups[gid].appendChild(addedEl);
+      }
+    } else {
+      _addElement(el);
+    }
+  }
 }
 
 // ── Open SVG Project ────────────────────────────────────────────
