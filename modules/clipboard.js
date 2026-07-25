@@ -8,6 +8,7 @@ import { addFreehandElement } from './freehand.js';
 import { addRectangleElement } from './rectangle.js';
 import { pushAction } from './history.js';
 import { selectElement } from './select.js';
+import { showNotification } from './notifications.js';
 
 var CLIPBOARD_FILENAME = 'ctrlc.svg';
 
@@ -234,48 +235,10 @@ export async function clipCopy() {
     await writable.write(fullSvg);
     await writable.close();
     localStorage.setItem(clipKey(), CLIPBOARD_FILENAME);
-    _showNotification('Selection copied successfully!', 3);
+    showNotification('Selection copied successfully!', 3);
   } catch (err) {
     console.error('clipCopy failed:', err);
   }
-}
-
-function _showNotification(msg, seconds) {
-  var existing = document.getElementById('clip-notification');
-  if (existing) existing.remove();
-
-  var div = document.createElement('div');
-  div.id = 'clip-notification';
-  div.style.cssText = 'position:absolute;top:0;left:0;right:0;background:rgba(var(--color-accent-rgb),0.9);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;z-index:30;font-size:13px;';
-
-  var textSpan = document.createElement('span');
-  textSpan.textContent = msg;
-  div.appendChild(textSpan);
-
-  var countSpan = document.createElement('span');
-  countSpan.id = 'clip-countdown';
-  countSpan.textContent = ' (will disappear in ' + seconds + 's)';
-  div.appendChild(countSpan);
-
-  var closeBtn = document.createElement('button');
-  closeBtn.textContent = '\u00D7';
-  closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;line-height:1;padding:0 4px;cursor:pointer;margin-left:10px;';
-  closeBtn.addEventListener('click', function() { div.remove(); });
-  div.appendChild(closeBtn);
-
-  var container = document.getElementById('editor-container');
-  if (container) container.appendChild(div);
-
-  var count = seconds;
-  var intervalId = setInterval(function() {
-    count--;
-    var cs = document.getElementById('clip-countdown');
-    if (cs) cs.textContent = ' (will disappear in ' + count + 's)';
-    if (count <= 0) {
-      clearInterval(intervalId);
-      if (div.parentNode) div.remove();
-    }
-  }, 1000);
 }
 
 export async function clipPaste() {

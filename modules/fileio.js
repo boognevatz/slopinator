@@ -14,6 +14,7 @@ import { savePreference, loadPreference } from './settings.js';
 import { switchTool } from './tools.js';
 import { isLayerVisible, updateWatermark, renderLayerList, selectLayer, setLayerOrder, setUserLayerCounter } from './layers.js';
 import { captureAllElementsState, captureElementState } from './dom-utils.js';
+import { showNotification, hideNotification } from './notifications.js';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -85,83 +86,49 @@ async function _tmpCreateWriter(name) {
 
 var _exportStartTime = 0;
 var _exportProgressText = '';
-var _exportCloseHandler = null;
 
-function _renderProgress(bar, span) {
-  if (!_exportStartTime) { span.textContent = _exportProgressText; return; }
+function _updateExportText(text) {
+  if (!_exportStartTime) { _setText(text); return; }
   var elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
   var min = Math.floor(elapsed / 60);
   var sec = elapsed % 60;
   var timeStr = min > 0 ? min + 'm ' + sec + 's' : sec + 's';
-  span.textContent = _exportProgressText + ' [' + timeStr + ']';
+  _setText(text + ' [' + timeStr + ']');
+}
+
+function _setText(t) {
+  var el = document.getElementById('notification-text');
+  if (el) el.textContent = t;
 }
 
 function showExportProgress(text) {
   _exportStartTime = Date.now();
   _exportProgressText = text;
-  var bar = document.getElementById('resize-notification');
-  if (!bar) return;
-  for (var ci = 0; ci < bar.children.length; ci++)
-    if (bar.children[ci].tagName === 'BUTTON') bar.children[ci].style.display = 'none';
-  var span = bar.querySelector('span');
-  if (span) _renderProgress(bar, span);
-  bar.hidden = false;
+  showNotification(text, 0);
 }
 
 function updateExportProgress(text) {
   _exportProgressText = text;
-  var bar = document.getElementById('resize-notification');
-  if (!bar) return;
-  var span = bar.querySelector('span');
-  if (span) _renderProgress(bar, span);
+  _updateExportText(text);
 }
 
 function hideExportProgress() {
-  if (_exportCloseHandler) {
-    var cb = document.getElementById('btn-close-notification');
-    if (cb) cb.removeEventListener('click', _exportCloseHandler);
-    _exportCloseHandler = null;
-  }
   _exportStartTime = 0;
   _exportProgressText = '';
-  var bar = document.getElementById('resize-notification');
-  if (!bar) return;
-  bar.hidden = true;
-  for (var ci = 0; ci < bar.children.length; ci++)
-    if (bar.children[ci].tagName === 'BUTTON') bar.children[ci].style.display = '';
-  var span = bar.querySelector('span');
-  if (span) span.textContent = 'Image is very large. Resize to:';
+  hideNotification();
 }
 
 async function showExportDone() {
-  var bar = document.getElementById('resize-notification');
-  if (!bar) return;
-  var span = bar.querySelector('span');
-  if (!span) return;
-
   var elapsed = Math.floor((Date.now() - _exportStartTime) / 1000);
   var min = Math.floor(elapsed / 60);
   var sec = elapsed % 60;
   var timeStr = min > 0 ? min + 'm ' + sec + 's' : sec + 's';
 
-  // Reuse the existing close button from the HTML
-  var closeBtn = document.getElementById('btn-close-notification');
-  closeBtn.style.display = ''; // show it (overrides display:none from showExportProgress)
-
-  var done = false;
-  _exportCloseHandler = function() {
-    done = true;
-    hideExportProgress();
-  };
-  closeBtn.addEventListener('click', _exportCloseHandler);
-
   for (var c = 5; c > 0; c--) {
-    if (done) return;
-    if (span) span.textContent = 'Done! [' + timeStr + ']  (auto-close in ' + c + ')';
+    _setText('Done! [' + timeStr + ']  (auto-close in ' + c + ')');
     await sleep(1000);
   }
-
-  if (!done) hideExportProgress();
+  hideNotification();
 }
 
 export function initFileIO() {
@@ -182,7 +149,6 @@ export function initFileIO() {
   const exportSizeSelect = document.getElementById('export-size-select');
   const exportPdfResSelect = document.getElementById('export-pdf-res-select');
   const btnExportDo = document.getElementById('btn-export-do');
-  const resizeNotification = document.getElementById('resize-notification');
 
   let currentFormat = 'jpg';
 
@@ -673,15 +639,11 @@ export function initFileIO() {
     }
   }
 
-  // Resize notification logic
-  document.getElementById('btn-close-notification').addEventListener('click', () => {
-    resizeNotification.hidden = true;
-  });
-
-  resizeNotification.querySelectorAll('button[data-width]').forEach(btn => {
+  // Resize popup logic
+  document.getElementById('resize-popup').querySelectorAll('[data-width]').forEach(btn => {
     btn.addEventListener('click', (e) => {
+      document.getElementById('resize-popup').hidden = true;
       const widthOpt = e.target.dataset.width;
-      resizeNotification.hidden = true;
       if (widthOpt !== 'original') {
         var targetW = parseInt(widthOpt);
         var ratio = targetW / state.image.naturalWidth;
@@ -691,15 +653,18 @@ export function initFileIO() {
     });
   });
 
+  document.getElementById('resize-popup-close').addEventListener('click', () => {
+    document.getElementById('resize-popup').hidden = true;
+  });
+
+  document.getElementById('resize-popup').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.target.hidden = true;
+  });
+
   // Expose test PDF generator for console debugging
   window.buildTestPdf = buildTestPdf;
   document.getElementById('btn-test-pdf').addEventListener('click', buildTestPdf);
   document.getElementById('btn-test-pdf-img').addEventListener('click', buildTestPdfWithImage);
-
-  // Hide notification on any tool usage
-  document.getElementById('editor-svg').addEventListener('pointerdown', () => {
-    resizeNotification.hidden = true;
-  }, { capture: true });
 
   // ── Resize dropdown + DPI (combined popup) ──────────────
   const sizeLabel = document.getElementById('image-size-label');
@@ -850,11 +815,8 @@ function openImageFile(file) {
       updateWatermark();
       
       const maxDim = Math.max(img.naturalWidth, img.naturalHeight);
-      const resizeNotification = document.getElementById('resize-notification');
       if (maxDim > 1000) {
-        resizeNotification.hidden = false;
-      } else {
-        resizeNotification.hidden = true;
+        document.getElementById('resize-popup').hidden = false;
       }
       updateFilenameDisplay();
     };

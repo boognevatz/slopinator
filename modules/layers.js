@@ -1,5 +1,6 @@
 import { dom, state } from './editor.js';
 import { bindGridControls, toggleGrid } from './grid.js';
+import { showNotification } from './notifications.js';
 
 var SYSTEM_LAYERS = {
   'layer-image': { name: 'Image', index: 0 },
@@ -308,20 +309,7 @@ function removeLayer() {
 }
 
 function showLayerNotification(msg) {
-  var existing = document.getElementById('layer-notification');
-  if (existing) existing.remove();
-  var div = document.createElement('div');
-  div.id = 'layer-notification';
-  div.textContent = msg;
-  div.style.cssText = 'position:absolute;top:0;left:0;right:0;background:rgba(var(--color-accent-rgb),0.9);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;z-index:30;font-size:13px;';
-  var closeBtn = document.createElement('button');
-  closeBtn.textContent = '\u00D7';
-  closeBtn.style.cssText = 'background:transparent;border:none;color:#fff;font-size:18px;line-height:1;padding:0 4px;cursor:pointer;margin-left:10px;';
-  closeBtn.addEventListener('click', function() { div.remove(); });
-  div.appendChild(closeBtn);
-  var container = document.getElementById('editor-container');
-  if (container) container.appendChild(div);
-  setTimeout(function() { if (div.parentNode) div.remove(); }, 4000);
+  showNotification(msg, 4);
 }
 
 function showLayerProps(entry) {
