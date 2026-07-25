@@ -584,12 +584,22 @@ function drawRectToolCircleHandles(data, activeIdx) {
   var svgRect = dom.svg.getBoundingClientRect();
   var scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
   var visR = Math.max(6, 10 * scale);
-  var pts = [
-    { x: data.x, y: data.y },
-    { x: data.x + data.width, y: data.y },
-    { x: data.x + data.width, y: data.y + data.height },
-    { x: data.x, y: data.y + data.height },
+  var cx = data.x + data.width / 2, cy = data.y + data.height / 2;
+  var halfW = data.width / 2, halfH = data.height / 2;
+  var relPts = [
+    { x: -halfW, y: -halfH },
+    { x: halfW, y: -halfH },
+    { x: halfW, y: halfH },
+    { x: -halfW, y: halfH },
   ];
+  if (data.rotation) {
+    var rad = data.rotation * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    relPts = relPts.map(function(p) {
+      return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
+    });
+  }
+  var pts = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
   for (var i = 0; i < pts.length; i++) {
     var tp = applyImageRotationToPoint(pts[i].x, pts[i].y);
     var isActive = i === activeIdx;

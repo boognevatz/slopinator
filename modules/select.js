@@ -1127,23 +1127,35 @@ function drawRectangleHandles(data) {
   const hw = Math.max(22, 28 * scale);
   const hh = hw;
   const { x, y, width: w, height: h, rotation } = data;
+  const cx = x + w / 2, cy = y + h / 2;
+  const halfW = w / 2, halfH = h / 2;
 
-  // Transform corners from annotation-space to viewBox-space
-  // (applies image rotation only — element rotation is on the handle group)
-  var tc1 = applyImageRotationToPoint(x, y);
-  var tc2 = applyImageRotationToPoint(x + w, y);
-  var tc3 = applyImageRotationToPoint(x + w, y + h);
-  var tc4 = applyImageRotationToPoint(x, y + h);
-  var tbx = Math.min(tc1.x, tc2.x, tc3.x, tc4.x);
-  var tby = Math.min(tc1.y, tc2.y, tc3.y, tc4.y);
-  var tbw = Math.max(tc1.x, tc2.x, tc3.x, tc4.x) - tbx;
-  var tbh = Math.max(tc1.y, tc2.y, tc3.y, tc4.y) - tby;
+  // Compute 4 corners in annotation-space, accounting for element rotation
+  var relPts = [
+    { x: -halfW, y: -halfH },
+    { x: halfW, y: -halfH },
+    { x: halfW, y: halfH },
+    { x: -halfW, y: halfH },
+  ];
+  if (rotation) {
+    var rad = rotation * Math.PI / 180;
+    var cos = Math.cos(rad), sin = Math.sin(rad);
+    relPts = relPts.map(function(p) {
+      return { x: p.x * cos - p.y * sin, y: p.x * sin + p.y * cos };
+    });
+  }
+  var annCorners = relPts.map(function(p) { return { x: cx + p.x, y: cy + p.y }; });
+
+  // Transform to viewBox-space (applies image rotation)
+  var tc = annCorners.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
+  var tbx = Math.min(tc[0].x, tc[1].x, tc[2].x, tc[3].x);
+  var tby = Math.min(tc[0].y, tc[1].y, tc[2].y, tc[3].y);
+  var tbw = Math.max(tc[0].x, tc[1].x, tc[2].x, tc[3].x) - tbx;
+  var tbh = Math.max(tc[0].y, tc[1].y, tc[2].y, tc[3].y) - tby;
   var tcx = tbx + tbw / 2, tcy = tby + tbh / 2;
   const isRotate = textInteractMode === 'rotate';
 
-  const handleGroup = svgEl('g', {
-    transform: `rotate(${rotation || 0}, ${tcx}, ${tcy})`
-  });
+  const handleGroup = svgEl('g', {});
 
   const selBox = svgEl('rect', {
     x: tbx, y: tby, width: tbw, height: tbh,
