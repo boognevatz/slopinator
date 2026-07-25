@@ -232,15 +232,11 @@ export function applyImageRotationToPoint(x, y) {
   if (flipH) px = -px;
   if (flipV) py = -py;
 
-  if (rotation === 90) {
-    const tmp = px; px = -py; py = tmp;
-  } else if (rotation === 180) {
-    px = -px; py = -py;
-  } else if (rotation === 270) {
-    const tmp = px; px = py; py = -tmp;
-  }
+  const rad = rotation * Math.PI / 180;
+  const rx = px * Math.cos(rad) - py * Math.sin(rad);
+  const ry = px * Math.sin(rad) + py * Math.cos(rad);
 
-  return { x: px + cx, y: py + cy };
+  return { x: rx + cx, y: ry + cy };
 }
 
 /**
@@ -259,18 +255,14 @@ export function applyInverseImageRotationToPoint(x, y) {
   let px = x - cx;
   let py = y - cy;
 
-  if (rotation === 90) {
-    const t = px; px = py; py = -t;
-  } else if (rotation === 180) {
-    px = -px; py = -py;
-  } else if (rotation === 270) {
-    const t = px; px = -py; py = t;
-  }
+  const rad = rotation * Math.PI / 180;
+  let rx = px * Math.cos(rad) + py * Math.sin(rad);
+  let ry = -px * Math.sin(rad) + py * Math.cos(rad);
 
-  if (flipH) px = -px;
-  if (flipV) py = -py;
+  if (flipH) rx = -rx;
+  if (flipV) ry = -ry;
 
-  return { x: px + w / 2, y: py + h / 2 };
+  return { x: rx + w / 2, y: ry + h / 2 };
 }
 
 export function getViewBoxDims() {
