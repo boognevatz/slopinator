@@ -814,8 +814,7 @@ function openImageFile(file) {
       switchTool('select');
       updateWatermark();
       
-      const maxDim = Math.max(img.naturalWidth, img.naturalHeight);
-      if (maxDim > 1000) {
+      if (img.naturalWidth > 1920 || img.naturalHeight > 1080) {
         document.getElementById('resize-popup').hidden = false;
       }
       updateFilenameDisplay();
