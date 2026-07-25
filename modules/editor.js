@@ -243,6 +243,36 @@ export function applyImageRotationToPoint(x, y) {
   return { x: px + cx, y: py + cy };
 }
 
+/**
+ * Inverse of applyImageRotationToPoint: viewBox-space → annotation-space.
+ */
+export function applyInverseImageRotationToPoint(x, y) {
+  const { naturalWidth: w, naturalHeight: h, rotation, flipH, flipV } = state.image;
+  if (rotation === 0 && !flipH && !flipV) return { x, y };
+
+  const isRotated = rotation === 90 || rotation === 270;
+  const vbW = isRotated ? h : w;
+  const vbH = isRotated ? w : h;
+  const cx = vbW / 2;
+  const cy = vbH / 2;
+
+  let px = x - cx;
+  let py = y - cy;
+
+  if (rotation === 90) {
+    const t = px; px = py; py = -t;
+  } else if (rotation === 180) {
+    px = -px; py = -py;
+  } else if (rotation === 270) {
+    const t = px; px = -py; py = t;
+  }
+
+  if (flipH) px = -px;
+  if (flipV) py = -py;
+
+  return { x: px + w / 2, y: py + h / 2 };
+}
+
 export function getViewBoxDims() {
   const { naturalWidth, naturalHeight, rotation } = state.image;
   const isRotated = rotation === 90 || rotation === 270;

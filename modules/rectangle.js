@@ -1,4 +1,4 @@
-import { state, dom, applyImageRotationToPoint } from './editor.js';
+import { state, dom, applyImageRotationToPoint, applyInverseImageRotationToPoint } from './editor.js';
 import { generateId, svgEl, screenToCoords } from './utils.js';
 import { pushAction } from './history.js';
 import { selectElement, clearSelection } from './select.js';
@@ -23,6 +23,7 @@ let dragStartPt = null;
 let dragCornerIdx = -1;
 
 var CORNERS = ['tl', 'tr', 'br', 'bl'];
+var rectDrag = null;
 
 export function initRectangle() {}
 
@@ -66,6 +67,7 @@ function cancelResizeMove() {
     document.removeEventListener('pointerup', onDragCancel);
     isPreparingDrag = false;
   }
+  if (rectDrag) { rectDrag.remove(); rectDrag = null; }
   isResizing = false;
   isMoving = false;
   resizeAnchor = null;
@@ -103,25 +105,45 @@ function onKeyDown(e) {
   if (!dx && !dy) return;
   e.preventDefault();
 
+  // Convert annotation rect to viewBox space
+  var vbCorners = [
+    applyImageRotationToPoint(data.x, data.y),
+    applyImageRotationToPoint(data.x + data.width, data.y),
+    applyImageRotationToPoint(data.x + data.width, data.y + data.height),
+    applyImageRotationToPoint(data.x, data.y + data.height),
+  ];
+  var xs = vbCorners.map(function(c) { return c.x; });
+  var ys = vbCorners.map(function(c) { return c.y; });
+  var vbX = Math.min.apply(null, xs);
+  var vbY = Math.min.apply(null, ys);
+  var vbW = Math.max.apply(null, xs) - vbX;
+  var vbH = Math.max.apply(null, ys) - vbY;
+
   var cornerPts = [
-    { x: data.x, y: data.y },
-    { x: data.x + data.width, y: data.y },
-    { x: data.x + data.width, y: data.y + data.height },
-    { x: data.x, y: data.y + data.height },
+    { x: vbX, y: vbY },
+    { x: vbX + vbW, y: vbY },
+    { x: vbX + vbW, y: vbY + vbH },
+    { x: vbX, y: vbY + vbH },
   ];
   var anchors = [
-    { x: data.x + data.width, y: data.y + data.height },
-    { x: data.x,              y: data.y + data.height },
-    { x: data.x,              y: data.y },
-    { x: data.x + data.width, y: data.y },
+    { x: vbX + vbW, y: vbY + vbH },
+    { x: vbX,       y: vbY + vbH },
+    { x: vbX,       y: vbY },
+    { x: vbX + vbW, y: vbY },
   ];
   var pt = { x: cornerPts[activeCorner].x + dx, y: cornerPts[activeCorner].y + dy };
   var ax = anchors[activeCorner].x;
   var ay = anchors[activeCorner].y;
-  data.x = Math.min(ax, pt.x);
-  data.y = Math.min(ay, pt.y);
-  data.width = Math.max(5, Math.abs(pt.x - ax));
-  data.height = Math.max(5, Math.abs(pt.y - ay));
+  var newVbX = Math.min(ax, pt.x);
+  var newVbY = Math.min(ay, pt.y);
+  var newVbW = Math.max(5, Math.abs(pt.x - ax));
+  var newVbH = Math.max(5, Math.abs(pt.y - ay));
+
+  var ann = vbRectToAnnotation(newVbX, newVbY, newVbW, newVbH);
+  data.x = Math.round(ann.x);
+  data.y = Math.round(ann.y);
+  data.width = Math.round(ann.width);
+  data.height = Math.round(ann.height);
   updateRectangleElement(data);
   drawRectToolCircleHandles(data, activeCorner);
 }
@@ -203,9 +225,12 @@ function onMouseDown(e) {
   if (target.closest('.annotation-line, .annotation-text, .line-hit-area, .handle, polyline')) return;
 
   isDrawing = true;
-  startPt = pt;
+  var vbPt = applyImageRotationToPoint(pt);
+  startPt = vbPt;
 
   currentBgFill = state.bgColor === 'transparent' ? 'none' : state.bgColor;
+  rectDrag = svgEl('g', { id: 'rect-drag' });
+  dom.handleLayer.appendChild(rectDrag);
   previewRect = svgEl('rect', {
     x: startPt.x, y: startPt.y, width: 0, height: 0,
     rx: state.activeCornerRadius,
@@ -215,7 +240,7 @@ function onMouseDown(e) {
     'stroke-dasharray': '4 3',
     'pointer-events': 'none',
   });
-  dom.annotationLayer.appendChild(previewRect);
+  rectDrag.appendChild(previewRect);
 
   document.addEventListener('pointermove', onMouseMove);
   document.addEventListener('pointerup', onMouseUp);
@@ -224,14 +249,27 @@ function onMouseDown(e) {
 function onMouseMove(e) {
   if (!isDrawing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var x = Math.min(startPt.x, pt.x);
-  var y = Math.min(startPt.y, pt.y);
-  var w = Math.abs(pt.x - startPt.x);
-  var h = Math.abs(pt.y - startPt.y);
+  var vbPt = applyImageRotationToPoint(pt);
+  var x = Math.min(startPt.x, vbPt.x);
+  var y = Math.min(startPt.y, vbPt.y);
+  var w = Math.abs(vbPt.x - startPt.x);
+  var h = Math.abs(vbPt.y - startPt.y);
   previewRect.setAttribute('x', x);
   previewRect.setAttribute('y', y);
   previewRect.setAttribute('width', w);
   previewRect.setAttribute('height', h);
+}
+
+function vbRectToAnnotation(vbX, vbY, vbW, vbH) {
+  var c1 = applyInverseImageRotationToPoint(vbX, vbY);
+  var c2 = applyInverseImageRotationToPoint(vbX + vbW, vbY);
+  var c3 = applyInverseImageRotationToPoint(vbX + vbW, vbY + vbH);
+  var c4 = applyInverseImageRotationToPoint(vbX, vbY + vbH);
+  var xs = [c1.x, c2.x, c3.x, c4.x];
+  var ys = [c1.y, c2.y, c3.y, c4.y];
+  var ax = Math.min.apply(null, xs);
+  var ay = Math.min.apply(null, ys);
+  return { x: ax, y: ay, width: Math.max.apply(null, xs) - ax, height: Math.max.apply(null, ys) - ay };
 }
 
 function onMouseUp(e) {
@@ -239,25 +277,23 @@ function onMouseUp(e) {
   document.removeEventListener('pointermove', onMouseMove);
   document.removeEventListener('pointerup', onMouseUp);
 
-  if (previewRect && previewRect.parentNode) {
-    previewRect.parentNode.removeChild(previewRect);
-  }
+  var vbX = parseFloat(previewRect.getAttribute('x'));
+  var vbY = parseFloat(previewRect.getAttribute('y'));
+  var vbW = parseFloat(previewRect.getAttribute('width'));
+  var vbH = parseFloat(previewRect.getAttribute('height'));
+  if (rectDrag) { rectDrag.remove(); rectDrag = null; }
   previewRect = null;
   isDrawing = false;
 
-  var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var x = Math.min(startPt.x, pt.x);
-  var y = Math.min(startPt.y, pt.y);
-  var w = Math.abs(pt.x - startPt.x);
-  var h = Math.abs(pt.y - startPt.y);
+  if (vbW < 5 && vbH < 5) return;
 
-  if (w < 5 && h < 5) return;
+  var ann = vbRectToAnnotation(vbX, vbY, vbW, vbH);
 
   var id = generateId();
   var data = {
     id,
     type: 'rectangle',
-    x: x, y: y, width: w, height: h,
+    x: ann.x, y: ann.y, width: ann.width, height: ann.height,
     rx: state.activeCornerRadius,
     rotation: 0,
     stroke: state.activeColor,
@@ -286,7 +322,8 @@ function startHandleDrag(idx, pt) {
   if (isResizing || isPreparingDrag) return;
   activeCorner = idx;
   dragCornerIdx = idx;
-  dragStartPt = { x: pt.x, y: pt.y };
+  var vbPt = applyImageRotationToPoint(pt);
+  dragStartPt = { x: vbPt.x, y: vbPt.y };
   isPreparingDrag = true;
 
   var data = captureElementState(state.selectedId);
@@ -298,14 +335,15 @@ function startHandleDrag(idx, pt) {
 
 function onDragPrepare(e) {
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var dx = pt.x - dragStartPt.x;
-  var dy = pt.y - dragStartPt.y;
+  var vbPt = applyImageRotationToPoint(pt);
+  var dx = vbPt.x - dragStartPt.x;
+  var dy = vbPt.y - dragStartPt.y;
   if (dx * dx + dy * dy < 9) return;
 
   document.removeEventListener('pointermove', onDragPrepare);
   document.removeEventListener('pointerup', onDragCancel);
   isPreparingDrag = false;
-  startResizeRect(dragCornerIdx, pt);
+  startResizeRect(dragCornerIdx, vbPt);
 }
 
 function onDragCancel(e) {
@@ -314,25 +352,52 @@ function onDragCancel(e) {
   isPreparingDrag = false;
   dragStartPt = null;
   dragCornerIdx = -1;
+  if (rectDrag) { rectDrag.remove(); rectDrag = null; }
 }
 
-function startResizeRect(idx, pt) {
+function startResizeRect(idx, vbPt) {
   activeCorner = idx;
   var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
 
+  // Convert annotation rect to viewBox space
+  var vbCorners = [
+    applyImageRotationToPoint(data.x, data.y),
+    applyImageRotationToPoint(data.x + data.width, data.y),
+    applyImageRotationToPoint(data.x + data.width, data.y + data.height),
+    applyImageRotationToPoint(data.x, data.y + data.height),
+  ];
+  var xs = vbCorners.map(function(c) { return c.x; });
+  var ys = vbCorners.map(function(c) { return c.y; });
+  var vbX = Math.min.apply(null, xs);
+  var vbY = Math.min.apply(null, ys);
+  var vbW = Math.max.apply(null, xs) - vbX;
+  var vbH = Math.max.apply(null, ys) - vbY;
+
+  // Create rect drag group on handleLayer
+  rectDrag = svgEl('g', { id: 'rect-drag' });
+  dom.handleLayer.appendChild(rectDrag);
+  var vRect = svgEl('rect', {
+    x: vbX, y: vbY, width: vbW, height: vbH,
+    rx: data.rx || 0,
+    fill: data.fill || 'transparent',
+    stroke: data.stroke,
+    'stroke-width': data.strokeWidth,
+    'pointer-events': 'none',
+  });
+  rectDrag.appendChild(vRect);
+
   var anchorMap = {
-    tl: { x: data.x + data.width, y: data.y + data.height },
-    tr: { x: data.x,               y: data.y + data.height },
-    bl: { x: data.x + data.width, y: data.y },
-    br: { x: data.x,               y: data.y },
+    tl: { x: vbX + vbW, y: vbY + vbH },
+    tr: { x: vbX,        y: vbY + vbH },
+    bl: { x: vbX + vbW, y: vbY },
+    br: { x: vbX,        y: vbY },
   };
   var corner = CORNERS[idx];
   resizeAnchor = anchorMap[corner];
-  resizeStart = { x: pt.x, y: pt.y };
-  resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height };
+  resizeStart = { x: vbPt.x, y: vbPt.y };
+  resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
-  drawRectToolCircleHandles(data, activeCorner);
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
   document.addEventListener('pointerup', onResizeEnd);
@@ -341,36 +406,29 @@ function startResizeRect(idx, pt) {
 function onResizeMove(e) {
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  if (!state.selectedId) return;
+  var vbPt = applyImageRotationToPoint(pt);
+  if (!state.selectedId || !rectDrag) return;
 
   var ax = resizeAnchor.x;
   var ay = resizeAnchor.y;
-  var nx = Math.min(ax, pt.x);
-  var ny = Math.min(ay, pt.y);
-  var nw = Math.abs(pt.x - ax);
-  var nh = Math.abs(pt.y - ay);
+  var nx = Math.min(ax, vbPt.x);
+  var ny = Math.min(ay, vbPt.y);
+  var nw = Math.abs(vbPt.x - ax);
+  var nh = Math.abs(vbPt.y - ay);
 
   if (nw < 5) nw = 5;
   if (nh < 5) nh = 5;
 
-  var el = dom.annotationLayer.querySelector('#' + CSS.escape(state.selectedId));
-  if (!el) return;
-  var fillRect = el.querySelector('.rect-fill');
-  var strokeRect = el.querySelector('.rect-stroke');
-  if (fillRect) {
-    fillRect.setAttribute('x', nx);
-    fillRect.setAttribute('y', ny);
-    fillRect.setAttribute('width', nw);
-    fillRect.setAttribute('height', nh);
-  }
-  if (strokeRect) {
-    strokeRect.setAttribute('x', nx);
-    strokeRect.setAttribute('y', ny);
-    strokeRect.setAttribute('width', nw);
-    strokeRect.setAttribute('height', nh);
-  }
+  // Update rectDrag on handleLayer
+  var vr = rectDrag.querySelector('rect');
+  vr.setAttribute('x', nx);
+  vr.setAttribute('y', ny);
+  vr.setAttribute('width', nw);
+  vr.setAttribute('height', nh);
 
-  drawRectToolCircleHandles({ x: nx, y: ny, width: nw, height: nh }, activeCorner);
+  // Convert vbData to annotation space for handles
+  var ann = vbRectToAnnotation(nx, ny, nw, nh);
+  drawRectToolCircleHandles(ann, activeCorner);
 }
 
 function onResizeEnd(e) {
@@ -382,11 +440,23 @@ function onResizeEnd(e) {
   var id = state.selectedId;
   if (!id) return;
 
+  // Read final rect from rectDrag (viewBox space)
+  if (!rectDrag) return;
+  var vr = rectDrag.querySelector('rect');
+  var vbX = parseFloat(vr.getAttribute('x'));
+  var vbY = parseFloat(vr.getAttribute('y'));
+  var vbW = parseFloat(vr.getAttribute('width'));
+  var vbH = parseFloat(vr.getAttribute('height'));
+  rectDrag.remove();
+  rectDrag = null;
+
   var orig = resizeOrig;
-  var finalData = captureElementState(id);
-  if (!finalData) return;
-  var final = { x: finalData.x, y: finalData.y, width: finalData.width, height: finalData.height };
+  var ann = vbRectToAnnotation(vbX, vbY, vbW, vbH);
+  var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height) };
   var cornerIdx = activeCorner;
+
+  // Update annotation layer rect
+  updateRectangleElement({ id: id, x: final.x, y: final.y, width: final.width, height: final.height, rx: orig.rx || 0, fill: orig.fill, stroke: orig.stroke, strokeWidth: orig.strokeWidth });
 
   if (orig.x !== final.x || orig.y !== final.y || orig.width !== final.width || orig.height !== final.height) {
     pushAction({
@@ -420,9 +490,7 @@ function onResizeEnd(e) {
 }
 
 function cancelDraw() {
-  if (previewRect && previewRect.parentNode) {
-    previewRect.parentNode.removeChild(previewRect);
-  }
+  if (rectDrag) { rectDrag.remove(); rectDrag = null; }
   previewRect = null;
   isDrawing = false;
   document.removeEventListener('pointermove', onMouseMove);
@@ -503,7 +571,7 @@ function removeRectangleElement(id) {
 }
 
 function drawRectToolCircleHandles(data, activeIdx) {
-  dom.handleLayer.innerHTML = '';
+  dom.handleLayer.querySelectorAll('.handle-endpoint').forEach(function(el) { el.remove(); });
   var viewBox = dom.svg.viewBox.baseVal;
   var svgRect = dom.svg.getBoundingClientRect();
   var scale = viewBox && viewBox.width ? viewBox.width / svgRect.width : 1;
