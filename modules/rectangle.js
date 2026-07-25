@@ -322,6 +322,7 @@ function onMouseUp(e) {
   });
 
   selectElement(id);
+  dom.handleLayer.innerHTML = '';
   activeCorner = -1;
   drawRectToolCircleHandles(data, activeCorner);
 }
