@@ -1164,10 +1164,10 @@ function drawRectangleHandles(data) {
   handleGroup.appendChild(selBox);
 
   const corners = [
-    { handle: 'tl', x: tbx,                y: tby,                cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: tbx + tbw - hw,      y: tby,                cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'bl', x: tbx,                y: tby + tbh - hh,     cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'br', x: tbx + tbw - hw,      y: tby + tbh - hh,    cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tc[0].x - hw/2, y: tc[0].y - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tc[1].x - hw/2, y: tc[1].y - hh/2, cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'bl', x: tc[3].x - hw/2, y: tc[3].y - hh/2, cursor: isRotate ? 'grab' : 'pointer' },
+    { handle: 'br', x: tc[2].x - hw/2, y: tc[2].y - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
