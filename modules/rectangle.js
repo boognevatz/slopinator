@@ -433,11 +433,19 @@ function startResizeRect(idx, vbPt) {
   rectDrag.appendChild(vPoly);
 
   var anchorIdx = (idx + 2) % 4;
-  resizeAnchor = { x: vbCorners[anchorIdx].x, y: vbCorners[anchorIdx].y };
+  resizeAnchor = { x: pts[anchorIdx].x, y: pts[anchorIdx].y };
   resizeStart = { x: vbPt.x, y: vbPt.y };
   resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
-  console.log('  anchor vb:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, 'anchorIdx:', anchorIdx);
+  var _rad = (data.rotation || 0) * Math.PI / 180;
+  var _c = Math.cos(_rad), _s = Math.sin(_rad);
+  resizeAnchor._absC = Math.abs(_c);
+  resizeAnchor._absS = Math.abs(_s);
+  resizeAnchor._cos2θ = _c * _c - _s * _s;
+  resizeAnchor._origW = data.width;
+  resizeAnchor._origH = data.height;
+
+  console.log('  anchor ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, 'anchorIdx:', anchorIdx, '| rot:', data.rotation, 'absC:', resizeAnchor._absC.toFixed(4), 'absS:', resizeAnchor._absS.toFixed(4));
 
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
@@ -448,27 +456,42 @@ function onResizeMove(e) {
   console.log('>>> rect onResizeMove', e.movementX, e.movementY);
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
-  var vbPt = applyImageRotationToPoint(pt.x, pt.y);
   if (!state.selectedId || !rectDrag) return;
 
   var ax = resizeAnchor.x;
   var ay = resizeAnchor.y;
-  var nx = Math.min(ax, vbPt.x);
-  var ny = Math.min(ay, vbPt.y);
-  var nw = Math.abs(vbPt.x - ax);
-  var nh = Math.abs(vbPt.y - ay);
+  var _aBX = Math.min(ax, pt.x);
+  var _aBY = Math.min(ay, pt.y);
+  var _aBW = Math.abs(pt.x - ax);
+  var _aBH = Math.abs(pt.y - ay);
 
-  if (nw < 5) nw = 5;
-  if (nh < 5) nh = 5;
+  if (_aBW < 5) _aBW = 5;
+  if (_aBH < 5) _aBH = 5;
 
-  console.log('  mouse vb:', Math.round(vbPt.x), Math.round(vbPt.y), '| bbox vb:', Math.round(nx), Math.round(ny), Math.round(nx+nw), Math.round(ny+nh), '| dims vb:', Math.round(nw), Math.round(nh));
+  console.log('  mouse ann:', Math.round(pt.x), Math.round(pt.y), '| bbox ann:', Math.round(_aBX), Math.round(_aBY), Math.round(_aBX+_aBW), Math.round(_aBY+_aBH), '| dims ann:', Math.round(_aBW), Math.round(_aBH));
 
-  // Update rectDrag on handleLayer
-  var ann = vbRectToAnnotation(nx, ny, nw, nh);
-  ann.rotation = resizeOrig.rotation;
+  // Solve for annotation rect dimensions from bbox + element rotation
+  var _absC = resizeAnchor._absC, _absS = resizeAnchor._absS, _cos2θ = resizeAnchor._cos2θ;
+  var _aW, _aH;
+  if (Math.abs(_cos2θ) < 0.01) {
+    var _s = Math.sqrt(_aBW * _aBW + _aBH * _aBH) / Math.sqrt(resizeAnchor._origW * resizeAnchor._origW + resizeAnchor._origH * resizeAnchor._origH);
+    _aW = resizeAnchor._origW * _s;
+    _aH = resizeAnchor._origH * _s;
+  } else {
+    _aW = (_aBW * _absC - _aBH * _absS) / _cos2θ;
+    _aH = (_aBH * _absC - _aBW * _absS) / _cos2θ;
+  }
+  _aW = Math.max(5, Math.abs(_aW));
+  _aH = Math.max(5, Math.abs(_aH));
+
+  var ann = {
+    x: _aBX + _aBW / 2 - _aW / 2,
+    y: _aBY + _aBH / 2 - _aH / 2,
+    width: _aW, height: _aH, rotation: resizeOrig.rotation
+  };
   resizeLastAnn = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: ann.rotation };
 
-  console.log('  ann:', ann.x.toFixed(2), ann.y.toFixed(2), ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
+  console.log('  ann bbox:', _aBX.toFixed(2), _aBY.toFixed(2), (_aBX+_aBW).toFixed(2), (_aBY+_aBH).toFixed(2), '| ann wh:', ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
 
   // Compute visual corners from annotation bbox + rotation
   var cx = ann.x + ann.width / 2, cy = ann.y + ann.height / 2;
@@ -513,10 +536,10 @@ function onResizeEnd(e) {
 
   var orig = resizeOrig;
   var ann = resizeLastAnn || orig;
-  var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height), rotation: orig.rotation };
+  var final = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: orig.rotation };
   var cornerIdx = activeCorner;
 
-  console.log('  final ann:', final.x, final.y, final.width, final.height, 'rot:', final.rotation, '| orig ann:', Math.round(orig.x), Math.round(orig.y), Math.round(orig.width), Math.round(orig.height));
+  console.log('  final ann:', final.x.toFixed(2), final.y.toFixed(2), final.width.toFixed(2), final.height.toFixed(2), 'rot:', final.rotation, '| orig ann:', orig.x.toFixed(1), orig.y.toFixed(1), orig.width.toFixed(1), orig.height.toFixed(1));
 
   // Show original annotation rect
   var groupEl = document.getElementById(id);
