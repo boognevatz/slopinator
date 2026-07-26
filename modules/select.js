@@ -327,15 +327,21 @@ function syncLineToolbarFromSelection(el) {
   setActiveLineMarkerSize(size);
 }
 
+function onDocPointerDownCapture(e) {
+  console.log('> DOC capture pointerdown:', e.target.tagName, e.target.getAttribute('class'));
+}
+
 export function activateSelect() {
   dom.svg.style.cursor = 'default';
   dom.svg.addEventListener('pointerdown', onMouseDown);
+  document.addEventListener('pointerdown', onDocPointerDownCapture, { capture: true });
   document.addEventListener('keydown', onKeyDown);
 }
 
 export function deactivateSelect() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
+  document.removeEventListener('pointerdown', onDocPointerDownCapture, { capture: true });
   document.removeEventListener('keydown', onKeyDown);
   if (isPanning) {
     document.removeEventListener('pointermove', onPanMove);
@@ -347,7 +353,7 @@ export function deactivateSelect() {
 }
 
 function onMouseDown(e) {
-  console.log('> onMouseDown target:', e.target.className, e.target.dataset.handle);
+  console.log('> onMouseDown', e.target.tagName, e.target.id, e.target.getAttribute('class'), e.target.dataset.handle, '| clientXY:', e.clientX, e.clientY, '| target:', e.target);
   if (e.button !== 0) return;
   if (isEditing()) return;
 
