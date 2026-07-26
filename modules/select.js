@@ -347,6 +347,7 @@ export function deactivateSelect() {
 }
 
 function onMouseDown(e) {
+  console.log('> onMouseDown target:', e.target.className, e.target.dataset.handle);
   if (e.button !== 0) return;
   if (isEditing()) return;
 
@@ -1565,6 +1566,7 @@ function drawGroupHandles(bbox) {
 }
 
 function startResize(handleEl, startPt, e) {
+  console.log('>>> startResize called', handleEl.dataset.handle, 'isGroup:', isGroupSelection());
   e.preventDefault();
   const handleType = handleEl.dataset.handle;
 
