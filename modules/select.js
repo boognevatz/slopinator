@@ -1,6 +1,6 @@
 // ── Select module: Selection, move, resize, delete ─────────────
 
-import { state, dom, applyImageRotationToPoint, applyInverseImageRotationToPoint } from './editor.js';
+import { state, dom, applyImageRotationToPoint } from './editor.js';
 import { svgEl, screenToCoords } from './utils.js';
 import { captureElementState } from './dom-utils.js';
 import { snapToGrid } from './grid.js';
@@ -1165,10 +1165,10 @@ function drawRectangleHandles(data) {
   handleGroup.appendChild(selBox);
 
   const corners = [
-    { handle: 'tl', x: tc[0].x - hw/2, y: tc[0].y - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
-    { handle: 'tr', x: tc[1].x - hw/2, y: tc[1].y - hh/2, cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'bl', x: tc[3].x - hw/2, y: tc[3].y - hh/2, cursor: isRotate ? 'grab' : 'pointer' },
-    { handle: 'br', x: tc[2].x - hw/2, y: tc[2].y - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tl', x: tbx - hw/2, y: tby - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'tr', x: tbx + tbw - hw/2, y: tby - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'bl', x: tbx - hw/2, y: tby + tbh - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
+    { handle: 'br', x: tbx + tbw - hw/2, y: tby + tbh - hh/2, cursor: isRotate ? 'grab' : 'nwse-resize' },
   ];
 
   for (const c of corners) {
@@ -1645,6 +1645,7 @@ function startResize(handleEl, startPt, e) {
   dragStart = startPt;
   dragOriginal = { ...data };
   dragCurrent = { ...data };
+  console.log('>>> startResize', handleType, data.type);
 
   if (data.type === 'line' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
     const el = dom.annotationLayer.querySelector(`#${CSS.escape(dragCurrent.id)}`);
@@ -1752,41 +1753,29 @@ function startResize(handleEl, startPt, e) {
     if (textInteractMode === 'rotate') {
       dragStart.angle = Math.atan2(startPt.y - rotationCenter.y, startPt.x - rotationCenter.x) * 180 / Math.PI;
     } else if (handleType === 'tl' || handleType === 'br') {
-      const anchorMap = {
-        tl: { x: dragCurrent.x + dragCurrent.width, y: dragCurrent.y + dragCurrent.height },
-        br: { x: dragCurrent.x, y: dragCurrent.y },
-      };
-      resizeAnchor = anchorMap[handleType];
-      const dc = handleType === 'tl'
-        ? { x: dragCurrent.x, y: dragCurrent.y }
-        : { x: dragCurrent.x + dragCurrent.width, y: dragCurrent.y + dragCurrent.height };
-      const dx = dc.x - resizeAnchor.x;
-      const dy = dc.y - resizeAnchor.y;
-      origDiagLen = Math.sqrt(dx * dx + dy * dy);
-      origDiagVec = origDiagLen > 0
-        ? { x: dx / origDiagLen, y: dy / origDiagLen }
-        : { x: 1, y: 1 };
-      // Compute 4 viewBox corners and basis vectors for stationary-corner resize
-      var _cxD = dragCurrent.x + dragCurrent.width / 2;
-      var _cyD = dragCurrent.y + dragCurrent.height / 2;
-      var _hwD = dragCurrent.width / 2, _hhD = dragCurrent.height / 2;
-      var _rRD = (dragCurrent.rotation || 0) * Math.PI / 180;
-      var _cRD = Math.cos(_rRD), _sRD = Math.sin(_rRD);
-      var _rel = [
-        { x: -_hwD, y: -_hhD },
-        { x: _hwD, y: -_hhD },
-        { x: _hwD, y: _hhD },
-        { x: -_hwD, y: _hhD },
+      var _cx = dragCurrent.x + dragCurrent.width / 2;
+      var _cy = dragCurrent.y + dragCurrent.height / 2;
+      var _hw = dragCurrent.width / 2, _hh = dragCurrent.height / 2;
+      var _r = (dragCurrent.rotation || 0) * Math.PI / 180;
+      var _c = Math.cos(_r), _s = Math.sin(_r);
+      var _corners = [
+        { x: _cx + (-_hw * _c + _hh * _s), y: _cy + (-_hw * _s - _hh * _c) },
+        { x: _cx + ( _hw * _c + _hh * _s), y: _cy + ( _hw * _s - _hh * _c) },
+        { x: _cx + ( _hw * _c - _hh * _s), y: _cy + ( _hw * _s + _hh * _c) },
+        { x: _cx + (-_hw * _c - _hh * _s), y: _cy + (-_hw * _s + _hh * _c) },
       ];
-      if (dragCurrent.rotation) {
-        _rel = _rel.map(function(p) { return { x: p.x * _cRD - p.y * _sRD, y: p.x * _sRD + p.y * _cRD }; });
-      }
-      var _annC = _rel.map(function(p) { return { x: _cxD + p.x, y: _cyD + p.y }; });
-      var _tc = _annC.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
-      resizeAnchor._vbCorners = _tc;
-      var _wI = dragCurrent.width, _hI = dragCurrent.height;
-      resizeAnchor._bx = { x: (_tc[1].x - _tc[0].x) / _wI, y: (_tc[1].y - _tc[0].y) / _wI };
-      resizeAnchor._by = { x: (_tc[3].x - _tc[0].x) / _hI, y: (_tc[3].y - _tc[0].y) / _hI };
+      var _minX = Math.min(_corners[0].x, _corners[1].x, _corners[2].x, _corners[3].x);
+      var _maxX = Math.max(_corners[0].x, _corners[1].x, _corners[2].x, _corners[3].x);
+      var _minY = Math.min(_corners[0].y, _corners[1].y, _corners[2].y, _corners[3].y);
+      var _maxY = Math.max(_corners[0].y, _corners[1].y, _corners[2].y, _corners[3].y);
+      resizeAnchor = handleType === 'tl'
+        ? { x: _maxX, y: _maxY }
+        : { x: _minX, y: _minY };
+      resizeAnchor._origW = dragCurrent.width;
+      resizeAnchor._origH = dragCurrent.height;
+      resizeAnchor._absC = Math.abs(_c);
+      resizeAnchor._absS = Math.abs(_s);
+      resizeAnchor._cos2θ = _c * _c - _s * _s;
     } else if (handleType === 'bl' || handleType === 'tr') {
       resizeAnchor = {
         x: handleType === 'bl' ? dragCurrent.x : dragCurrent.x + dragCurrent.width,
@@ -1812,6 +1801,7 @@ function startResize(handleEl, startPt, e) {
 }
 
 function onResizeMove(e) {
+  console.log('>>> onResizeMove', e.movementX, e.movementY);
   if (!isResizing) return;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const data = dragCurrent;
@@ -2040,67 +2030,39 @@ function onResizeMove(e) {
       if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
       showRotationTooltip(e, displayRot);
     } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
-      var _bx = resizeAnchor._bx, _by = resizeAnchor._by;
-      if (!_bx || !_by) return;
+      console.log('>>> entering tl/br block', resizeHandle);
+      var _newMinX = Math.min(resizeAnchor.x, pt.x);
+      var _newMaxX = Math.max(resizeAnchor.x, pt.x);
+      var _newMinY = Math.min(resizeAnchor.y, pt.y);
+      var _newMaxY = Math.max(resizeAnchor.y, pt.y);
+      var _bbW = _newMaxX - _newMinX;
+      var _bbH = _newMaxY - _newMinY;
+      if (_bbW < 0.5 || _bbH < 0.5) return;
 
-      var _anchorIdx = resizeHandle === 'tl' ? 2 : 0;
-      var _dragIdx = resizeHandle === 'tl' ? 0 : 2;
-      var _anchorVb = resizeAnchor._vbCorners[_anchorIdx];
-      var _mouseVb = applyImageRotationToPoint(pt.x, pt.y);
-
-      var _ctrVbX = (_anchorVb.x + _mouseVb.x) / 2;
-      var _ctrVbY = (_anchorVb.y + _mouseVb.y) / 2;
-      var _vx = _mouseVb.x - _ctrVbX;
-      var _vy = _mouseVb.y - _ctrVbY;
-
-      var _projX = _vx * _bx.x + _vy * _bx.y;
-      var _projY = _vx * _by.x + _vy * _by.y;
-      if (isNaN(_projX) || isNaN(_projY)) return;
-
-      console.log('> resize', resizeHandle, '| mouse(ann)', Math.round(pt.x), Math.round(pt.y), '(vb)', Math.round(_mouseVb.x), Math.round(_mouseVb.y), '| anchor(vb)', Math.round(_anchorVb.x), Math.round(_anchorVb.y));
-
+      var _absC = resizeAnchor._absC, _absS = resizeAnchor._absS;
+      var _cos2θ = resizeAnchor._cos2θ;
       var _newW, _newH;
-      if (resizeHandle === 'tl') {
-        _newW = Math.max(5, Math.abs(-2 * _projX));
-        _newH = Math.max(5, Math.abs(-2 * _projY));
+
+      if (Math.abs(_cos2θ) < 0.01) {
+        var _s = Math.sqrt(_bbW * _bbW + _bbH * _bbH) / Math.sqrt(resizeAnchor._origW * resizeAnchor._origW + resizeAnchor._origH * resizeAnchor._origH);
+        _newW = resizeAnchor._origW * _s;
+        _newH = resizeAnchor._origH * _s;
       } else {
-        _newW = Math.max(5, Math.abs(2 * _projX));
-        _newH = Math.max(5, Math.abs(2 * _projY));
+        _newW = (_bbW * _absC - _bbH * _absS) / _cos2θ;
+        _newH = (_bbH * _absC - _bbW * _absS) / _cos2θ;
       }
 
-      var _halfW = _newW / 2, _halfH = _newH / 2;
-      var _vbCorners = [
-        { x: _ctrVbX - _halfW * _bx.x - _halfH * _by.x, y: _ctrVbY - _halfW * _bx.y - _halfH * _by.y },
-        { x: _ctrVbX + _halfW * _bx.x - _halfH * _by.x, y: _ctrVbY + _halfW * _bx.y - _halfH * _by.y },
-        { x: _ctrVbX + _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY + _halfW * _bx.y + _halfH * _by.y },
-        { x: _ctrVbX - _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY - _halfW * _bx.y + _halfH * _by.y },
-      ];
+      if (isNaN(_newW) || isNaN(_newH)) return;
 
-      var _driftX = _vbCorners[_anchorIdx].x - _anchorVb.x;
-      var _driftY = _vbCorners[_anchorIdx].y - _anchorVb.y;
-      console.log('> proj', _projX.toFixed(2), _projY.toFixed(2), '| wh', Math.round(_newW), Math.round(_newH), '| drift(vb)', _driftX.toFixed(2), _driftY.toFixed(2));
-      console.log('> vbCorners  TL', Math.round(_vbCorners[0].x), Math.round(_vbCorners[0].y), 'TR', Math.round(_vbCorners[1].x), Math.round(_vbCorners[1].y), 'BR', Math.round(_vbCorners[2].x), Math.round(_vbCorners[2].y), 'BL', Math.round(_vbCorners[3].x), Math.round(_vbCorners[3].y));
+      data.width = Math.max(5, Math.round(Math.abs(_newW)));
+      data.height = Math.max(5, Math.round(Math.abs(_newH)));
 
-      var _annCorners = _vbCorners.map(function(c) { return applyInverseImageRotationToPoint(c.x, c.y); });
-      var _eRotRad = (data.rotation || 0) * Math.PI / 180;
-      var _cE = Math.cos(_eRotRad), _sE = Math.sin(_eRotRad);
-      var _ctrAnnX = (_annCorners[_anchorIdx].x + _annCorners[_dragIdx].x) / 2;
-      var _ctrAnnY = (_annCorners[_anchorIdx].y + _annCorners[_dragIdx].y) / 2;
-      var _annTL = _annCorners[0];
-      var _dxTL = _annTL.x - _ctrAnnX, _dyTL = _annTL.y - _ctrAnnY;
-      var _localTLX = _ctrAnnX + _dxTL * _cE + _dyTL * _sE;
-      var _localTLY = _ctrAnnY - _dxTL * _sE + _dyTL * _cE;
-      var _annBR = _annCorners[2];
-      var _dxBR = _annBR.x - _ctrAnnX, _dyBR = _annBR.y - _ctrAnnY;
-      var _localBRX = _ctrAnnX + _dxBR * _cE + _dyBR * _sE;
-      var _localBRY = _ctrAnnY - _dxBR * _sE + _dyBR * _cE;
+      var _cx = (_newMinX + _newMaxX) / 2;
+      var _cy = (_newMinY + _newMaxY) / 2;
+      data.x = Math.round(_cx - data.width / 2);
+      data.y = Math.round(_cy - data.height / 2);
 
-      if (isNaN(_localTLX) || isNaN(_localTLY) || isNaN(_localBRX) || isNaN(_localBRY)) return;
-
-      data.x = Math.round(Math.min(_localTLX, _localBRX));
-      data.y = Math.round(Math.min(_localTLY, _localBRY));
-      data.width = Math.max(5, Math.round(Math.abs(_localBRX - _localTLX)));
-      data.height = Math.max(5, Math.round(Math.abs(_localBRY - _localTLY)));
+      console.log('> tl/br', resizeHandle, '| mouse(ann)', Math.round(pt.x), Math.round(pt.y), '| bbox', Math.round(_newMinX), Math.round(_newMinY), Math.round(_newMaxX), Math.round(_newMaxY), '| wh', data.width, data.height);
 
       const maxRx = Math.min(data.width, data.height) / 2;
       if (data.rx > maxRx) {
