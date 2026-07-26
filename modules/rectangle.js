@@ -27,11 +27,16 @@ var resizeLastAnn = null;
 
 export function initRectangle() {}
 
+function onRectDocPointerDownCapture(e) {
+  console.log('> rect DOC capture pointerdown:', e.target.tagName, e.target.getAttribute('class'), e.target.dataset.handle || '');
+}
+
 export function activateRectangle(preSelectId) {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onMouseDown);
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('palette-bgcolor-changed', onPaletteBgChange);
+  document.addEventListener('pointerdown', onRectDocPointerDownCapture, { capture: true });
   var targetId = preSelectId || state.selectedId;
   if (targetId) {
     if (preSelectId) { selectElement(preSelectId); dom.handleLayer.innerHTML = ''; }
@@ -47,6 +52,7 @@ export function deactivateRectangle() {
   dom.svg.removeEventListener('pointerdown', onMouseDown);
   document.removeEventListener('keydown', onKeyDown);
   document.removeEventListener('palette-bgcolor-changed', onPaletteBgChange);
+  document.removeEventListener('pointerdown', onRectDocPointerDownCapture, { capture: true });
   dom.handleLayer.innerHTML = '';
   cancelDraw();
   cancelResizeMove();
@@ -161,6 +167,7 @@ function onKeyDown(e) {
 }
 
 function onMouseDown(e) {
+  console.log('> rect onMouseDown', e.target.tagName, e.target.getAttribute('class'), '| clientXY:', e.clientX, e.clientY);
   if (e.button !== 0) return;
   if (!state.hasImage) return;
 
@@ -335,6 +342,7 @@ function onMouseUp(e) {
 }
 
 function startHandleDrag(idx, pt) {
+  console.log('> startHandleDrag corner:', idx, CORNERS[idx], '| ann:', Math.round(pt.x), Math.round(pt.y));
   if (isResizing || isPreparingDrag) return;
   activeCorner = idx;
   dragCornerIdx = idx;
@@ -372,9 +380,12 @@ function onDragCancel(e) {
 }
 
 function startResizeRect(idx, vbPt) {
+  console.log('> startResizeRect idx:', idx, CORNERS[idx], '| mouse vb:', Math.round(vbPt.x), Math.round(vbPt.y));
   activeCorner = idx;
   var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
+
+  console.log('  orig ann:', data.x.toFixed(1), data.y.toFixed(1), data.width.toFixed(1), data.height.toFixed(1), 'rot:', data.rotation, 'id:', data.id);
 
   var groupEl = document.getElementById(data.id);
   if (groupEl) groupEl.style.visibility = 'hidden';
@@ -405,6 +416,9 @@ function startResizeRect(idx, vbPt) {
   var vbW = Math.max.apply(null, xs) - vbX;
   var vbH = Math.max.apply(null, ys) - vbY;
 
+  console.log('  vbCorners:', vbCorners.map(function(c) { return Math.round(c.x)+','+Math.round(c.y); }).join(' '));
+  console.log('  vbBbox:', Math.round(vbX), Math.round(vbY), Math.round(vbX+vbW), Math.round(vbY+vbH));
+
   // Create rect drag group on handleLayer
   rectDrag = svgEl('g', { id: 'rect-drag' });
   dom.handleLayer.appendChild(rectDrag);
@@ -423,12 +437,15 @@ function startResizeRect(idx, vbPt) {
   resizeStart = { x: vbPt.x, y: vbPt.y };
   resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
+  console.log('  anchor vb:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, 'anchorIdx:', anchorIdx);
+
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
   document.addEventListener('pointerup', onResizeEnd);
 }
 
 function onResizeMove(e) {
+  console.log('>>> rect onResizeMove', e.movementX, e.movementY);
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   var vbPt = applyImageRotationToPoint(pt.x, pt.y);
@@ -444,10 +461,14 @@ function onResizeMove(e) {
   if (nw < 5) nw = 5;
   if (nh < 5) nh = 5;
 
+  console.log('  mouse vb:', Math.round(vbPt.x), Math.round(vbPt.y), '| bbox vb:', Math.round(nx), Math.round(ny), Math.round(nx+nw), Math.round(ny+nh), '| dims vb:', Math.round(nw), Math.round(nh));
+
   // Update rectDrag on handleLayer
   var ann = vbRectToAnnotation(nx, ny, nw, nh);
   ann.rotation = resizeOrig.rotation;
   resizeLastAnn = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: ann.rotation };
+
+  console.log('  ann:', ann.x.toFixed(2), ann.y.toFixed(2), ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
 
   // Compute visual corners from annotation bbox + rotation
   var cx = ann.x + ann.width / 2, cy = ann.y + ann.height / 2;
@@ -476,6 +497,7 @@ function onResizeMove(e) {
 }
 
 function onResizeEnd(e) {
+  console.log('>>> rect onResizeEnd');
   document.removeEventListener('pointermove', onResizeMove);
   document.removeEventListener('pointerup', onResizeEnd);
   if (!isResizing) return;
@@ -493,6 +515,8 @@ function onResizeEnd(e) {
   var ann = resizeLastAnn || orig;
   var final = { x: Math.round(ann.x), y: Math.round(ann.y), width: Math.round(ann.width), height: Math.round(ann.height), rotation: orig.rotation };
   var cornerIdx = activeCorner;
+
+  console.log('  final ann:', final.x, final.y, final.width, final.height, 'rot:', final.rotation, '| orig ann:', Math.round(orig.x), Math.round(orig.y), Math.round(orig.width), Math.round(orig.height));
 
   // Show original annotation rect
   var groupEl = document.getElementById(id);
