@@ -327,21 +327,15 @@ function syncLineToolbarFromSelection(el) {
   setActiveLineMarkerSize(size);
 }
 
-function onDocPointerDownCapture(e) {
-  console.log('> DOC capture pointerdown:', e.target.tagName, e.target.getAttribute('class'));
-}
-
 export function activateSelect() {
   dom.svg.style.cursor = 'default';
   dom.svg.addEventListener('pointerdown', onMouseDown);
-  document.addEventListener('pointerdown', onDocPointerDownCapture, { capture: true });
   document.addEventListener('keydown', onKeyDown);
 }
 
 export function deactivateSelect() {
   dom.svg.style.cursor = '';
   dom.svg.removeEventListener('pointerdown', onMouseDown);
-  document.removeEventListener('pointerdown', onDocPointerDownCapture, { capture: true });
   document.removeEventListener('keydown', onKeyDown);
   if (isPanning) {
     document.removeEventListener('pointermove', onPanMove);
@@ -353,7 +347,6 @@ export function deactivateSelect() {
 }
 
 function onMouseDown(e) {
-  console.log('> onMouseDown', e.target.tagName, e.target.id, e.target.getAttribute('class'), e.target.dataset.handle, '| clientXY:', e.clientX, e.clientY, '| target:', e.target);
   if (e.button !== 0) return;
   if (isEditing()) return;
 
@@ -1155,7 +1148,6 @@ function drawRectangleHandles(data) {
 
   // Transform to viewBox-space (applies image rotation)
   var tc = annCorners.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
-  console.log('> handles drawn  TL', Math.round(tc[0].x), Math.round(tc[0].y), 'TR', Math.round(tc[1].x), Math.round(tc[1].y), 'BR', Math.round(tc[2].x), Math.round(tc[2].y), 'BL', Math.round(tc[3].x), Math.round(tc[3].y));
   var tbx = Math.min(tc[0].x, tc[1].x, tc[2].x, tc[3].x);
   var tby = Math.min(tc[0].y, tc[1].y, tc[2].y, tc[3].y);
   var tbw = Math.max(tc[0].x, tc[1].x, tc[2].x, tc[3].x) - tbx;
@@ -1572,7 +1564,6 @@ function drawGroupHandles(bbox) {
 }
 
 function startResize(handleEl, startPt, e) {
-  console.log('>>> startResize called', handleEl.dataset.handle, 'isGroup:', isGroupSelection());
   e.preventDefault();
   const handleType = handleEl.dataset.handle;
 
@@ -1653,7 +1644,6 @@ function startResize(handleEl, startPt, e) {
   dragStart = startPt;
   dragOriginal = { ...data };
   dragCurrent = { ...data };
-  console.log('>>> startResize', handleType, data.type);
 
   if (data.type === 'line' && ['tl', 'tr', 'bl', 'br'].includes(handleType)) {
     const el = dom.annotationLayer.querySelector(`#${CSS.escape(dragCurrent.id)}`);
@@ -1809,7 +1799,6 @@ function startResize(handleEl, startPt, e) {
 }
 
 function onResizeMove(e) {
-  console.log('>>> onResizeMove', e.movementX, e.movementY);
   if (!isResizing) return;
   const pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   const data = dragCurrent;
@@ -2038,7 +2027,6 @@ function onResizeMove(e) {
       if (_ri) { _applyingRotation = true; _ri.value = displayRot; _applyingRotation = false; }
       showRotationTooltip(e, displayRot);
     } else if (resizeHandle === 'tl' || resizeHandle === 'br') {
-      console.log('>>> entering tl/br block', resizeHandle);
       var _newMinX = Math.min(resizeAnchor.x, pt.x);
       var _newMaxX = Math.max(resizeAnchor.x, pt.x);
       var _newMinY = Math.min(resizeAnchor.y, pt.y);
@@ -2066,8 +2054,6 @@ function onResizeMove(e) {
       data.height = Math.max(5, Math.abs(_newH));
       data.x = (_newMinX + _newMaxX) / 2 - data.width / 2;
       data.y = (_newMinY + _newMaxY) / 2 - data.height / 2;
-
-      console.log('> tl/br', resizeHandle, '| mouse(ann)', Math.round(pt.x), Math.round(pt.y), '| bbox', Math.round(_newMinX), Math.round(_newMinY), Math.round(_newMaxX), Math.round(_newMaxY), '| wh', data.width, data.height);
 
       const maxRx = Math.min(data.width, data.height) / 2;
       if (data.rx > maxRx) {
