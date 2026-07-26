@@ -1148,6 +1148,7 @@ function drawRectangleHandles(data) {
 
   // Transform to viewBox-space (applies image rotation)
   var tc = annCorners.map(function(c) { return applyImageRotationToPoint(c.x, c.y); });
+  console.log('> handles drawn  TL', Math.round(tc[0].x), Math.round(tc[0].y), 'TR', Math.round(tc[1].x), Math.round(tc[1].y), 'BR', Math.round(tc[2].x), Math.round(tc[2].y), 'BL', Math.round(tc[3].x), Math.round(tc[3].y));
   var tbx = Math.min(tc[0].x, tc[1].x, tc[2].x, tc[3].x);
   var tby = Math.min(tc[0].y, tc[1].y, tc[2].y, tc[3].y);
   var tbw = Math.max(tc[0].x, tc[1].x, tc[2].x, tc[3].x) - tbx;
@@ -2056,6 +2057,8 @@ function onResizeMove(e) {
       var _projY = _vx * _by.x + _vy * _by.y;
       if (isNaN(_projX) || isNaN(_projY)) return;
 
+      console.log('> resize', resizeHandle, '| mouse(ann)', Math.round(pt.x), Math.round(pt.y), '(vb)', Math.round(_mouseVb.x), Math.round(_mouseVb.y), '| anchor(vb)', Math.round(_anchorVb.x), Math.round(_anchorVb.y));
+
       var _newW, _newH;
       if (resizeHandle === 'tl') {
         _newW = Math.max(5, Math.abs(-2 * _projX));
@@ -2072,6 +2075,11 @@ function onResizeMove(e) {
         { x: _ctrVbX + _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY + _halfW * _bx.y + _halfH * _by.y },
         { x: _ctrVbX - _halfW * _bx.x + _halfH * _by.x, y: _ctrVbY - _halfW * _bx.y + _halfH * _by.y },
       ];
+
+      var _driftX = _vbCorners[_anchorIdx].x - _anchorVb.x;
+      var _driftY = _vbCorners[_anchorIdx].y - _anchorVb.y;
+      console.log('> proj', _projX.toFixed(2), _projY.toFixed(2), '| wh', Math.round(_newW), Math.round(_newH), '| drift(vb)', _driftX.toFixed(2), _driftY.toFixed(2));
+      console.log('> vbCorners  TL', Math.round(_vbCorners[0].x), Math.round(_vbCorners[0].y), 'TR', Math.round(_vbCorners[1].x), Math.round(_vbCorners[1].y), 'BR', Math.round(_vbCorners[2].x), Math.round(_vbCorners[2].y), 'BL', Math.round(_vbCorners[3].x), Math.round(_vbCorners[3].y));
 
       var _annCorners = _vbCorners.map(function(c) { return applyInverseImageRotationToPoint(c.x, c.y); });
       var _eRotRad = (data.rotation || 0) * Math.PI / 180;
