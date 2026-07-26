@@ -26,16 +26,11 @@ var resizeLastAnn = null;
 
 export function initRectangle() {}
 
-function onRectDocPointerDownCapture(e) {
-  console.log('> rect DOC capture pointerdown:', e.target.tagName, e.target.getAttribute('class'), e.target.dataset.handle || '');
-}
-
 export function activateRectangle(preSelectId) {
   dom.svg.style.cursor = 'crosshair';
   dom.svg.addEventListener('pointerdown', onMouseDown);
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('palette-bgcolor-changed', onPaletteBgChange);
-  document.addEventListener('pointerdown', onRectDocPointerDownCapture, { capture: true });
   var targetId = preSelectId || state.selectedId;
   if (targetId) {
     if (preSelectId) { selectElement(preSelectId); dom.handleLayer.innerHTML = ''; }
@@ -51,7 +46,6 @@ export function deactivateRectangle() {
   dom.svg.removeEventListener('pointerdown', onMouseDown);
   document.removeEventListener('keydown', onKeyDown);
   document.removeEventListener('palette-bgcolor-changed', onPaletteBgChange);
-  document.removeEventListener('pointerdown', onRectDocPointerDownCapture, { capture: true });
   dom.handleLayer.innerHTML = '';
   cancelDraw();
   cancelResizeMove();
@@ -165,7 +159,6 @@ function onKeyDown(e) {
 }
 
 function onMouseDown(e) {
-  console.log('> rect onMouseDown', e.target.tagName, e.target.getAttribute('class'), '| clientXY:', e.clientX, e.clientY);
   if (e.button !== 0) return;
   if (!state.hasImage) return;
 
@@ -340,7 +333,6 @@ function onMouseUp(e) {
 }
 
 function startHandleDrag(idx, pt) {
-  console.log('> startHandleDrag corner:', idx, CORNERS[idx], '| ann:', Math.round(pt.x), Math.round(pt.y));
   if (isResizing || isPreparingDrag) return;
   activeCorner = idx;
   dragCornerIdx = idx;
@@ -378,12 +370,9 @@ function onDragCancel(e) {
 }
 
 function startResizeRect(idx, vbPt) {
-  console.log('> startResizeRect idx:', idx, CORNERS[idx], '| mouse vb:', Math.round(vbPt.x), Math.round(vbPt.y));
   activeCorner = idx;
   var data = captureElementState(state.selectedId);
   if (!data || data.type !== 'rectangle') return;
-
-  console.log('  orig ann:', data.x.toFixed(1), data.y.toFixed(1), data.width.toFixed(1), data.height.toFixed(1), 'rot:', data.rotation, 'id:', data.id);
 
   var groupEl = document.getElementById(data.id);
   if (groupEl) groupEl.style.visibility = 'hidden';
@@ -414,9 +403,6 @@ function startResizeRect(idx, vbPt) {
   var vbW = Math.max.apply(null, xs) - vbX;
   var vbH = Math.max.apply(null, ys) - vbY;
 
-  console.log('  vbCorners:', vbCorners.map(function(c) { return Math.round(c.x)+','+Math.round(c.y); }).join(' '));
-  console.log('  vbBbox:', Math.round(vbX), Math.round(vbY), Math.round(vbX+vbW), Math.round(vbY+vbH));
-
   // Create rect drag group on handleLayer
   rectDrag = svgEl('g', { id: 'rect-drag' });
   dom.handleLayer.appendChild(rectDrag);
@@ -438,15 +424,12 @@ function startResizeRect(idx, vbPt) {
   resizeAnchor._cos = Math.cos(_rad);
   resizeAnchor._sin = Math.sin(_rad);
 
-  console.log('  opposite ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| idx:', idx, 'oppositeIdx:', oppositeIdx, '| rot:', data.rotation);
-
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
   document.addEventListener('pointerup', onResizeEnd);
 }
 
 function onResizeMove(e) {
-  console.log('>>> rect onResizeMove', e.movementX, e.movementY);
   if (!isResizing) return;
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   if (!state.selectedId || !rectDrag) return;
@@ -465,8 +448,6 @@ function onResizeMove(e) {
     width: _aW, height: _aH, rotation: resizeOrig.rotation
   };
   resizeLastAnn = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: ann.rotation };
-
-  console.log('  mouse ann:', Math.round(pt.x), Math.round(pt.y), '| opposite ann:', Math.round(ax), Math.round(ay), '| ann wh:', ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
 
   // Compute visual corners from annotation data
   var cx2 = ann.x + ann.width / 2, cy2 = ann.y + ann.height / 2;
@@ -495,7 +476,6 @@ function onResizeMove(e) {
 }
 
 function onResizeEnd(e) {
-  console.log('>>> rect onResizeEnd');
   document.removeEventListener('pointermove', onResizeMove);
   document.removeEventListener('pointerup', onResizeEnd);
   if (!isResizing) return;
@@ -513,8 +493,6 @@ function onResizeEnd(e) {
   var ann = resizeLastAnn || orig;
   var final = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: orig.rotation };
   var cornerIdx = activeCorner;
-
-  console.log('  final ann:', final.x.toFixed(2), final.y.toFixed(2), final.width.toFixed(2), final.height.toFixed(2), 'rot:', final.rotation, '| orig ann:', orig.x.toFixed(1), orig.y.toFixed(1), orig.width.toFixed(1), orig.height.toFixed(1));
 
   // Show original annotation rect
   var groupEl = document.getElementById(id);
