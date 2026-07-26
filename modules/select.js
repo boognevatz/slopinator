@@ -2062,13 +2062,10 @@ function onResizeMove(e) {
 
       if (isNaN(_newW) || isNaN(_newH)) return;
 
-      data.width = Math.max(5, Math.round(Math.abs(_newW)));
-      data.height = Math.max(5, Math.round(Math.abs(_newH)));
-
-      var _cx = (_newMinX + _newMaxX) / 2;
-      var _cy = (_newMinY + _newMaxY) / 2;
-      data.x = Math.round(_cx - data.width / 2);
-      data.y = Math.round(_cy - data.height / 2);
+      data.width = Math.max(5, Math.abs(_newW));
+      data.height = Math.max(5, Math.abs(_newH));
+      data.x = (_newMinX + _newMaxX) / 2 - data.width / 2;
+      data.y = (_newMinY + _newMaxY) / 2 - data.height / 2;
 
       console.log('> tl/br', resizeHandle, '| mouse(ann)', Math.round(pt.x), Math.round(pt.y), '| bbox', Math.round(_newMinX), Math.round(_newMinY), Math.round(_newMaxX), Math.round(_newMaxY), '| wh', data.width, data.height);
 
