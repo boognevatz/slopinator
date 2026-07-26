@@ -13,7 +13,6 @@ let activeCorner = -1;
 let isResizing = false;
 let isMoving = false;
 let resizeAnchor = null;
-let resizeStart = null;
 let resizeOrig = null;
 let moveStart = null;
 let moveOrig = null;
@@ -77,7 +76,6 @@ function cancelResizeMove() {
   isResizing = false;
   isMoving = false;
   resizeAnchor = null;
-  resizeStart = null;
   resizeOrig = null;
   resizeLastAnn = null;
   moveStart = null;
@@ -432,29 +430,15 @@ function startResizeRect(idx, vbPt) {
   });
   rectDrag.appendChild(vPoly);
 
-  var annMaxX = Math.max(pts[0].x, pts[1].x, pts[2].x, pts[3].x);
-  var annMinX = Math.min(pts[0].x, pts[1].x, pts[2].x, pts[3].x);
-  var annMaxY = Math.max(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
-  var annMinY = Math.min(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
-  var annBboxAnchors = [
-    { x: annMaxX, y: annMaxY },
-    { x: annMinX, y: annMaxY },
-    { x: annMinX, y: annMinY },
-    { x: annMaxX, y: annMinY },
-  ];
-  resizeAnchor = annBboxAnchors[idx];
-  resizeStart = { x: vbPt.x, y: vbPt.y };
+  var oppositeIdx = (idx + 2) % 4;
+  resizeAnchor = { x: pts[oppositeIdx].x, y: pts[oppositeIdx].y };
   resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
   var _rad = (data.rotation || 0) * Math.PI / 180;
-  var _c = Math.cos(_rad), _s = Math.sin(_rad);
-  resizeAnchor._absC = Math.abs(_c);
-  resizeAnchor._absS = Math.abs(_s);
-  resizeAnchor._cos2θ = _c * _c - _s * _s;
-  resizeAnchor._origW = data.width;
-  resizeAnchor._origH = data.height;
+  resizeAnchor._cos = Math.cos(_rad);
+  resizeAnchor._sin = Math.sin(_rad);
 
-  console.log('  anchor ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, '| rot:', data.rotation, 'absC:', resizeAnchor._absC.toFixed(4), 'absS:', resizeAnchor._absS.toFixed(4));
+  console.log('  opposite ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| idx:', idx, 'oppositeIdx:', oppositeIdx, '| rot:', data.rotation);
 
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
@@ -467,43 +451,25 @@ function onResizeMove(e) {
   var pt = screenToCoords(dom.svg, dom.annotationLayer, e.clientX, e.clientY);
   if (!state.selectedId || !rectDrag) return;
 
-  var ax = resizeAnchor.x;
-  var ay = resizeAnchor.y;
-  var _aBX = Math.min(ax, pt.x);
-  var _aBY = Math.min(ay, pt.y);
-  var _aBW = Math.abs(pt.x - ax);
-  var _aBH = Math.abs(pt.y - ay);
+  var ax = resizeAnchor.x, ay = resizeAnchor.y;
+  var _cos = resizeAnchor._cos, _sin = resizeAnchor._sin;
 
-  if (_aBW < 5) _aBW = 5;
-  if (_aBH < 5) _aBH = 5;
+  var dx = pt.x - ax;
+  var dy = pt.y - ay;
+  var _aW = Math.max(5, Math.abs(dx * _cos + dy * _sin));
+  var _aH = Math.max(5, Math.abs(dx * (-_sin) + dy * _cos));
 
-  console.log('  mouse ann:', Math.round(pt.x), Math.round(pt.y), '| bbox ann:', Math.round(_aBX), Math.round(_aBY), Math.round(_aBX+_aBW), Math.round(_aBY+_aBH), '| dims ann:', Math.round(_aBW), Math.round(_aBH));
-
-  // Solve for annotation rect dimensions from bbox + element rotation
-  var _absC = resizeAnchor._absC, _absS = resizeAnchor._absS, _cos2θ = resizeAnchor._cos2θ;
-  var _aW, _aH;
-  if (Math.abs(_cos2θ) < 0.01) {
-    var _s = Math.sqrt(_aBW * _aBW + _aBH * _aBH) / Math.sqrt(resizeAnchor._origW * resizeAnchor._origW + resizeAnchor._origH * resizeAnchor._origH);
-    _aW = resizeAnchor._origW * _s;
-    _aH = resizeAnchor._origH * _s;
-  } else {
-    _aW = (_aBW * _absC - _aBH * _absS) / _cos2θ;
-    _aH = (_aBH * _absC - _aBW * _absS) / _cos2θ;
-  }
-  _aW = Math.max(5, Math.abs(_aW));
-  _aH = Math.max(5, Math.abs(_aH));
-
+  var cx = (pt.x + ax) / 2, cy = (pt.y + ay) / 2;
   var ann = {
-    x: _aBX + _aBW / 2 - _aW / 2,
-    y: _aBY + _aBH / 2 - _aH / 2,
+    x: cx - _aW / 2, y: cy - _aH / 2,
     width: _aW, height: _aH, rotation: resizeOrig.rotation
   };
   resizeLastAnn = { x: ann.x, y: ann.y, width: ann.width, height: ann.height, rotation: ann.rotation };
 
-  console.log('  ann bbox:', _aBX.toFixed(2), _aBY.toFixed(2), (_aBX+_aBW).toFixed(2), (_aBY+_aBH).toFixed(2), '| ann wh:', ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
+  console.log('  mouse ann:', Math.round(pt.x), Math.round(pt.y), '| opposite ann:', Math.round(ax), Math.round(ay), '| ann wh:', ann.width.toFixed(2), ann.height.toFixed(2), 'rot:', ann.rotation);
 
-  // Compute visual corners from annotation bbox + rotation
-  var cx = ann.x + ann.width / 2, cy = ann.y + ann.height / 2;
+  // Compute visual corners from annotation data
+  var cx2 = ann.x + ann.width / 2, cy2 = ann.y + ann.height / 2;
   var halfW = ann.width / 2, halfH = ann.height / 2;
   var relPts = [
     { x: -halfW, y: -halfH },
@@ -519,7 +485,7 @@ function onResizeMove(e) {
     });
   }
   var vbPts = relPts.map(function(p) {
-    var tp = applyImageRotationToPoint(cx + p.x, cy + p.y);
+    var tp = applyImageRotationToPoint(cx2 + p.x, cy2 + p.y);
     return tp.x + ',' + tp.y;
   });
   var poly = rectDrag.querySelector('polygon');
