@@ -432,8 +432,17 @@ function startResizeRect(idx, vbPt) {
   });
   rectDrag.appendChild(vPoly);
 
-  var anchorIdx = (idx + 2) % 4;
-  resizeAnchor = { x: pts[anchorIdx].x, y: pts[anchorIdx].y };
+  var annMaxX = Math.max(pts[0].x, pts[1].x, pts[2].x, pts[3].x);
+  var annMinX = Math.min(pts[0].x, pts[1].x, pts[2].x, pts[3].x);
+  var annMaxY = Math.max(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
+  var annMinY = Math.min(pts[0].y, pts[1].y, pts[2].y, pts[3].y);
+  var annBboxAnchors = [
+    { x: annMaxX, y: annMaxY },
+    { x: annMinX, y: annMaxY },
+    { x: annMinX, y: annMinY },
+    { x: annMaxX, y: annMinY },
+  ];
+  resizeAnchor = annBboxAnchors[idx];
   resizeStart = { x: vbPt.x, y: vbPt.y };
   resizeOrig = { x: data.x, y: data.y, width: data.width, height: data.height, rx: data.rx, rotation: data.rotation, fill: data.fill, stroke: data.stroke, strokeWidth: data.strokeWidth };
 
@@ -445,7 +454,7 @@ function startResizeRect(idx, vbPt) {
   resizeAnchor._origW = data.width;
   resizeAnchor._origH = data.height;
 
-  console.log('  anchor ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, 'anchorIdx:', anchorIdx, '| rot:', data.rotation, 'absC:', resizeAnchor._absC.toFixed(4), 'absS:', resizeAnchor._absS.toFixed(4));
+  console.log('  anchor ann:', Math.round(resizeAnchor.x), Math.round(resizeAnchor.y), '| cornerIdx:', idx, '| rot:', data.rotation, 'absC:', resizeAnchor._absC.toFixed(4), 'absS:', resizeAnchor._absS.toFixed(4));
 
   isResizing = true;
   document.addEventListener('pointermove', onResizeMove);
